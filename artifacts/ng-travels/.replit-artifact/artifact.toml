@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "NG Travels"
+description = "A production-ready travel operations system for owners and drivers to manage customers, trips, fares, payments, expenses, reports, and trip execution from one responsive workspace."
+version = "1.0.0"
+id = "artifacts/ng-travels"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20884
+
+[services.development]
+run = "pnpm --filter @workspace/ng-travels run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ng-travels", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ng-travels/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20884"
+BASE_PATH = "/"
