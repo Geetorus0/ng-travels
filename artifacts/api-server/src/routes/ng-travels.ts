@@ -260,13 +260,13 @@ router.get("/dashboard", requireOwner, async (req, res): Promise<void> => {
   const metrics = {
     todaysTrips: todayTrips.length,
     upcomingTrips: todayTrips.filter((trip) =>
-      ["Upcoming", "Confirmed", "Ready"].includes(trip.status),
+       ["upcoming", "confirmed", "ready"].includes(trip.status),
     ).length,
-    started: todayTrips.filter((trip) => trip.status === "Started").length,
+    started: todayTrips.filter((trip) => trip.status === "started").length,
     inProgress: todayTrips.filter((trip) =>
-      ["Reached Pickup", "Customer Picked Up", "In Progress"].includes(trip.status),
+      ["reached_pickup", "customer_picked_up", "in_progress"].includes(trip.status),
     ).length,
-    completedToday: todayTrips.filter((trip) => trip.status === "Completed").length,
+    completedToday: todayTrips.filter((trip) => trip.status === "completed").length,
     paymentPending: allTrips.filter((trip) => numeric(trip.remainingBalance) > 0).length,
     todaysCollection: Math.round(
       todayTrips.reduce((sum, trip) => sum + numeric(trip.totalPaid), 0) * 100,
@@ -529,7 +529,7 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
         passengerCount: data.passengerCount,
         notes: data.notes ?? null,
         specialInstructions: data.specialInstructions ?? null,
-        status: "Upcoming",
+        status: "upcoming",
         mapDistanceKm: String(data.mapDistanceKm ?? 0),
         routeDurationMinutes: data.routeDurationMinutes ?? null,
         routeSummary: data.routeSummary ?? null,
@@ -559,7 +559,7 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
     }
     await tx.insert(tripStatusHistoryTable).values({
       tripId: trip.id,
-      status: "Upcoming",
+      status: "upcoming",
       changedBy: "owner",
     });
     return updatedTrip;
@@ -678,7 +678,10 @@ router.post("/trips/:id/status", async (req, res): Promise<void> => {
   }
   const [updated] = await db
     .update(tripsTable)
-    .set({ status: body.data.status, updatedAt: new Date() })
+    .set({
+      status: body.data.status.toLowerCase().replaceAll(" ", "_"),
+      updatedAt: new Date(),
+    })
     .where(eq(tripsTable.id, params.data.id))
     .returning();
   const viewer = await viewerFor(req);
@@ -689,7 +692,7 @@ router.post("/trips/:id/status", async (req, res): Promise<void> => {
     changedBy: viewer?.name ?? "driver",
   });
   await notify(
-    `Trip ${updated.status}`,
+    `Trip ${updated.status.replaceAll("_", " ")}`,
     `${updated.bookingId} moved to ${updated.status}`,
     "trip_status",
     updated.id,
@@ -927,8 +930,8 @@ router.get("/reports/summary", requireOwner, async (req, res): Promise<void> => 
     from: new Date(`${from}T00:00:00Z`),
     to: new Date(`${to}T00:00:00Z`),
     totalTrips: rows.length,
-    completed: rows.filter((trip) => trip.status === "Completed").length,
-    cancelled: rows.filter((trip) => trip.status === "Cancelled").length,
+    completed: rows.filter((trip) => trip.status === "completed").length,
+    cancelled: rows.filter((trip) => trip.status === "cancelled").length,
     billingKm: rows.reduce((sum, trip) => sum + trip.billingKm, 0),
     grossFare: revenue,
     toll: rows.reduce((sum, trip) => sum + trip.toll, 0),

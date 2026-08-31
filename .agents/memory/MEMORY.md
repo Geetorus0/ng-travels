@@ -1,0 +1,1 @@
+- [Stack compatibility](stack-compatibility.md) — keep generated Zod validators and Clerk React on their supported major/patch lines.

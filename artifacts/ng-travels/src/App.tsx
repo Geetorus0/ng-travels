@@ -1,5 +1,8 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
 import {
   Archive, ArrowLeft, ArrowUpRight, BarChart3, Bell, CalendarDays,
   Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, Clock3,
@@ -22,9 +25,70 @@ import type { Customer, CustomerInput, ExpenseInput, PaymentInput, TripInput, Tr
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
+import { Redirect, Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
 
 const queryClient = new QueryClient();
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || '/'
+    : path;
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#287d70',
+    colorForeground: '#18353a',
+    colorMutedForeground: '#637477',
+    colorDanger: '#bd453e',
+    colorBackground: '#fbfaf7',
+    colorInput: '#f4f0e8',
+    colorInputForeground: '#18353a',
+    colorNeutral: '#dcd5c9',
+    fontFamily: 'Manrope, sans-serif',
+    borderRadius: '0.85rem',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#fbfaf7] rounded-2xl w-[440px] max-w-full overflow-hidden',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'text-[#18353a] font-extrabold',
+    headerSubtitle: 'text-[#637477]',
+    socialButtonsBlockButtonText: 'text-[#18353a] font-bold',
+    formFieldLabel: 'text-[#18353a] font-bold',
+    footerActionLink: 'text-[#287d70] font-bold',
+    footerActionText: 'text-[#637477]',
+    dividerText: 'text-[#637477]',
+    identityPreviewEditButton: 'text-[#287d70]',
+    formFieldSuccessText: 'text-[#287d70]',
+    alertText: 'text-[#bd453e]',
+    logoBox: 'rounded-xl',
+    logoImage: 'rounded-xl',
+    socialButtonsBlockButton: 'border-[#dcd5c9] bg-[#f4f0e8] hover:bg-[#ebe5da]',
+    formButtonPrimary: 'bg-[#287d70] hover:bg-[#236c61] text-white font-bold',
+    formFieldInput: 'border-[#dcd5c9] bg-[#f4f0e8] text-[#18353a]',
+    footerAction: 'bg-transparent',
+    dividerLine: 'bg-[#dcd5c9]',
+    alert: 'border-[#bd453e]/30 bg-[#bd453e]/10',
+    otpCodeFieldInput: 'border-[#dcd5c9] bg-[#f4f0e8]',
+    formFieldRow: 'mb-4',
+    main: 'bg-transparent',
+  },
+};
 
 const money = (value?: number | null) => `₹${Math.round(value ?? 0).toLocaleString('en-IN')}`;
 const dateLabel = (value?: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -71,6 +135,8 @@ function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const { signOut } = useClerk();
+  const { user } = useUser();
   const unreadQuery = useListNotifications({ query: { queryKey: getListNotificationsQueryKey() } });
   const unread = (unreadQuery.data ?? []).filter((item) => !item.isRead).length;
   const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2600); };
@@ -78,9 +144,9 @@ function Shell({ children }: { children: ReactNode }) {
   return <div className="noise flex min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[250px] -translate-x-full flex-col bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:relative md:translate-x-0 ${mobileOpen ? 'translate-x-0' : ''}`}>
       <div className="mb-8 flex items-center justify-between px-2"><Link href="/dashboard" data-testid="link-brand" className="focus-ring flex items-center gap-2.5 rounded-lg"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span><span className="block text-sm font-extrabold tracking-tight">NG Travels</span><span className="eyebrow mt-1 block text-sidebar-foreground/55">Operations desk</span></span></Link><button data-testid="button-close-sidebar" onClick={() => setMobileOpen(false)} className="text-sidebar-foreground/60 md:hidden"><X size={18} /></button></div>
-      <div className="mb-7 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-foreground">AR</span><div><p className="text-xs font-bold">Arjun Rao</p><p className="mt-0.5 text-[10px] text-sidebar-foreground/55">Owner account</p></div><ChevronDown className="ml-auto text-sidebar-foreground/55" size={14} /></div></div>
+      <div className="mb-7 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-foreground">{initials(user?.fullName ?? user?.primaryEmailAddress?.emailAddress)}</span><div><p className="truncate text-xs font-bold">{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Workspace user'}</p><p className="mt-0.5 text-[10px] text-sidebar-foreground/55">Authenticated account</p></div><ChevronDown className="ml-auto text-sidebar-foreground/55" size={14} /></div></div>
       <nav className="flex-1 space-y-6">{navGroups.map((group) => <div key={group.label}><p className="eyebrow mb-2 px-3 text-sidebar-foreground/45">{group.label}</p><div className="space-y-1">{group.links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} data-testid={`link-nav-${label.toLowerCase().replace(' ', '-')}`} onClick={() => setMobileOpen(false)} className={`focus-ring flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${location === href || (href !== '/dashboard' && location.startsWith(href)) ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === 'Notifications' && unread > 0 && <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-foreground">{unread}</span>}</Link>)}</div></div>)}</nav>
-      <div className="border-t border-sidebar-border pt-4"><Link href="/sign-in" data-testid="link-sign-out" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"><LogOut size={17} />Sign out</Link></div>
+       <div className="border-t border-sidebar-border pt-4"><button onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"><LogOut size={17} />Sign out</button></div>
     </aside>
     {mobileOpen && <button aria-label="Close navigation" data-testid="button-mobile-backdrop" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-sidebar/40 md:hidden" />}
     <main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b bg-background/90 px-5 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button data-testid="button-open-sidebar" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="eyebrow hidden sm:block">{location === '/dashboard' || location === '/' ? 'Today’s command centre' : 'NG Travels'}</p><p className="text-sm font-extrabold capitalize">{location.split('/')[1]?.replace('-', ' ') || 'Dashboard'}</p></div></div><div className="flex items-center gap-2"><Link href="/notifications" data-testid="link-header-notifications" className="focus-ring relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Bell size={18} />{unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />}</Link><div className="hidden h-7 w-px bg-border sm:block" /><button onClick={() => flash('Workspace is up to date')} data-testid="button-status-check" className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted sm:flex"><span className="h-2 w-2 rounded-full bg-primary" />All systems go</button></div></header><div className="mx-auto max-w-[1440px] px-5 py-7 md:px-8 lg:px-10"><div key={location} className="page-in">{children}</div></div></main>
@@ -174,12 +240,43 @@ function SettingsPage() { const [saved, setSaved] = useState(false); const [form
 function DriverHome() { const trips = useListTrips({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }, { query: { queryKey: getListTripsQueryKey({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }) } }); return <div className="mx-auto max-w-xl"><div className="mb-7 flex items-center justify-between"><Link href="/dashboard" data-testid="link-driver-brand" className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span className="text-sm font-extrabold">NG Travels</span></Link><span className="rounded-full bg-primary/10 px-3 py-1.5 text-[10px] font-extrabold text-primary">Driver view</span></div><div className="rounded-2xl bg-sidebar p-6 text-sidebar-foreground"><p className="eyebrow text-sidebar-foreground/55">Today · {dateLabel(new Date().toISOString().slice(0, 10))}</p><h1 className="mt-3 text-3xl font-extrabold">Your runs, at a glance.</h1><p className="mt-2 text-sm text-sidebar-foreground/65">Stay focused on the next pickup.</p><div className="mt-7 flex items-center gap-7"><div><p className="text-3xl font-extrabold text-accent">{trips.data?.items.length ?? 0}</p><p className="mt-1 text-xs text-sidebar-foreground/60">assigned today</p></div><div className="h-10 w-px bg-sidebar-border" /><div><p className="text-3xl font-extrabold">{(trips.data?.items ?? []).filter((trip) => trip.status === 'completed').length}</p><p className="mt-1 text-xs text-sidebar-foreground/60">completed</p></div></div></div><div className="mt-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-extrabold">Next on your route</h2><Link href="/driver/trips" className="text-xs font-bold text-primary">All trips</Link></div>{trips.isLoading ? <LoadingState /> : (trips.data?.items ?? []).length ? <div className="space-y-3">{trips.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`card-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex items-center justify-between"><span className="mono text-[10px] font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><div className="mt-4 flex gap-3"><div className="flex flex-col items-center pt-1"><span className="h-2.5 w-2.5 rounded-full border-2 border-primary" /><span className="my-1 h-7 w-px bg-border" /><span className="h-2.5 w-2.5 rounded-full bg-accent" /></div><div className="space-y-3 text-sm font-bold"><p>{trip.pickup.name}<span className="ml-2 text-xs font-normal text-muted-foreground">{trip.startTime}</span></p><p>{trip.destination.name}</p></div></div></Link>)}</div> : <EmptyState icon={Navigation} title="No trips assigned today" copy="Your next assignment will appear here." />}</div></div>; }
 function DriverTripsPage() { const query = useListTrips({ page: 1, limit: 50 }, { query: { queryKey: getListTripsQueryKey({ page: 1, limit: 50 }) } }); return <div className="mx-auto max-w-2xl"><div className="mb-6 flex items-center gap-3"><Link href="/driver" className="rounded-lg p-2 hover:bg-muted"><ArrowLeft size={18} /></Link><div><p className="eyebrow">Driver view</p><h1 className="text-xl font-extrabold">Your trips</h1></div></div>{query.isLoading ? <LoadingState /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : <div className="space-y-3">{query.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`row-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex justify-between"><span className="mono text-xs font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><p className="mt-3 text-sm font-extrabold">{trip.pickup.name} <span className="font-normal text-muted-foreground">to</span> {trip.destination.name}</p><div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>{shortDate(trip.startDate)} · {trip.startTime}</span><span>{trip.customerName}</span></div></Link>)}</div>}</div>; }
 
-function AuthPage({ signUp = false }: { signUp?: boolean }) { const [submitted, setSubmitted] = useState(false); return <div className="noise grid min-h-[100dvh] place-items-center bg-sidebar p-5 text-sidebar-foreground"><div className="grid w-full max-w-4xl overflow-hidden rounded-3xl bg-card text-card-foreground shadow-2xl md:grid-cols-[.8fr_1.2fr]"><div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-8 text-primary-foreground md:flex"><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><p className="mt-5 text-lg font-extrabold">The calm behind every good journey.</p></div><div><p className="text-6xl font-extrabold leading-[.9] tracking-[-.06em]">Keep the<br />day moving.</p><p className="mt-5 max-w-xs text-sm leading-relaxed text-primary-foreground/70">A focused operations desk for bookings, drivers and the details that make a trip feel effortless.</p></div><p className="eyebrow text-primary-foreground/50">NG Travels · Bengaluru</p></div><div className="p-7 sm:p-12"><div className="mb-10 flex items-center justify-between"><Link href="/dashboard" data-testid="link-auth-brand" className="flex items-center gap-2 font-extrabold md:hidden"><span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-xs font-black text-accent-foreground">NG</span>NG Travels</Link><span className="eyebrow ml-auto">Secure workspace</span></div><p className="eyebrow text-primary">{signUp ? 'Start the desk' : 'Welcome back'}</p><h1 className="mt-2 text-3xl font-extrabold tracking-tight">{signUp ? 'Create your owner account.' : 'Good to see you again.'}</h1><p className="mt-3 text-sm text-muted-foreground">{signUp ? 'Set up the operating desk for your travel business.' : 'Sign in to see today’s runs and keep the books close.'}</p>{submitted ? <div className="mt-8 rounded-2xl bg-primary/10 p-5"><CheckCircle2 className="text-primary" size={22} /><p className="mt-3 font-extrabold">Check your email to continue.</p><p className="mt-1 text-sm text-muted-foreground">Your secure sign-in link is on its way.</p></div> : <form onSubmit={(event) => { event.preventDefault(); setSubmitted(true); }} className="mt-8 space-y-4"><Field label="Email address" required type="email" testId="input-auth-email" /><Field label="Password" required type="password" testId="input-auth-password" /><Button type="submit" className="mt-3 w-full py-3">{signUp ? 'Create account' : 'Sign in'} <ArrowUpRight size={15} /></Button><p className="pt-2 text-center text-xs text-muted-foreground">Protected by Clerk authentication</p></form>}<p className="mt-8 text-center text-sm text-muted-foreground">{signUp ? 'Already have an account? ' : 'New to NG Travels? '}<Link href={signUp ? '/sign-in' : '/sign-up'} data-testid="link-auth-switch" className="font-extrabold text-primary hover:underline">{signUp ? 'Sign in' : 'Create an account'}</Link></p></div></div></div>; }
+function SignInPage() { return <div className="noise flex min-h-[100dvh] items-center justify-center bg-sidebar px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div>; }
+function SignUpPage() { return <div className="noise flex min-h-[100dvh] items-center justify-center bg-sidebar px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div>; }
+
+function LandingPage() {
+  return <div className="noise min-h-[100dvh] bg-sidebar text-sidebar-foreground">
+    <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6 md:px-8"><Link href="/" className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span><span className="block text-sm font-extrabold">NG Travels</span><span className="eyebrow mt-1 block text-sidebar-foreground/55">Operations desk</span></span></Link><div className="flex items-center gap-2"><Link href="/sign-in" className="rounded-lg px-3 py-2 text-xs font-bold text-sidebar-foreground/70 hover:bg-sidebar-accent">Sign in</Link><Link href="/sign-up"><Button>Open the desk <ArrowUpRight size={14} /></Button></Link></div></header>
+    <main className="mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-12 md:grid-cols-[1.1fr_.9fr] md:px-8 md:pb-24 md:pt-20">
+      <div className="self-center"><p className="eyebrow text-accent">Travel operations, made calm</p><h1 className="mt-5 max-w-2xl text-5xl font-extrabold leading-[.98] tracking-[-.06em] md:text-7xl">Keep the day moving.</h1><p className="mt-6 max-w-xl text-base leading-relaxed text-sidebar-foreground/65 md:text-lg">One focused workspace for bookings, customer details, driver execution, collection and the small signals that keep every journey on track.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/sign-up"><Button className="px-5 py-3">Start with NG Travels <ArrowUpRight size={15} /></Button></Link><Link href="/sign-in" className="inline-flex items-center rounded-lg border border-sidebar-border px-5 py-3 text-xs font-bold text-sidebar-foreground/80 hover:bg-sidebar-accent">I already have an account</Link></div><div className="mt-12 flex flex-wrap gap-x-8 gap-y-3 text-xs font-semibold text-sidebar-foreground/50"><span>Bookings & routes</span><span>Transparent fares</span><span>Driver-first execution</span></div></div>
+      <div className="relative"><div className="absolute -inset-8 rounded-full bg-accent/10 blur-3xl" /><div className="relative rounded-3xl border border-sidebar-border bg-sidebar-accent/45 p-4 shadow-2xl md:p-5"><div className="rounded-2xl bg-card p-5 text-card-foreground"><div className="flex items-start justify-between"><div><p className="eyebrow text-primary">Operations workspace</p><p className="mt-2 text-xl font-extrabold">One calm view.</p></div><span className="rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-extrabold text-primary">READY</span></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl bg-muted p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bookings</p><p className="mt-2 text-2xl font-extrabold">Live</p></div><div className="rounded-xl bg-primary p-3 text-primary-foreground"><p className="text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Fares</p><p className="mt-2 text-2xl font-extrabold">Clear</p></div></div><div className="mt-3 rounded-xl border p-4"><p className="eyebrow">Built for the next action</p><div className="mt-3 flex gap-3"><span className="mt-1 h-2.5 w-2.5 rounded-full border-2 border-primary" /><div><p className="text-sm font-extrabold">Plan, collect, execute.</p><p className="mono mt-1 text-[10px] text-muted-foreground">Customer records · route details · driver updates</p></div></div></div></div></div></div>
+    </main>
+  </div>;
+}
 
 function NotFound() { return <div className="grid min-h-[100dvh] place-items-center bg-background p-6"><div className="max-w-md text-center"><p className="eyebrow text-primary">404 · Off route</p><h1 className="mt-3 text-4xl font-extrabold">This road ends here.</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">The page you’re looking for doesn’t exist in this workspace.</p><Link href="/dashboard" data-testid="link-not-found-home"><Button className="mt-6">Back to dashboard</Button></Link></div></div>; }
 
-function Router() { return <Switch><Route path="/sign-in"><AuthPage /></Route><Route path="/sign-in/:rest*"><AuthPage /></Route><Route path="/sign-up"><AuthPage signUp /></Route><Route path="/sign-up/:rest*"><AuthPage signUp /></Route><Route path="/dashboard"><DashboardPage /></Route><Route path="/"><DashboardPage /></Route><Route path="/customers/:id"><CustomerDetailPage /></Route><Route path="/customers"><CustomersPage /></Route><Route path="/trips/new"><TripFormPage /></Route><Route path="/trips/:id"><TripDetailPage /></Route><Route path="/trips"><TripsPage /></Route><Route path="/payments"><PaymentsPage /></Route><Route path="/expenses"><ExpensesPage /></Route><Route path="/reports"><ReportsPage /></Route><Route path="/notifications"><NotificationsPage /></Route><Route path="/settings"><SettingsPage /></Route><Route path="/audit-logs"><AuditLogsPage /></Route><Route path="/driver/trips/:id"><TripDetailPage driverView /></Route><Route path="/driver/trips"><DriverTripsPage /></Route><Route path="/driver"><DriverHome /></Route><Route component={NotFound} /></Switch>; }
+function HomeRedirect() { return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><LandingPage /></Show></>; }
+function ProtectedApp() { return <><Show when="signed-in"><Shell><RoutedErrorBoundary><Switch><Route path="/dashboard"><DashboardPage /></Route><Route path="/customers/:id"><CustomerDetailPage /></Route><Route path="/customers"><CustomersPage /></Route><Route path="/trips/new"><TripFormPage /></Route><Route path="/trips/:id"><TripDetailPage /></Route><Route path="/trips"><TripsPage /></Route><Route path="/payments"><PaymentsPage /></Route><Route path="/expenses"><ExpensesPage /></Route><Route path="/reports"><ReportsPage /></Route><Route path="/notifications"><NotificationsPage /></Route><Route path="/settings"><SettingsPage /></Route><Route path="/audit-logs"><AuditLogsPage /></Route><Route path="/driver/trips/:id"><TripDetailPage driverView /></Route><Route path="/driver/trips"><DriverTripsPage /></Route><Route path="/driver"><DriverHome /></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary></Shell></Show><Show when="signed-out"><Redirect to="/" /></Show></>; }
+function Router() { return <Switch><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/" component={HomeRedirect} /><Route component={ProtectedApp} /></Switch>; }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Shell><RoutedErrorBoundary><Router /></RoutedErrorBoundary></Shell></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>; }
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const [prevUserId, setPrevUserId] = useState<string | null | undefined>(undefined);
+  const query = useQueryClient();
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const nextUserId = user?.id ?? null;
+      if (prevUserId !== undefined && prevUserId !== nextUserId) query.clear();
+      setPrevUserId(nextUserId);
+    });
+    return unsubscribe;
+  }, [addListener, prevUserId, query]);
+  return null;
+}
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryClientCacheInvalidator /><TooltipProvider><Router /><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+}
+function App() { return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>; }
 export default App;
