@@ -1,0 +1,1712 @@
+NG TRAVELS — CREATE TRIP GOOGLE MAPS + AUTO KM + AUTO TOLL IMPLEMENTATION PROMPT
+
+You are working on the existing NG Travels production application.
+
+IMPORTANT:
+Do NOT create a UI mockup.
+Do NOT create fake map data.
+Do NOT hardcode distance, duration or toll.
+Do NOT redesign the entire application.
+Do NOT disturb existing working functionality.
+
+First inspect the existing codebase and understand the current Create Trip page, form state, API structure, database models and Google Maps integration.
+
+Then upgrade the existing Create Trip workflow according to the requirements below.
+
+==================================================
+1. MAIN OBJECTIVE
+==================================================
+
+I want the Create Trip page to work like this:
+
+Pickup
++
+Destination
++
+Optional Stops
+        ↓
+Google Maps automatically calculates route
+        ↓
+Automatically show:
+- Route
+- Distance KM
+- Duration
+- Traffic duration when available
+- Toll estimate when available
+        ↓
+Billing KM automatically uses Google route KM
+        ↓
+Owner can optionally override Billing KM
+        ↓
+Owner enters Rate Per KM
+        ↓
+Base Fare automatically calculates
+        ↓
+Toll automatically comes from Google when available
+        ↓
+Owner can override final toll
+        ↓
+Parking manually entered
+        ↓
+Other Charges manually entered
+        ↓
+Advance / Payments
+        ↓
+Customer Total
+        ↓
+Balance
+
+The Owner must NOT manually type the Google Maps distance.
+
+==================================================
+2. IMPORTANT CURRENT UI CHANGE
+==================================================
+
+The current Create Trip page contains a section similar to:
+
+Fare & Collection
+
+Billing kilometres *
+Rate per kilometre *
+Advance received
+Toll
+Parking
+Other charges
+
+CHANGE THIS.
+
+Remove the old mandatory manual Billing Kilometres input.
+
+Instead create:
+
+Route Distance
+86.4 KM
+Google Maps calculated
+
+Billing KM
+86.4 KM
+Owner adjustable
+
+Rate Per KM
+₹18
+
+Base Fare
+₹1,555.20
+
+Toll
+₹250
+Google estimated
+
+Parking
+₹0
+
+Other Charges
+₹0
+
+Advance / Paid
+₹0
+
+Customer Total
+₹1,805.20
+
+Balance
+₹1,805.20
+
+==================================================
+3. DO NOT DISTURB EXISTING UI
+==================================================
+
+Preserve the existing NG Travels design.
+
+Keep:
+
+- Existing dark/light theme behavior if already implemented
+- Existing typography
+- Existing cards
+- Existing spacing system
+- Existing navigation
+- Existing form components
+- Existing buttons
+- Existing responsive structure
+
+Only improve the Route + Fare + Collection functionality.
+
+Do not introduce unnecessary:
+
+- Animations
+- Gradients
+- Glows
+- Popups
+- Modals
+- Decorative elements
+- Large cards
+- Complex interactions
+
+The UI must remain clean, professional and business-oriented.
+
+==================================================
+4. PICKUP LOCATION
+==================================================
+
+Pickup must use Google Places Autocomplete.
+
+When user types:
+
+Erode Bus
+
+Google suggestions should appear.
+
+When user selects a place, save:
+
+- place_id
+- place_name
+- formatted_address
+- latitude
+- longitude
+
+Do not store only the text.
+
+The selected place must be a valid Google location.
+
+==================================================
+5. DESTINATION
+==================================================
+
+Destination must work exactly like Pickup.
+
+Support:
+
+- Google Places Autocomplete
+- Search
+- Place selection
+- Latitude
+- Longitude
+- Place ID
+- Formatted address
+
+==================================================
+6. AUTOMATIC ROUTE CALCULATION
+==================================================
+
+When valid Pickup and Destination are selected:
+
+Automatically calculate the route.
+
+Do NOT require a:
+
+"Calculate KM"
+
+button.
+
+The route calculation should happen automatically.
+
+Use the appropriate Google Maps Platform API available in the project.
+
+Prefer the current Google Routes API if the existing implementation supports it.
+
+Do not use fake Directions data.
+
+Do not hardcode:
+
+86.4 KM
+
+2 hr 45 min
+
+₹250
+
+Those are only examples.
+
+Actual values must come from Google Maps.
+
+==================================================
+7. ROUTE CALCULATION TRIGGER
+==================================================
+
+Recalculate route when:
+
+- Pickup changes
+- Destination changes
+- Stop is added
+- Stop is removed
+- Stop order changes
+
+Do NOT calculate on every keyboard keystroke.
+
+Use proper place selection events and debounce where required.
+
+Do not generate unnecessary Google API calls.
+
+==================================================
+8. MAP DISPLAY
+==================================================
+
+After valid locations are selected, show the Google Map.
+
+Display:
+
+- Pickup marker
+- Stop markers
+- Destination marker
+- Actual route polyline
+
+Example:
+
+Pickup
+  ↓
+Stop 1
+  ↓
+Stop 2
+  ↓
+Destination
+
+The map must use real Google Maps data.
+
+==================================================
+9. MAP RESPONSIVENESS
+==================================================
+
+Desktop:
+
+Show map beside or near the route form.
+
+Mobile:
+
+Show map below Pickup/Destination.
+
+The map must never:
+
+- Overflow horizontally
+- Break the page width
+- Cover buttons
+- Become unusably tall
+- Break when screen rotates
+- Break when sidebar opens/closes
+- Break inside a modal/drawer
+
+Mobile map height should be approximately 260–320px.
+
+Desktop map can be approximately 400–500px depending on existing layout.
+
+==================================================
+10. ADDITIONAL STOPS
+==================================================
+
+Keep:
+
++ Add Stop
+
+Each stop must support:
+
+- Google autocomplete
+- Map selection
+- Remove
+- Reorder
+
+After changing stops:
+
+Automatically recalculate:
+
+- Distance
+- Duration
+- Toll estimate
+
+Do not require manual route calculation.
+
+==================================================
+11. ROUTE INFORMATION CARD
+==================================================
+
+After route calculation, display a compact Route Summary.
+
+Example:
+
+Route Summary
+
+Distance
+86.4 KM
+
+Duration
+2 hr 45 min
+
+Traffic
+3 hr 05 min
+
+Toll
+₹250
+
+If Google does not provide traffic duration:
+
+Do not display fake traffic data.
+
+If Google does not provide toll:
+
+Show:
+
+Toll estimate unavailable
+
+Do not automatically invent a toll amount.
+
+==================================================
+12. ROUTE ALTERNATIVES
+==================================================
+
+If Google provides multiple routes:
+
+Show:
+
+Route 1
+86.4 KM
+2 hr 45 min
+Toll ₹250
+
+Route 2
+91.2 KM
+2 hr 55 min
+Toll ₹180
+
+Allow Owner to select a route.
+
+Highlight selected route.
+
+If alternatives are unavailable:
+
+Simply show the available route.
+
+Never invent alternative routes.
+
+==================================================
+13. AUTOMATIC ROUTE DISTANCE
+==================================================
+
+Store Google distance separately.
+
+Database field:
+
+map_distance_km
+
+Example:
+
+map_distance_km = 86.4
+
+This value comes from Google Maps.
+
+Never overwrite this value with Billing KM.
+
+==================================================
+14. BILLING KM
+==================================================
+
+Billing KM should automatically default to:
+
+Google route distance.
+
+Example:
+
+Google Distance:
+86.4 KM
+
+Billing KM:
+86.4 KM
+
+The Owner may optionally override it.
+
+Example:
+
+Google Distance:
+86.4 KM
+
+Billing KM:
+100 KM
+
+Important:
+
+Google Distance remains:
+
+86.4 KM
+
+Billing KM becomes:
+
+100 KM
+
+Do not overwrite map_distance_km.
+
+==================================================
+15. BILLING KM UI
+==================================================
+
+Do NOT show Billing KM as a required empty input.
+
+Instead show:
+
+Route Distance
+86.4 KM
+Google Maps
+
+Billing KM
+86.4 KM
+Owner adjustable
+
+Make it visually obvious that:
+
+Route Distance = Google calculated
+
+Billing KM = billing value
+
+Default Billing KM = Route Distance.
+
+==================================================
+16. RATE PER KM
+==================================================
+
+Rate Per KM remains Owner-controlled.
+
+Example:
+
+₹18
+
+The default rate can come from:
+
+Settings → Default Rate Per KM
+
+But Owner must be able to change it per trip.
+
+Do not hardcode ₹18.
+
+==================================================
+17. AUTOMATIC BASE FARE
+==================================================
+
+Whenever Billing KM or Rate Per KM changes:
+
+Automatically calculate:
+
+baseFare =
+billingKm × ratePerKm
+
+Example:
+
+Billing KM:
+200
+
+Rate:
+₹18
+
+Base Fare:
+₹3,600
+
+Update immediately.
+
+No page refresh.
+
+No separate Calculate button.
+
+==================================================
+18. TOLL — AUTOMATIC
+==================================================
+
+This is extremely important.
+
+If Google Maps returns toll information:
+
+Automatically populate the toll value.
+
+Example:
+
+Google Estimated Toll:
+₹250
+
+Show:
+
+Toll
+₹250
+Google estimated
+
+The Owner should NOT manually type the toll initially.
+
+==================================================
+19. TOLL BREAKDOWN
+==================================================
+
+If Google provides toll breakdown:
+
+Show it optionally.
+
+Example:
+
+Toll Breakdown
+
+Toll Plaza A
+₹100
+
+Toll Plaza B
+₹150
+
+Estimated Total
+₹250
+
+Do not create fake toll plaza names.
+
+Only show breakdown data actually returned by Google.
+
+==================================================
+20. TOLL UNAVAILABLE
+==================================================
+
+If Google does not provide toll information:
+
+Show:
+
+Toll estimate unavailable
+
+Do NOT assume:
+
+₹0
+
+Do NOT invent a value.
+
+However, allow Owner to manually enter a final customer toll if required.
+
+==================================================
+21. FINAL TOLL OVERRIDE
+==================================================
+
+Owner must be able to override Google estimated toll.
+
+Example:
+
+Google Estimated Toll
+₹250
+
+Final Customer Toll
+₹300
+
+Store both values separately:
+
+estimated_toll
+
+final_toll
+
+Customer fare must use:
+
+final_toll
+
+If Owner does not override:
+
+final_toll = estimated_toll
+
+==================================================
+22. PARKING
+==================================================
+
+Parking is Owner-controlled.
+
+Default:
+
+₹0
+
+Owner can enter:
+
+₹200
+
+Blank must behave as:
+
+₹0
+
+Parking is customer payable.
+
+Parking must NOT come from Driver operational expenses.
+
+==================================================
+23. OTHER CHARGES
+==================================================
+
+Support:
+
++ Add Charge
+
+Each charge:
+
+Charge Name
+Amount
+
+Examples:
+
+Permit
+₹200
+
+Entry Fee
+₹100
+
+Waiting Charge
+₹300
+
+Night Charge
+₹500
+
+Other
+
+Calculate the total Other Charges automatically.
+
+==================================================
+24. ADVANCE
+==================================================
+
+Keep Advance Received.
+
+Default:
+
+₹0
+
+Blank:
+
+₹0
+
+However, architect the backend so that payments are stored as payment records.
+
+Do not create conflicting balance logic between:
+
+Advance
+
+and
+
+Payments.
+
+Advance should be represented by the payment system where appropriate.
+
+==================================================
+25. CUSTOMER TOTAL
+==================================================
+
+Backend formula:
+
+baseFare =
+billingKm × ratePerKm
+
+otherCharges =
+sum(all trip charges)
+
+customerTotal =
+baseFare
++ finalToll
++ parking
++ otherCharges
+
+Never trust frontend totals.
+
+Backend must recalculate.
+
+==================================================
+26. BALANCE
+==================================================
+
+Use:
+
+totalPaid = sum(valid payment records)
+
+balance =
+max(customerTotal - totalPaid, 0)
+
+If:
+
+customerTotal = ₹4,000
+
+totalPaid = ₹4,500
+
+show:
+
+Balance
+₹0
+
+Customer Credit
+₹500
+
+Never show:
+
+Balance -₹500
+
+==================================================
+27. REAL-TIME FARE UI
+==================================================
+
+As the Owner changes:
+
+Billing KM
+
+Rate/KM
+
+Toll
+
+Parking
+
+Other Charges
+
+Payment
+
+the UI must immediately update:
+
+Base Fare
+
+Customer Total
+
+Paid
+
+Balance
+
+Credit
+
+Do not wait for Save Trip.
+
+However:
+
+Frontend calculation is for display.
+
+Backend is the final source of truth.
+
+==================================================
+28. DECIMAL SAFETY
+==================================================
+
+Use proper decimal handling.
+
+Support:
+
+86.4 KM
+
+86.45 KM
+
+₹18.50
+
+₹250.75
+
+Do not show:
+
+1799.999999
+
+Use database Decimal/Numeric types for financial values.
+
+Do not use unsafe floating-point storage for money.
+
+==================================================
+29. ROUND TRIP
+==================================================
+
+If Trip Type = Round Trip:
+
+Support:
+
+Outbound Route
+
+Return Route
+
+Additional KM
+
+Option:
+
+Use Same Route For Return
+
+If enabled:
+
+Return distance = outbound route distance
+
+Example:
+
+Outbound:
+86.4 KM
+
+Return:
+86.4 KM
+
+Additional:
+27.2 KM
+
+Billing default:
+200 KM
+
+Do not manually ask user to re-enter Google route distance.
+
+==================================================
+30. ROUND TRIP TOLL
+==================================================
+
+If Google provides toll for outbound route:
+
+Handle return toll according to the actual route/API result.
+
+Do not blindly multiply toll unless the API/business logic explicitly supports that assumption.
+
+If return route is separately calculated:
+
+Use the actual returned toll information.
+
+If toll cannot be determined:
+
+Show unavailable and allow Owner override.
+
+==================================================
+31. GOOGLE API FAILURE
+==================================================
+
+If route calculation fails:
+
+Do not crash the page.
+
+Show:
+
+Unable to calculate this route.
+
+Please check the selected locations and try again.
+
+The rest of the form must remain usable.
+
+Owner should be able to manually set Billing KM if the business needs to continue.
+
+Clearly label:
+
+Google route unavailable
+
+Do not pretend the route was calculated.
+
+==================================================
+32. LOADING STATES
+==================================================
+
+When Google route is calculating:
+
+Show:
+
+Calculating route...
+
+Disable only actions that depend on route calculation.
+
+Do not freeze the entire page unnecessarily.
+
+When saving:
+
+Saving Trip...
+
+Prevent duplicate submission.
+
+==================================================
+33. GOOGLE API SECURITY
+==================================================
+
+Use environment variables.
+
+Example:
+
+GOOGLE_MAPS_API_KEY
+
+GOOGLE_MAPS_SERVER_KEY
+
+Never hardcode API keys.
+
+Use proper Google API restrictions.
+
+Browser key:
+
+HTTP referrer restrictions.
+
+Server key:
+
+Server/API restrictions.
+
+Enable only required Google APIs.
+
+==================================================
+34. DATABASE
+==================================================
+
+Ensure the trip model stores:
+
+pickup_place_id
+
+pickup_address
+
+pickup_latitude
+
+pickup_longitude
+
+destination_place_id
+
+destination_address
+
+destination_latitude
+
+destination_longitude
+
+map_distance_km
+
+map_duration_seconds
+
+traffic_duration_seconds
+
+route_polyline
+
+route_summary
+
+estimated_toll
+
+final_toll
+
+billing_km
+
+rate_per_km
+
+base_fare
+
+parking_charge
+
+other_charges_total
+
+customer_total
+
+total_paid
+
+balance
+
+customer_credit
+
+==================================================
+35. ROUTE HISTORY
+==================================================
+
+Store the selected route information.
+
+If Owner changes route:
+
+Update the current selected route.
+
+Keep sufficient audit information where required.
+
+Do not lose the original Google route data without trace.
+
+==================================================
+36. API DESIGN
+==================================================
+
+Use clean backend APIs.
+
+Examples:
+
+GET /api/maps/route
+
+POST /api/trips
+
+GET /api/trips/:id
+
+PATCH /api/trips/:id
+
+POST /api/trips/:id/payments
+
+GET /api/trips/:id/payments
+
+The exact existing API architecture may be preserved if already implemented.
+
+Do not create duplicate APIs unnecessarily.
+
+==================================================
+37. BACKEND VALIDATION
+==================================================
+
+Validate:
+
+billingKm > 0
+
+ratePerKm > 0
+
+parking >= 0
+
+toll >= 0
+
+other charges >= 0
+
+payment amount > 0
+
+coordinates valid
+
+return datetime >= start datetime
+
+ending KM >= starting KM
+
+Do not rely only on frontend validation.
+
+==================================================
+38. RESPONSIVE MOBILE UI
+==================================================
+
+The Create Trip page must work perfectly at:
+
+320px
+
+375px
+
+390px
+
+430px
+
+768px
+
+1024px+
+
+Mobile layout:
+
+Trip Type
+
+Passengers
+
+Pickup
+
+Destination
+
+Stops
+
+Map
+
+Route Summary
+
+Route Distance
+
+Billing KM
+
+Rate/KM
+
+Toll
+
+Parking
+
+Other Charges
+
+Advance/Payment
+
+Fare Summary
+
+Save Trip
+
+Do not create horizontal scrolling.
+
+Do not use desktop-sized tables on mobile.
+
+Do not make form inputs too small.
+
+Touch targets should be at least approximately 44px.
+
+==================================================
+39. DESKTOP UI
+==================================================
+
+On desktop:
+
+Use the available screen space intelligently.
+
+Preferred structure:
+
+LEFT:
+Trip details/form
+
+RIGHT:
+Google Map + Route Summary
+
+Then:
+
+Fare & Collection
+
+Fare Summary
+
+Do not make the entire form unnecessarily wide.
+
+==================================================
+40. IMPORTANT MOBILE BEHAVIOR
+==================================================
+
+On mobile:
+
+The map should appear naturally below Pickup/Destination.
+
+Do not open the map automatically as a fullscreen popup.
+
+Do not interrupt the Owner while entering the form.
+
+If route updates:
+
+Update the Route Summary quietly.
+
+Do not show unnecessary popup notifications for every calculation.
+
+==================================================
+41. NO DISTURBANCE RULE
+==================================================
+
+Do NOT introduce:
+
+- Automatic popup after selecting destination
+- Fullscreen map takeover
+- Repeated confirmation dialogs
+- Repeated success toasts
+- Excessive animations
+- Auto-scrolling
+- Layout jumping
+- Input focus jumping
+- Form reset after route calculation
+- Losing entered fare values
+- Losing selected locations
+- Losing entered charges
+
+When Google route recalculates:
+
+DO NOT reset:
+
+Rate
+
+Parking
+
+Other Charges
+
+Advance/payment
+
+Billing KM override
+
+Notes
+
+Trip type
+
+==================================================
+42. FORM STATE
+==================================================
+
+Route recalculation must not reset unrelated form fields.
+
+For example:
+
+Owner enters:
+
+Rate = ₹18
+
+Parking = ₹200
+
+Other = ₹300
+
+Then changes Destination.
+
+The route should recalculate.
+
+These values must remain.
+
+Only route-dependent values should update.
+
+Billing KM should reset to the new Google distance ONLY if the Owner has not manually overridden Billing KM.
+
+If Owner manually changed Billing KM:
+
+Preserve the manual override unless the Owner explicitly chooses:
+
+Use Google Distance.
+
+==================================================
+43. BILLING KM OVERRIDE UX
+==================================================
+
+Provide a simple control:
+
+Billing KM
+
+[86.4]
+
+Use Google Distance
+
+If Owner changes:
+
+[100]
+
+show:
+
+Billing KM manually adjusted
+
+Google Route:
+86.4 KM
+
+Billing:
+100 KM
+
+Provide:
+
+Reset to Google Distance
+
+This avoids confusion.
+
+==================================================
+44. FARE SUMMARY
+==================================================
+
+Create a compact professional summary:
+
+FARE SUMMARY
+
+Google Distance
+86.4 KM
+
+Billing KM
+100 KM
+
+Rate / KM
+₹18
+
+Base Fare
+₹1,800
+
+Estimated Toll
+₹250
+
+Final Toll
+₹300
+
+Parking
+₹200
+
+Other Charges
+₹300
+
+Customer Total
+₹2,600
+
+Paid
+₹1,000
+
+Balance
+₹1,600
+
+Do not show internal profit on customer-facing confirmation.
+
+==================================================
+45. SAVE TRIP
+==================================================
+
+When Owner clicks:
+
+Save Trip
+
+Backend must:
+
+1. Validate customer
+2. Validate locations
+3. Validate route data
+4. Validate billing KM
+5. Validate rate
+6. Validate charges
+7. Recalculate fare
+8. Validate payment
+9. Save trip
+10. Save route
+11. Save stops
+12. Save charges
+13. Save payment
+14. Save status
+15. Save timeline
+16. Create audit record
+
+Use a database transaction where multiple records are created.
+
+==================================================
+46. SAVE SUCCESS
+==================================================
+
+Show a subtle success message:
+
+Trip saved successfully.
+
+Do not show excessive animation.
+
+Do not redirect unexpectedly.
+
+After save:
+
+Show Booking ID.
+
+Example:
+
+NG-2026-000125
+
+==================================================
+47. REFRESH TEST
+==================================================
+
+After saving:
+
+Refresh browser.
+
+Verify:
+
+Pickup persists
+
+Destination persists
+
+Stops persist
+
+Google route data persists
+
+Map distance persists
+
+Billing KM persists
+
+Rate persists
+
+Toll persists
+
+Parking persists
+
+Other charges persist
+
+Payment persists
+
+Balance persists
+
+Trip status persists
+
+==================================================
+48. SECURITY
+==================================================
+
+Only Owner/Admin can modify:
+
+Billing KM
+
+Rate
+
+Toll
+
+Parking
+
+Other Charges
+
+Customer Total
+
+Payments
+
+Financial values
+
+Driver must NOT be able to modify these values.
+
+Backend must enforce this.
+
+Never rely only on hidden frontend controls.
+
+==================================================
+49. NO DRIVER ASSIGNMENT
+==================================================
+
+Do NOT add:
+
+Assign Driver
+
+Select Driver
+
+Reassign Driver
+
+Driver Availability
+
+Assign Vehicle
+
+Select Vehicle
+
+Reassign Vehicle
+
+Vehicle Availability
+
+Do not reintroduce these workflows.
+
+==================================================
+50. TEST CASE
+==================================================
+
+Test:
+
+Pickup:
+Erode BUS STAND
+
+Destination:
+OOTY
+
+Trip Type:
+Round Trip
+
+Start Date:
+31 Aug 2026
+
+Start Time:
+09:00 AM
+
+The system must:
+
+1. Accept Google Pickup
+2. Accept Google Destination
+3. Automatically calculate route
+4. Show real map
+5. Show real distance
+6. Show real duration
+7. Show toll when Google provides it
+8. Default Billing KM from Google route
+9. Allow Billing KM override
+10. Allow Rate/KM
+11. Automatically calculate Base Fare
+12. Automatically set Google toll
+13. Allow final toll override
+14. Allow Parking
+15. Allow Other Charges
+16. Allow Advance/payment
+17. Calculate Customer Total
+18. Calculate Balance
+19. Save to PostgreSQL
+20. Persist after refresh
+
+==================================================
+51. TEST THE UI
+==================================================
+
+Test mobile:
+
+320px
+375px
+390px
+430px
+
+Test tablet:
+
+768px
+
+Test desktop:
+
+1366px
+1440px
+1920px
+
+Verify:
+
+No horizontal overflow.
+
+No broken inputs.
+
+No overlapping elements.
+
+No broken map.
+
+No broken dropdowns.
+
+No broken date picker.
+
+No broken time picker.
+
+No layout jumping.
+
+No dead buttons.
+
+==================================================
+52. TEST API FAILURE
+==================================================
+
+Test:
+
+Google API unavailable.
+
+Expected:
+
+Controlled error message.
+
+Application must NOT crash.
+
+Test:
+
+Database unavailable.
+
+Expected:
+
+Controlled server error.
+
+No raw stack trace shown to users.
+
+Test:
+
+Duplicate Save click.
+
+Expected:
+
+Only one trip created.
+
+==================================================
+53. FINAL CODE QUALITY
+==================================================
+
+Before completing:
+
+Remove unused imports.
+
+Remove dead components.
+
+Remove mock route data.
+
+Remove fake distance.
+
+Remove fake toll.
+
+Remove fake fare.
+
+Remove hardcoded customer data.
+
+Remove console errors.
+
+Remove unnecessary API calls.
+
+Remove duplicate calculations.
+
+Use reusable components.
+
+Keep the implementation maintainable.
+
+==================================================
+54. FINAL ACCEPTANCE CRITERIA
+==================================================
+
+The implementation is successful only if:
+
+[ ] Pickup Google autocomplete works
+
+[ ] Destination Google autocomplete works
+
+[ ] Coordinates are stored
+
+[ ] Place IDs are stored
+
+[ ] Google Map loads
+
+[ ] Route automatically calculates
+
+[ ] Real distance is shown
+
+[ ] Real duration is shown
+
+[ ] Traffic duration shown when available
+
+[ ] Toll shown when available
+
+[ ] Toll unavailable handled correctly
+
+[ ] Additional stops work
+
+[ ] Route recalculates when stops change
+
+[ ] Billing KM defaults from Google
+
+[ ] Billing KM can be manually overridden
+
+[ ] Google distance remains unchanged
+
+[ ] Rate/KM is Owner controlled
+
+[ ] Base fare calculates automatically
+
+[ ] Toll is automatically populated when available
+
+[ ] Final toll can be overridden
+
+[ ] Parking works
+
+[ ] Other charges work
+
+[ ] Advance/payment works
+
+[ ] Customer total calculates correctly
+
+[ ] Balance calculates correctly
+
+[ ] Credit calculates correctly
+
+[ ] Decimal values work correctly
+
+[ ] Backend recalculates financial values
+
+[ ] Database persistence works
+
+[ ] Refresh persistence works
+
+[ ] Mobile UI works
+
+[ ] Desktop UI works
+
+[ ] No horizontal scrolling
+
+[ ] No unnecessary popups
+
+[ ] No layout jumping
+
+[ ] No fake data
+
+[ ] No dead buttons
+
+[ ] No Driver Assignment
+
+[ ] No Vehicle Assignment
+
+[ ] No critical console errors
+
+[ ] No unhandled API errors
+
+==================================================
+55. FINAL RESPONSE REQUIRED FROM THE CODING AGENT
+==================================================
+
+After implementation, report:
+
+1. Files changed
+2. Database changes
+3. API changes
+4. Google Maps APIs used
+5. Route calculation implementation
+6. Toll implementation
+7. Fare calculation implementation
+8. Billing KM implementation
+9. Mobile UI changes
+10. Desktop UI changes
+11. Tests performed
+12. Test results
+13. Remaining issues
+14. Required environment variables
+
+Do NOT say "100% complete" unless every acceptance criterion actually passes.
+
+==================================================
+FINAL PRINCIPLE
+==================================================
+
+The Owner experience should be extremely simple:
+
+SELECT PICKUP
+        ↓
+SELECT DESTINATION
+        ↓
+GOOGLE MAP AUTOMATICALLY LOADS
+        ↓
+DISTANCE AUTOMATICALLY CALCULATED
+        ↓
+TOLL AUTOMATICALLY CALCULATED WHEN AVAILABLE
+        ↓
+BILLING KM DEFAULTS TO GOOGLE DISTANCE
+        ↓
+OWNER ENTERS RATE/KM
+        ↓
+BASE FARE AUTOMATICALLY CALCULATES
+        ↓
+TOLL / PARKING / OTHER CHARGES
+        ↓
+PAYMENT / ADVANCE
+        ↓
+TOTAL
+        ↓
+BALANCE
+        ↓
+SAVE TRIP
+
+Make this workflow fast, clean, predictable and professional.
+
+Do not disturb the user with unnecessary UI.
+
+Do not make the Owner manually enter data that Google Maps can reliably provide.
+
+Build the feature as production functionality, not as a visual prototype.
