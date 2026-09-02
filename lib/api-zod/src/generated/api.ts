@@ -1063,3 +1063,50 @@ export const ListAuditLogsResponseItem = zod.object({
 export const ListAuditLogsResponse = zod.array(ListAuditLogsResponseItem)
 
 
+/**
+ * @summary Get workspace settings
+ */
+export const getSettingsResponseDefaultRateMin = 0;
+
+
+
+export const GetSettingsResponse = zod.object({
+  "company": zod.string(),
+  "mobile": zod.string(),
+  "email": zod.string(),
+  "currency": zod.string(),
+  "timezone": zod.string(),
+  "defaultRate": zod.number().min(getSettingsResponseDefaultRateMin)
+})
+
+
+/**
+ * @summary Update workspace settings
+ */
+export const updateSettingsBodyDefaultRateMin = 0;
+
+
+
+export const UpdateSettingsBody = zod.object({
+  "company": zod.string().optional(),
+  "mobile": zod.string().optional(),
+  "email": zod.string().optional(),
+  "currency": zod.string().optional(),
+  "timezone": zod.string().optional(),
+  "defaultRate": zod.number().min(updateSettingsBodyDefaultRateMin).optional()
+})
+
+export const updateSettingsResponseDefaultRateMin = 0;
+
+
+
+export const UpdateSettingsResponse = zod.object({
+  "company": zod.string(),
+  "mobile": zod.string(),
+  "email": zod.string(),
+  "currency": zod.string(),
+  "timezone": zod.string(),
+  "defaultRate": zod.number().min(updateSettingsResponseDefaultRateMin)
+})
+
+

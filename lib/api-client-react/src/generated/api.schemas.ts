@@ -363,6 +363,26 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface Settings {
+  company: string;
+  mobile: string;
+  email: string;
+  currency: string;
+  timezone: string;
+  /** @minimum 0 */
+  defaultRate: number;
+}
+
+export interface SettingsUpdate {
+  company?: string;
+  mobile?: string;
+  email?: string;
+  currency?: string;
+  timezone?: string;
+  /** @minimum 0 */
+  defaultRate?: number;
+}
+
 /**
  * Entity not found
  */

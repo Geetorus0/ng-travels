@@ -29,6 +29,8 @@ export * from './paymentInput';
 export * from './reportSummary';
 export * from './reportSummaryPaymentMethodsItem';
 export * from './scheduleItem';
+export * from './settings';
+export * from './settingsUpdate';
 export * from './trip';
 export * from './tripInput';
 export * from './tripList';

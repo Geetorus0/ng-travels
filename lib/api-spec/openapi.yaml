@@ -18,6 +18,7 @@ tags:
   - name: reports
   - name: notifications
   - name: audit
+  - name: settings
 paths:
   /healthz:
     get:
@@ -377,6 +378,35 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/AuditLog" }
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get workspace settings
+      responses:
+        "200":
+          description: Workspace settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update workspace settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated workspace settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
 components:
   parameters:
     Id:
@@ -734,4 +764,23 @@ components:
         oldValue: { type: ["string", "null"] }
         newValue: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+    Settings:
+      type: object
+      required: [company, mobile, email, currency, timezone, defaultRate]
+      properties:
+        company: { type: string }
+        mobile: { type: string }
+        email: { type: string }
+        currency: { type: string }
+        timezone: { type: string }
+        defaultRate: { type: number, minimum: 0 }
+    SettingsUpdate:
+      type: object
+      properties:
+        company: { type: string }
+        mobile: { type: string }
+        email: { type: string }
+        currency: { type: string }
+        timezone: { type: string }
+        defaultRate: { type: number, minimum: 0 }
 

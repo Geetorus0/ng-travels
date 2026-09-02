@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { and, asc, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   appSettingsTable,
@@ -29,6 +29,7 @@ import {
   GetDashboardResponse,
   GetReportSummaryQueryParams,
   GetReportSummaryResponse,
+  GetSettingsResponse,
   GetTripParams,
   GetTripResponse,
   ListAuditLogsResponse,
@@ -55,6 +56,8 @@ import {
   UpdateTripStatusBody,
   UpdateTripStatusParams,
   UpdateTripStatusResponse,
+  UpdateSettingsBody,
+  UpdateSettingsResponse,
 } from "@workspace/api-zod";
 import { requireOwner, viewerFor } from "../middlewares/auth";
 
@@ -69,6 +72,36 @@ const dateOnly = (value: unknown): string => {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value);
 };
+
+const normalizeTripStatus = (value: unknown): string => {
+  const normalized = String(value ?? "").trim().toLowerCase().replaceAll(" ", "_");
+  return normalized === "pending" ? "upcoming" : normalized;
+};
+
+const defaultSettings = {
+  company: "NG Travels",
+  mobile: "+91 98450 21867",
+  email: "hello@ngtravels.in",
+  currency: "INR",
+  timezone: "Asia/Kolkata",
+  defaultRate: 18,
+};
+
+async function settingsView() {
+  const rows = await db.select().from(appSettingsTable);
+  const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return {
+    company: values.company ?? defaultSettings.company,
+    mobile: values.mobile ?? defaultSettings.mobile,
+    email: values.email ?? defaultSettings.email,
+    currency: values.currency ?? defaultSettings.currency,
+    timezone: values.timezone ?? defaultSettings.timezone,
+    defaultRate:
+      values.defaultRate == null
+        ? defaultSettings.defaultRate
+        : numeric(values.defaultRate),
+  };
+}
 
 const today = (): string =>
   new Intl.DateTimeFormat("en-CA", {
@@ -210,7 +243,7 @@ function tripView(
     passengerCount: trip.passengerCount,
     notes: trip.notes,
     specialInstructions: trip.specialInstructions,
-    status: trip.status,
+    status: normalizeTripStatus(trip.status),
     mapDistanceKm: numeric(trip.mapDistanceKm),
     routeDurationMinutes: trip.routeDurationMinutes,
     routeSummary: trip.routeSummary,
@@ -260,13 +293,13 @@ router.get("/dashboard", requireOwner, async (req, res): Promise<void> => {
   const metrics = {
     todaysTrips: todayTrips.length,
     upcomingTrips: todayTrips.filter((trip) =>
-       ["upcoming", "confirmed", "ready"].includes(trip.status),
+       ["upcoming", "confirmed", "ready"].includes(normalizeTripStatus(trip.status)),
     ).length,
-    started: todayTrips.filter((trip) => trip.status === "started").length,
+    started: todayTrips.filter((trip) => normalizeTripStatus(trip.status) === "started").length,
     inProgress: todayTrips.filter((trip) =>
-      ["reached_pickup", "customer_picked_up", "in_progress"].includes(trip.status),
+      ["reached_pickup", "customer_picked_up", "in_progress"].includes(normalizeTripStatus(trip.status)),
     ).length,
-    completedToday: todayTrips.filter((trip) => trip.status === "completed").length,
+    completedToday: todayTrips.filter((trip) => normalizeTripStatus(trip.status) === "completed").length,
     paymentPending: allTrips.filter((trip) => numeric(trip.remainingBalance) > 0).length,
     todaysCollection: Math.round(
       todayTrips.reduce((sum, trip) => sum + numeric(trip.totalPaid), 0) * 100,
@@ -340,15 +373,15 @@ router.get("/customers", requireOwner, async (req, res): Promise<void> => {
     .orderBy(desc(customersTable.createdAt))
     .limit(limit)
     .offset((page - 1) * limit);
-  const [{ count }] = await db
-    .select({ count: customersTable.id })
+  const [{ count: customerCount }] = await db
+    .select({ count: count() })
     .from(customersTable)
     .where(and(...filters));
   const items = await Promise.all(rows.map(customerView));
   res.json(
     ListCustomersResponse.parse({
       items,
-      total: Number(count ?? 0),
+      total: Number(customerCount ?? 0),
       page,
       limit,
     }),
@@ -455,7 +488,7 @@ router.get("/trips", async (req, res): Promise<void> => {
       )
     : undefined;
   const filters = [
-    status ? eq(tripsTable.status, status) : undefined,
+    status ? ilike(tripsTable.status, normalizeTripStatus(status)) : undefined,
     date ? eq(tripsTable.startDate, dateOnly(date)) : undefined,
     searchFilter,
   ].filter(Boolean);
@@ -910,7 +943,7 @@ router.get("/reports/summary", requireOwner, async (req, res): Promise<void> => 
   const filtered = all.filter(({ trip }) =>
     trip.startDate >= from &&
     trip.startDate <= to &&
-    (!parsed.data.status || trip.status === parsed.data.status) &&
+    (!parsed.data.status || normalizeTripStatus(trip.status) === normalizeTripStatus(parsed.data.status)) &&
     (!parsed.data.tripType || trip.tripType === parsed.data.tripType),
   );
   const rows = filtered.map(({ trip, customer }) => tripView(trip, customer));
@@ -930,8 +963,8 @@ router.get("/reports/summary", requireOwner, async (req, res): Promise<void> => 
     from: new Date(`${from}T00:00:00Z`),
     to: new Date(`${to}T00:00:00Z`),
     totalTrips: rows.length,
-    completed: rows.filter((trip) => trip.status === "completed").length,
-    cancelled: rows.filter((trip) => trip.status === "cancelled").length,
+    completed: rows.filter((trip) => normalizeTripStatus(trip.status) === "completed").length,
+    cancelled: rows.filter((trip) => normalizeTripStatus(trip.status) === "cancelled").length,
     billingKm: rows.reduce((sum, trip) => sum + trip.billingKm, 0),
     grossFare: revenue,
     toll: rows.reduce((sum, trip) => sum + trip.toll, 0),
@@ -985,6 +1018,30 @@ router.get("/audit-logs", requireOwner, async (_req, res): Promise<void> => {
     .orderBy(desc(auditLogsTable.createdAt))
     .limit(100);
   res.json(ListAuditLogsResponse.parse(rows));
+});
+
+router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
+  res.json(GetSettingsResponse.parse(await settingsView()));
+});
+
+router.patch("/settings", requireOwner, async (req, res): Promise<void> => {
+  const body = UpdateSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  for (const [key, value] of Object.entries(body.data)) {
+    if (value === undefined) continue;
+    await db
+      .insert(appSettingsTable)
+      .values({ key, value: String(value) })
+      .onConflictDoUpdate({
+        target: appSettingsTable.key,
+        set: { value: String(value), updatedAt: new Date() },
+      });
+  }
+  await writeAudit(req, "Workspace settings updated", "settings", "workspace", null, body.data);
+  res.json(UpdateSettingsResponse.parse(await settingsView()));
 });
 
 export default router;

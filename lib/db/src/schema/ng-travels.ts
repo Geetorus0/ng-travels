@@ -83,7 +83,7 @@ export const tripsTable = pgTable(
     passengerCount: integer("passenger_count").notNull().default(1),
     notes: text("notes"),
     specialInstructions: text("special_instructions"),
-    status: text("status").notNull().default("Upcoming"),
+    status: text("status").notNull().default("upcoming"),
     mapDistanceKm: numeric("map_distance_km", {
       precision: 12,
       scale: 2,

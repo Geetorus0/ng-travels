@@ -1,0 +1,3089 @@
+NG TRAVELS – PRODUCTION-GRADE TRAVEL MANAGEMENT SYSTEM
+========================================================
+
+You are a senior full-stack architect, product engineer, UI/UX designer, database engineer, security engineer and QA engineer.
+
+Upgrade the existing NG Travels application into a REAL, PRODUCTION-READY Travel Operations Management System.
+
+IMPORTANT:
+
+This is NOT a UI-only project.
+
+Do NOT create static dashboards, fake data, mock APIs, placeholder buttons, simulated calculations or frontend-only functionality.
+
+EVERYTHING visible in the UI must be connected to a real backend/database/API and must actually work.
+
+Before making changes:
+
+1. Inspect the complete existing codebase.
+2. Understand the current architecture.
+3. Identify existing working features.
+4. Preserve working functionality.
+5. Fix broken functionality.
+6. Remove fake/static data.
+7. Implement missing backend functionality.
+8. Implement proper role-based access.
+9. Test every workflow end-to-end.
+10. Do not break existing functionality unnecessarily.
+
+========================================================
+1. PRODUCT
+========================================================
+
+Product:
+
+NG Travels
+
+Tagline:
+
+Travel with Comfort & Safety
+
+Business type:
+
+Travel / Taxi / Tourist Vehicle / Outstation Trip Management.
+
+Primary users:
+
+1. OWNER / ADMIN
+2. DRIVER
+
+The system must have completely different workspaces for Owner and Driver.
+
+========================================================
+2. ROLE BASED ACCESS CONTROL
+========================================================
+
+Implement proper RBAC.
+
+Roles:
+
+OWNER
+DRIVER
+
+Never rely only on frontend route hiding.
+
+Permissions must be enforced:
+
+Frontend
++
+Backend API
++
+Database query layer
+
+A Driver must never be able to access Owner-only APIs simply by changing a URL or API request.
+
+Every API endpoint must verify authenticated user + role + permission.
+
+========================================================
+3. OWNER ROLE
+========================================================
+
+OWNER has full operational control.
+
+Owner can access:
+
+Dashboard
+Customers
+Enquiries
+Trips
+Trip Planning
+Google Maps
+Fare Calculator
+Payments
+Expenses
+Reports
+Notifications
+Customer Documents
+Driver Workspace Monitoring
+Settings
+Audit Logs
+
+Owner can:
+
+Create
+Read
+Update
+Delete
+
+where appropriate.
+
+Owner controls all financial information.
+
+Owner controls:
+
+Rate Per KM
+Billing KM
+Toll
+Parking
+Other Charges
+Advance
+Payments
+Refunds
+Expenses
+Profit
+Reports
+
+========================================================
+4. DRIVER ROLE
+========================================================
+
+Driver gets a completely separate mobile-first workspace.
+
+Driver cannot access:
+
+Owner Dashboard
+Revenue Dashboard
+Profit
+Customer financial reports
+All customer database
+All payments
+All expenses
+Owner settings
+Audit logs
+Reports
+Rate configuration
+Billing configuration
+
+Driver can only access trips/data that the backend allows for that Driver.
+
+Driver workspace:
+
+Home
+My Trips
+Current Trip
+Notifications
+Profile
+Trip History
+
+========================================================
+5. DRIVER ACCESS MODEL
+========================================================
+
+IMPORTANT:
+
+DO NOT create a separate:
+
+"Assign Driver"
+
+module.
+
+DO NOT create:
+
+Assign Driver button
+Assign Vehicle button
+Vehicle Assignment page
+Driver Assignment page
+
+However, a Driver must still receive only the trips that are authorized for that Driver.
+
+Implement a secure trip dispatch/access mechanism.
+
+A trip can have a driver access reference internally if the existing business logic requires it, but do not expose a separate assignment workflow.
+
+Driver must never be able to access another Driver's private trip data.
+
+Owner can control which Driver receives/accesses a trip through the existing trip workflow or dispatch mechanism.
+
+Do not create unnecessary vehicle assignment functionality.
+
+========================================================
+6. AUTHENTICATION
+========================================================
+
+Implement secure authentication.
+
+Features:
+
+Login
+Logout
+Session management
+Password hashing
+Forgot password
+Change password
+Session expiration
+Protected routes
+Role-based redirect
+
+After login:
+
+OWNER → Owner Dashboard
+
+DRIVER → Driver Dashboard
+
+Never allow:
+
+Driver → Owner Dashboard
+
+even by manually entering the URL.
+
+========================================================
+7. OWNER DASHBOARD
+========================================================
+
+Create a professional real-time Owner Command Center.
+
+Cards:
+
+Today's Trips
+Upcoming Trips
+Trips in Progress
+Completed Trips
+Cancelled Trips
+Today's Revenue
+Today's Collection
+Pending Payments
+Today's Expenses
+Today's Profit
+Total KM
+Monthly Revenue
+Monthly Expenses
+Monthly Profit
+Outstanding Balance
+
+All values MUST come from the database.
+
+No hardcoded numbers.
+
+========================================================
+8. OWNER DASHBOARD CHARTS
+========================================================
+
+Add real charts:
+
+Revenue by Day
+Trips by Day
+Expenses by Day
+Profit by Day
+Monthly Revenue
+Monthly Expenses
+Monthly Profit
+Trip Status Distribution
+Payment Status Distribution
+Top Destinations
+Top Customers
+
+Charts must update based on selected date range.
+
+========================================================
+9. DATE FILTER
+========================================================
+
+Global report/dashboard filters:
+
+Today
+Yesterday
+This Week
+Last Week
+This Month
+Last Month
+This Year
+Custom Range
+
+Changing date range must trigger actual database queries.
+
+Do not filter only frontend-loaded data.
+
+========================================================
+10. CUSTOMER MANAGEMENT
+========================================================
+
+Owner can create customers.
+
+Fields:
+
+Customer ID
+Name
+Mobile
+WhatsApp
+Alternate Number
+Email
+Address
+City
+Notes
+Created Date
+
+Customer profile:
+
+Total Trips
+Completed Trips
+Cancelled Trips
+Total Billing
+Total Paid
+Outstanding
+Last Trip
+Frequent Destinations
+
+Actions:
+
+Call
+WhatsApp
+Create Trip
+View History
+Edit
+Archive
+
+Search:
+
+Name
+Phone
+WhatsApp
+Customer ID
+
+Pagination required.
+
+========================================================
+11. CUSTOMER DUPLICATE DETECTION
+========================================================
+
+When adding a customer:
+
+Check mobile number.
+
+If customer already exists:
+
+Show:
+
+"Customer already exists."
+
+Allow Owner to open existing customer instead of creating duplicates.
+
+========================================================
+12. ENQUIRY / LEAD MANAGEMENT
+========================================================
+
+Add Enquiries module.
+
+Fields:
+
+Enquiry ID
+Customer
+Phone
+Trip Type
+Pickup
+Destination
+Travel Date
+Expected Passengers
+Expected KM
+Estimated Fare
+Source
+Notes
+Status
+
+Statuses:
+
+New
+Contacted
+Negotiating
+Confirmed
+Lost
+Cancelled
+
+Owner can convert Enquiry → Trip.
+
+When converted:
+
+Preserve customer information.
+
+========================================================
+13. CREATE TRIP
+========================================================
+
+Trip creation must contain:
+
+Customer
+Pickup
+Destination
+Stops
+Trip Type
+Start Date
+Start Time
+Return Date
+Return Time
+Passenger Count
+Notes
+
+Trip types:
+
+One Way
+Round Trip
+Local
+Outstation
+Airport Pickup
+Airport Drop
+Tour
+Multi-Day
+Corporate
+Wedding
+Custom
+
+========================================================
+14. DATE PICKER
+========================================================
+
+Trip Start Date must use a proper calendar picker.
+
+No plain text date input.
+
+Features:
+
+Calendar
+Month navigation
+Year selection
+Today
+Validation
+
+Store ISO date in database.
+
+========================================================
+15. TIME PICKER
+========================================================
+
+Use a proper time picker.
+
+Support:
+
+Hour
+Minute
+AM/PM
+
+Validate date + time correctly.
+
+========================================================
+16. GOOGLE MAPS
+========================================================
+
+Implement REAL Google Maps integration.
+
+Features:
+
+Google Maps
+Places Autocomplete
+Geocoding
+Reverse Geocoding
+Routes
+Route calculation
+Route alternatives
+Distance
+Duration
+Traffic duration where supported
+Toll information where supported
+Map markers
+
+Do NOT fake route data.
+
+========================================================
+17. PICKUP LOCATION
+========================================================
+
+Pickup supports:
+
+Google Search
+Autocomplete
+Map Pin Selection
+Drag Pin
+Current location where permitted
+
+Store:
+
+Name
+Address
+Latitude
+Longitude
+Place ID
+
+========================================================
+18. DESTINATION
+========================================================
+
+Same as Pickup.
+
+Store:
+
+Name
+Address
+Latitude
+Longitude
+Place ID
+
+========================================================
+19. MULTIPLE STOPS
+========================================================
+
+Allow:
+
++ Add Stop
+
+Each stop:
+
+Search
+Select
+Map Pin
+
+Allow:
+
+Reorder
+Delete
+Edit
+
+Route automatically recalculates.
+
+========================================================
+20. MAP ROUTE
+========================================================
+
+Display:
+
+Pickup marker
+Stop markers
+Destination marker
+Route polyline
+Alternative routes
+
+Route summary:
+
+Distance
+Duration
+Traffic duration
+Toll estimate
+
+========================================================
+21. ROUTE SELECTION
+========================================================
+
+If Google returns multiple routes:
+
+Display:
+
+Route A
+Route B
+Route C
+
+Owner selects route.
+
+Selected route is highlighted.
+
+Save selected route.
+
+========================================================
+22. TOLL
+========================================================
+
+If toll information is available:
+
+Show estimated toll.
+
+Example:
+
+Estimated Toll:
+₹250
+
+If unavailable:
+
+"Toll estimate unavailable."
+
+Do not invent toll values.
+
+Owner can manually enter final toll.
+
+Store:
+
+estimated_toll
+final_toll
+
+Customer calculation uses:
+
+final_toll
+
+========================================================
+23. BILLING KM
+========================================================
+
+Keep these values separate:
+
+Map Distance
+Billing KM
+
+Example:
+
+Google Map:
+
+86.4 KM
+
+Owner Billing KM:
+
+100 KM
+
+Do NOT overwrite Map Distance.
+
+========================================================
+24. RATE PER KM
+========================================================
+
+Owner enters:
+
+Rate Per KM
+
+Examples:
+
+₹18
+₹20
+₹25
+
+Do NOT hardcode ₹18.
+
+Default rate can come from Settings.
+
+Owner can override per trip.
+
+========================================================
+25. ADDITIONAL KM
+========================================================
+
+Support:
+
+Additional KM
+
+Examples:
+
+Local Travel
+Sightseeing
+Detour
+Extra Stop
+Hotel Pickup
+
+Formula:
+
+Calculated KM =
+Route KM + Return KM + Additional KM
+
+Owner can confirm/edit Billing KM.
+
+========================================================
+26. FARE CALCULATOR
+========================================================
+
+Real-time calculation.
+
+Formula:
+
+Base Fare =
+Billing KM × Rate Per KM
+
+Example:
+
+200 KM × ₹18
+
+= ₹3,600
+
+========================================================
+27. PARKING
+========================================================
+
+Parking is customer payable.
+
+Field:
+
+Parking Charge
+
+Default:
+
+₹0
+
+Owner can edit.
+
+========================================================
+28. OTHER CUSTOMER CHARGES
+========================================================
+
+Allow:
+
++ Add Charge
+
+Fields:
+
+Charge Name
+Amount
+
+Examples:
+
+Permit
+Hill Station Fee
+Waiting
+Night Charge
+Entry Fee
+Driver Bata
+Other
+
+========================================================
+29. CUSTOMER TOTAL
+========================================================
+
+Formula:
+
+Customer Total =
+Base Fare
++
+Final Toll
++
+Parking
++
+Other Charges
+
+========================================================
+30. ADVANCE
+========================================================
+
+Owner enters:
+
+Advance Received
+
+Blank:
+
+₹0
+
+No advance should never cause validation failure.
+
+========================================================
+31. FINAL BALANCE
+========================================================
+
+Formula:
+
+Balance =
+Customer Total - Advance
+
+Never show negative balance.
+
+If advance exceeds total:
+
+Balance = ₹0
+
+Show:
+
+Customer Credit
+
+========================================================
+32. FARE SUMMARY
+========================================================
+
+Display:
+
+Map Distance
+Billing KM
+Rate / KM
+Base Fare
+Toll
+Parking
+Other Charges
+Customer Total
+Advance
+Remaining Balance
+
+All values update instantly.
+
+========================================================
+33. DRIVER START KM
+========================================================
+
+Driver can enter:
+
+Starting Odometer KM
+
+Example:
+
+82450 KM
+
+Allow:
+
+Odometer Photo
+
+Save:
+
+Timestamp
+GPS location if permission available
+
+========================================================
+34. DRIVER TRIP STATUS
+========================================================
+
+Driver can update:
+
+Started
+Reached Pickup
+Customer Picked Up
+In Progress
+Reached Destination
+Return Started
+Completed
+
+Every update:
+
+Save database record
+Timestamp
+User
+Location if available
+Notify Owner
+Add timeline entry
+
+========================================================
+35. DRIVER NAVIGATION
+========================================================
+
+Driver sees:
+
+Pickup
+Destination
+Stops
+
+Buttons:
+
+Navigate to Pickup
+Navigate to Destination
+
+Open navigation using map provider.
+
+========================================================
+36. DRIVER CUSTOMER CONTACT
+========================================================
+
+Driver can:
+
+Call Customer
+WhatsApp Customer
+
+Do not expose unnecessary customer information.
+
+========================================================
+37. DRIVER CURRENT TRIP
+========================================================
+
+Driver Home:
+
+Current Trip
+
+Show:
+
+Customer
+Pickup
+Destination
+Start Time
+Trip Status
+Stops
+Important Notes
+
+Financial information must remain restricted.
+
+========================================================
+38. DRIVER END KM
+========================================================
+
+Driver enters:
+
+Ending KM
+
+Validate:
+
+Ending KM >= Starting KM
+
+Calculate:
+
+Actual KM =
+Ending KM - Starting KM
+
+Store:
+
+Starting KM
+Ending KM
+Actual KM
+
+========================================================
+39. DRIVER EXPENSES
+========================================================
+
+Driver can submit operational expenses.
+
+Categories:
+
+Fuel
+Toll
+Parking
+Permit
+Food
+Accommodation
+Repair
+Other
+
+Fields:
+
+Category
+Amount
+Description
+Receipt
+Date
+Time
+
+Status:
+
+Pending Approval
+Approved
+Rejected
+
+Owner approves/rejects.
+
+========================================================
+40. CUSTOMER TOLL VS DRIVER EXPENSE
+========================================================
+
+VERY IMPORTANT.
+
+Do NOT mix:
+
+Customer Toll Charge
+
+with
+
+Driver Operational Toll Expense.
+
+They are different records.
+
+Customer Toll:
+
+Used for customer billing.
+
+Driver Toll Expense:
+
+Used for company expense/profit.
+
+Same applies to:
+
+Parking.
+
+========================================================
+41. PAYMENT MANAGEMENT
+========================================================
+
+Owner can record:
+
+Advance
+Partial Payment
+Final Payment
+Refund
+
+Methods:
+
+Cash
+UPI
+Bank Transfer
+Card
+Cheque
+Other
+
+Store:
+
+Amount
+Method
+Reference
+Date
+Notes
+Created By
+
+========================================================
+42. AUTOMATIC PAYMENT BALANCE
+========================================================
+
+Do not manually type final balance.
+
+Calculate from:
+
+Customer Total
+-
+All Valid Payments
+
+Example:
+
+Total:
+
+₹10,000
+
+Advance:
+
+₹2,000
+
+Final Payment:
+
+₹3,000
+
+Balance:
+
+₹5,000
+
+========================================================
+43. PAYMENT HISTORY
+========================================================
+
+Trip payment page:
+
+Payment 1
+₹2,000
+UPI
+Date
+
+Payment 2
+₹3,000
+Cash
+Date
+
+Total Paid:
+₹5,000
+
+Balance:
+₹5,000
+
+========================================================
+44. REFUND
+========================================================
+
+Owner can issue refund.
+
+Record:
+
+Refund Amount
+Reason
+Method
+Reference
+Date
+
+Never delete original payment.
+
+========================================================
+45. TRIP TIMELINE
+========================================================
+
+Every trip must have timeline.
+
+Example:
+
+10:20 AM
+Trip Created
+
+10:25 AM
+Route Confirmed
+
+10:30 AM
+Advance Received
+
+06:15 AM
+Driver Started
+
+06:45 AM
+Reached Pickup
+
+07:00 AM
+Customer Picked Up
+
+10:00 AM
+Destination Reached
+
+10:15 AM
+Trip Completed
+
+10:20 AM
+Payment Updated
+
+Timeline must be database-backed.
+
+========================================================
+46. NOTIFICATIONS
+========================================================
+
+Real notification system.
+
+Owner receives:
+
+New Enquiry
+Trip Created
+Trip Updated
+Trip Starting Soon
+Driver Started
+Driver Reached Pickup
+Trip Completed
+Expense Submitted
+Payment Added
+Payment Pending
+Trip Cancelled
+
+Driver receives:
+
+Trip Available
+Trip Updated
+Trip Time Reminder
+Owner Message
+Trip Cancelled
+Important Trip Update
+
+========================================================
+47. NOTIFICATION CENTER
+========================================================
+
+Features:
+
+Unread count
+Mark read
+Mark all read
+Delete notification
+Filter
+Notification timestamp
+
+Click notification:
+
+Navigate to relevant trip/customer/payment.
+
+========================================================
+48. REAL-TIME UPDATES
+========================================================
+
+Where practical implement:
+
+WebSocket
+Socket.IO
+Supabase Realtime
+or equivalent.
+
+Owner should see Driver status updates without manually refreshing.
+
+If real-time connection fails:
+
+Fallback to safe polling.
+
+========================================================
+49. TRIP REMINDERS
+========================================================
+
+Automatic reminders:
+
+24 hours before
+2 hours before
+1 hour before
+
+Avoid duplicate notifications.
+
+========================================================
+50. REPORTS
+========================================================
+
+Owner-only.
+
+Reports:
+
+Daily
+Weekly
+Monthly
+Custom Range
+
+========================================================
+51. DAILY REPORT
+========================================================
+
+Show:
+
+Trips
+Completed
+Cancelled
+Billing KM
+Base Fare
+Toll
+Parking
+Other Charges
+Total Customer Billing
+Payments
+Outstanding
+Expenses
+Profit
+
+========================================================
+52. WEEKLY REPORT
+========================================================
+
+Show:
+
+Trips
+Revenue
+Payments
+Expenses
+Profit
+Outstanding
+Total KM
+Average Trip Value
+Top Destination
+
+Compare previous week.
+
+========================================================
+53. MONTHLY REPORT
+========================================================
+
+Show:
+
+Total Trips
+Completed
+Cancelled
+Revenue
+Collection
+Expenses
+Profit
+Outstanding
+Total KM
+Average Fare
+Top Customers
+Top Destinations
+Payment Methods
+
+========================================================
+54. PROFIT CALCULATION
+========================================================
+
+Do NOT calculate profit as simply:
+
+Customer Total - Advance.
+
+Correct business reporting:
+
+Revenue =
+Customer billing
+
+Expenses =
+Approved operational expenses
+
+Profit =
+Revenue - Approved Expenses
+
+Advance is NOT revenue reduction.
+
+Advance is a payment received against revenue.
+
+========================================================
+55. REPORT FILTERS
+========================================================
+
+Filters:
+
+Date
+Customer
+Trip Type
+Destination
+Status
+Payment Status
+Driver
+Payment Method
+
+All filters must query backend/database.
+
+========================================================
+56. EXCEL EXPORT
+========================================================
+
+Owner can export:
+
+Daily
+Weekly
+Monthly
+Custom
+
+Generate REAL XLSX.
+
+Columns:
+
+Booking ID
+Date
+Customer
+Phone
+Pickup
+Destination
+Trip Type
+Map KM
+Billing KM
+Rate/KM
+Base Fare
+Toll
+Parking
+Other Charges
+Customer Total
+Advance
+Paid
+Balance
+Starting KM
+Ending KM
+Actual KM
+Expenses
+Profit
+Payment Status
+Trip Status
+
+Use proper Excel formatting.
+
+Freeze header.
+
+Auto-size columns.
+
+Currency formatting.
+
+Date formatting.
+
+Totals row where appropriate.
+
+========================================================
+57. PDF EXPORT
+========================================================
+
+Generate professional PDF.
+
+Include:
+
+NG Travels Logo
+Report Title
+Date Range
+Summary
+Detailed Table
+Total Revenue
+Total Expenses
+Profit
+Outstanding
+
+========================================================
+58. CUSTOMER CONFIRMATION
+========================================================
+
+Generate customer booking summary.
+
+Show:
+
+NG Travels
+Booking ID
+Customer
+Phone
+Pickup
+Destination
+Date
+Time
+Route
+Map KM
+Billing KM
+Rate
+Base Fare
+Toll
+Parking
+Other Charges
+Total
+Advance
+Balance
+
+Do not show:
+
+Company profit
+Internal expenses
+Internal notes
+Driver private data
+
+========================================================
+59. CUSTOMER COPY
+========================================================
+
+Allow:
+
+Print
+PDF
+Share
+WhatsApp
+
+========================================================
+60. TRIP SEARCH
+========================================================
+
+Search by:
+
+Booking ID
+Customer
+Phone
+Pickup
+Destination
+
+Backend search.
+
+Do not download entire database to frontend just for search.
+
+========================================================
+61. PAGINATION
+========================================================
+
+Use server-side pagination.
+
+For:
+
+Customers
+Trips
+Payments
+Expenses
+Reports where applicable
+
+Do not load thousands of records at once.
+
+========================================================
+62. SORTING
+========================================================
+
+Support sorting:
+
+Date
+Amount
+Status
+Customer
+Destination
+
+========================================================
+63. FILTER PERSISTENCE
+========================================================
+
+When navigating report pages:
+
+Keep selected filters where appropriate.
+
+========================================================
+64. AUDIT LOG
+========================================================
+
+Owner-only.
+
+Track:
+
+Login
+Logout
+Trip Created
+Trip Edited
+Fare Changed
+Billing KM Changed
+Toll Changed
+Parking Changed
+Advance Added
+Payment Added
+Refund
+Expense Approved
+Expense Rejected
+Trip Cancelled
+Settings Changed
+
+Store:
+
+User
+Role
+Action
+Entity
+Entity ID
+Old Value
+New Value
+Timestamp
+IP/device information where legally appropriate
+
+========================================================
+65. DATABASE DESIGN
+========================================================
+
+Use PostgreSQL.
+
+Recommended entities:
+
+users
+roles
+permissions
+user_permissions
+
+customers
+customer_notes
+
+enquiries
+
+trips
+trip_stops
+trip_routes
+trip_route_options
+trip_status_history
+trip_km_logs
+
+trip_charges
+trip_expenses
+
+payments
+refunds
+
+notifications
+
+audit_logs
+
+app_settings
+
+reports if required
+
+Do not duplicate data unnecessarily.
+
+Use proper relationships.
+
+========================================================
+66. DATABASE INTEGRITY
+========================================================
+
+Use:
+
+Foreign Keys
+Indexes
+Unique Constraints
+Transactions
+Validation
+Soft Delete where appropriate
+
+Important indexes:
+
+customer phone
+booking ID
+trip date
+trip status
+payment status
+driver/user ID
+created date
+
+========================================================
+67. FINANCIAL DATA
+========================================================
+
+Do not use floating point for financial values.
+
+Use database numeric/decimal types.
+
+Avoid:
+
+999.999999
+
+Use:
+
+999.99
+
+All currency calculations must be consistent.
+
+========================================================
+68. BACKEND API
+========================================================
+
+Create proper APIs.
+
+Examples:
+
+POST /api/auth/login
+
+POST /api/auth/logout
+
+GET /api/me
+
+GET /api/customers
+
+POST /api/customers
+
+GET /api/customers/:id
+
+PATCH /api/customers/:id
+
+GET /api/trips
+
+POST /api/trips
+
+GET /api/trips/:id
+
+PATCH /api/trips/:id
+
+POST /api/trips/:id/status
+
+POST /api/trips/:id/payments
+
+POST /api/trips/:id/expenses
+
+POST /api/trips/:id/refunds
+
+GET /api/reports/daily
+
+GET /api/reports/weekly
+
+GET /api/reports/monthly
+
+GET /api/reports/custom
+
+GET /api/reports/export/excel
+
+GET /api/reports/export/pdf
+
+GET /api/notifications
+
+PATCH /api/notifications/:id/read
+
+GET /api/audit-logs
+
+========================================================
+69. API SECURITY
+========================================================
+
+Every endpoint must verify:
+
+Authentication
+Role
+Permission
+Resource ownership
+
+Example:
+
+Driver A must NOT access Driver B's private trip.
+
+Driver must NOT call:
+
+/api/reports/monthly
+
+and receive data.
+
+Return:
+
+403 Forbidden
+
+========================================================
+70. FRONTEND ROUTING
+========================================================
+
+Owner routes:
+
+/owner
+/owner/dashboard
+/owner/customers
+/owner/enquiries
+/owner/trips
+/owner/trips/new
+/owner/trips/:id
+/owner/payments
+/owner/expenses
+/owner/reports
+/owner/notifications
+/owner/settings
+/owner/audit
+
+Driver routes:
+
+/driver
+/driver/home
+/driver/trips
+/driver/trips/:id
+/driver/notifications
+/driver/profile
+
+Protect all routes.
+
+========================================================
+71. NO CROSS-ROLE DATA LEAK
+========================================================
+
+This is critical.
+
+Do not merely hide Owner screens.
+
+Backend must prevent access.
+
+Example:
+
+Driver tries:
+
+GET /api/reports/monthly
+
+Return:
+
+403
+
+Driver tries:
+
+GET /api/customers/all
+
+Return:
+
+403
+
+Driver tries to modify fare:
+
+403
+
+Driver tries to modify advance:
+
+403
+
+Driver tries to modify customer phone:
+
+403
+
+========================================================
+72. OWNER EDIT PERMISSIONS
+========================================================
+
+Owner can edit:
+
+Customer
+Route
+Date
+Time
+Billing KM
+Rate
+Toll
+Parking
+Other Charges
+Advance
+Payments
+Trip Status
+Notes
+
+All financial changes should create audit log.
+
+========================================================
+73. DRIVER EDIT PERMISSIONS
+========================================================
+
+Driver can edit only operational information:
+
+Starting KM
+Ending KM
+Trip Status
+Driver Notes
+Operational Expense submission
+Receipt
+
+Everything else is read-only.
+
+========================================================
+74. OFFLINE / BAD NETWORK
+========================================================
+
+Driver may have poor network.
+
+Implement graceful handling.
+
+If network unavailable:
+
+Show:
+
+"Connection unavailable."
+
+Do not lose entered Starting KM / Ending KM.
+
+Use local temporary state where safe.
+
+When connection returns:
+
+Sync safely.
+
+Do not duplicate submissions.
+
+========================================================
+75. DUPLICATE SUBMISSION PROTECTION
+========================================================
+
+Prevent double clicking:
+
+Save
+Payment
+Expense
+Start Trip
+Complete Trip
+
+Use:
+
+Loading states
+Idempotency where required
+Backend validation
+
+========================================================
+76. ERROR HANDLING
+========================================================
+
+No blank error screens.
+
+Handle:
+
+Google Maps error
+Database error
+Network error
+Authentication error
+Validation error
+Payment error
+Excel generation error
+PDF generation error
+
+Show meaningful user-friendly messages.
+
+Log technical details server-side.
+
+========================================================
+77. LOADING STATES
+========================================================
+
+Every API action needs:
+
+Loading
+Success
+Error
+
+Examples:
+
+Calculating Route...
+Saving Trip...
+Saving Payment...
+Generating Excel...
+Generating PDF...
+
+========================================================
+78. EMPTY STATES
+========================================================
+
+Examples:
+
+No Trips Today
+No Customers Found
+No Payments
+No Expenses
+No Notifications
+No Report Data
+
+Give useful action buttons.
+
+========================================================
+79. MOBILE DRIVER UI
+========================================================
+
+Driver app must be mobile-first.
+
+Large buttons.
+
+Easy navigation.
+
+Important actions:
+
+Start Trip
+Navigate
+Reached Pickup
+Customer Picked Up
+Reached Destination
+Complete Trip
+
+must be easy to tap.
+
+Avoid tiny controls.
+
+========================================================
+80. OWNER RESPONSIVE UI
+========================================================
+
+Owner dashboard:
+
+Desktop-first but responsive.
+
+Support:
+
+Mobile
+Tablet
+Laptop
+Desktop
+
+No horizontal scrolling.
+
+========================================================
+81. DARK THEME
+========================================================
+
+NG Travels branding:
+
+Dark background
+White text
+Yellow/gold accent
+Subtle borders
+Professional cards
+Clean typography
+
+Do not overuse:
+
+Glass effects
+Glow
+Huge gradients
+Animations
+
+Functionality is more important than decoration.
+
+========================================================
+82. SETTINGS
+========================================================
+
+Owner settings:
+
+Company Name
+Logo
+Phone
+WhatsApp
+Email
+Address
+Default Rate/KM
+Currency
+Business Hours
+Notification Settings
+Receipt Settings
+Report Settings
+
+Default Rate/KM is only a default.
+
+Owner can change per trip.
+
+========================================================
+83. GOOGLE MAP API SECURITY
+========================================================
+
+Use environment variables.
+
+Never hardcode secret keys.
+
+Example:
+
+GOOGLE_MAPS_API_KEY
+
+DATABASE_URL
+
+SESSION_SECRET
+
+etc.
+
+Apply API restrictions.
+
+Do not expose server-only secrets to browser.
+
+========================================================
+84. GOOGLE MAP API EFFICIENCY
+========================================================
+
+Do not call APIs unnecessarily.
+
+Use:
+
+Debounced autocomplete
+Caching
+Route request only when required
+Avoid duplicate route calls
+
+Do not call API on every keystroke unnecessarily.
+
+========================================================
+85. REAL DATA FETCHING
+========================================================
+
+Every dashboard card must use real database queries.
+
+Every list must fetch from backend.
+
+Every detail page must fetch by ID.
+
+Every report must calculate from database.
+
+Every chart must use actual data.
+
+Do not create:
+
+const trips = [...]
+const revenue = 50000
+
+as fake data.
+
+========================================================
+86. NO STATIC DATA
+========================================================
+
+Search entire codebase for:
+
+mock
+dummy
+sample
+fake
+placeholder
+hardcoded
+TODO
+coming soon
+
+Remove or replace with real implementation.
+
+If a feature cannot be implemented:
+
+Clearly report it instead of pretending it works.
+
+========================================================
+87. AUTOMATIC CALCULATION CONSISTENCY
+========================================================
+
+Use one centralized fare calculation service.
+
+Do not implement fare formulas separately in:
+
+Frontend
+Backend
+Reports
+PDF
+Excel
+
+Create one source of truth.
+
+Formula:
+
+baseFare =
+billingKm × ratePerKm
+
+customerTotal =
+baseFare
++
+toll
++
+parking
++
+otherCharges
+
+balance =
+customerTotal
+-
+totalValidPayments
+
+Profit:
+
+revenue
+-
+approvedExpenses
+
+========================================================
+88. IMPORTANT PAYMENT RULE
+========================================================
+
+Do NOT use only "Advance" as the payment source.
+
+A trip may have:
+
+Advance
+Partial Payment
+Final Payment
+
+Balance must use:
+
+Total Valid Payments
+
+Example:
+
+Total = ₹10,000
+
+Advance = ₹2,000
+
+Second Payment = ₹3,000
+
+Final Payment = ₹5,000
+
+Balance = ₹0
+
+========================================================
+89. TRIP EDITING
+========================================================
+
+When Owner edits:
+
+Pickup
+Destination
+Stops
+
+recalculate route.
+
+When Owner edits:
+
+Billing KM
+Rate
+Toll
+Parking
+Other Charges
+Payments
+
+recalculate financial summary.
+
+Do not accidentally reset unrelated fields.
+
+========================================================
+90. ROUTE SNAPSHOT
+========================================================
+
+When trip is confirmed:
+
+Save route snapshot.
+
+Store:
+
+Pickup
+Destination
+Stops
+Selected Route
+Distance
+Duration
+Toll Estimate
+Polyline where appropriate
+
+This allows historical trips to preserve original route information even if map routing changes later.
+
+========================================================
+91. CONFIRMATION LOCK
+========================================================
+
+Once trip is completed:
+
+Operational data should be locked.
+
+Owner can reopen/edit with explicit action.
+
+If financial values are changed after completion:
+
+Create audit log.
+
+========================================================
+92. REPORT ACCURACY
+========================================================
+
+Reports must calculate from actual records.
+
+Example:
+
+Revenue:
+Sum of confirmed/completed customer billings based on selected reporting rule.
+
+Payments:
+Sum of valid payment records.
+
+Expenses:
+Sum of approved expenses.
+
+Profit:
+Revenue - approved expenses.
+
+Outstanding:
+Customer totals - valid payments.
+
+Document the exact reporting rules in code.
+
+========================================================
+93. REPORT PERFORMANCE
+========================================================
+
+Do not load every trip to browser to calculate monthly reports.
+
+Use backend/database aggregation.
+
+For example:
+
+SUM
+COUNT
+GROUP BY
+
+Use proper database queries.
+
+========================================================
+94. EXCEL ACCURACY
+========================================================
+
+Excel values must come from same backend calculation service.
+
+Never calculate a different value inside Excel generator.
+
+========================================================
+95. PDF ACCURACY
+========================================================
+
+PDF values must use same backend source.
+
+Never create a second calculation formula.
+
+========================================================
+96. CUSTOMER COMMUNICATION
+========================================================
+
+Provide customer communication actions:
+
+Call
+WhatsApp
+Share Booking
+Share Payment Receipt
+
+Use customer phone stored in database.
+
+========================================================
+97. DRIVER PROFILE
+========================================================
+
+Driver profile:
+
+Name
+Phone
+Profile Photo
+License information if business requires
+Emergency Contact if business requires
+Joined Date
+Status
+
+Driver sees own profile.
+
+Owner can manage driver accounts.
+
+========================================================
+98. DRIVER TRIP HISTORY
+========================================================
+
+Driver sees only their permitted trip history.
+
+Filters:
+
+Today
+This Week
+This Month
+Completed
+Cancelled
+
+No Owner financial analytics.
+
+========================================================
+99. OWNER DRIVER MANAGEMENT
+========================================================
+
+Owner can:
+
+Create Driver
+Edit Driver
+Deactivate Driver
+Reset Password
+View Driver Activity
+
+Do NOT create a separate vehicle assignment module.
+
+========================================================
+100. SECURITY
+========================================================
+
+Implement:
+
+Password hashing
+Secure cookies/session
+CSRF protection where applicable
+Input validation
+SQL injection prevention
+XSS prevention
+Rate limiting on authentication
+API authorization
+Secure headers
+Environment variables
+No secrets in Git
+No secrets in frontend
+
+========================================================
+101. DATABASE TRANSACTIONS
+========================================================
+
+Use transactions for:
+
+Trip creation
+Payment creation
+Refund
+Expense approval
+Trip completion
+
+If one operation fails:
+
+Rollback.
+
+Never leave partial data.
+
+========================================================
+102. SOFT DELETE
+========================================================
+
+For important records:
+
+Do not permanently delete by default.
+
+Use:
+
+deletedAt
+
+or
+
+archived status.
+
+Especially:
+
+Customers
+Trips
+Payments
+Expenses
+
+Never delete financial records casually.
+
+========================================================
+103. AUDITABLE FINANCIAL CHANGES
+========================================================
+
+If Owner changes:
+
+Rate
+Billing KM
+Toll
+Parking
+Other Charges
+Total
+Advance
+Payment
+
+record:
+
+Old value
+New value
+Changed by
+Timestamp
+Reason if appropriate
+
+========================================================
+104. GLOBAL SEARCH
+========================================================
+
+Owner global search:
+
+Customer
+Booking
+Phone
+Destination
+Payment reference
+
+Return categorized results.
+
+========================================================
+105. DASHBOARD QUICK ACTIONS
+========================================================
+
+Owner:
+
+New Customer
+New Enquiry
+Create Trip
+Add Payment
+Add Expense
+Daily Report
+
+Driver:
+
+Current Trip
+My Trips
+Notifications
+Profile
+
+========================================================
+106. TRIP DETAIL PAGE
+========================================================
+
+Owner trip detail should contain tabs:
+
+Overview
+Route
+Fare
+Payments
+Expenses
+Timeline
+Documents
+Audit
+
+Driver:
+
+Overview
+Route
+Status
+KM
+Expenses
+Timeline
+
+Do not expose Owner-only tabs to Driver.
+
+========================================================
+107. DOCUMENTS
+========================================================
+
+Allow Owner to store trip-related documents where useful:
+
+Booking confirmation
+Payment receipt
+Customer document
+Permit
+Invoice
+
+Use secure storage.
+
+Do not expose private documents to unauthorized users.
+
+========================================================
+108. DATA VALIDATION
+========================================================
+
+Customer phone:
+
+Validate.
+
+Billing KM:
+
+>= 0
+
+Rate:
+
+> 0
+
+Toll:
+
+>= 0
+
+Parking:
+
+>= 0
+
+Other Charges:
+
+>= 0
+
+Advance:
+
+>= 0
+
+Payment:
+
+> 0
+
+Ending KM:
+
+>= Starting KM
+
+Return Date/Time:
+
+>= Start Date/Time
+
+========================================================
+109. FARE EXAMPLE
+========================================================
+
+Test:
+
+Map Distance:
+
+86.4 KM
+
+Billing KM:
+
+200 KM
+
+Rate:
+
+₹18
+
+Base Fare:
+
+₹3,600
+
+Toll:
+
+₹150
+
+Parking:
+
+₹200
+
+Other:
+
+₹300
+
+Customer Total:
+
+₹4,250
+
+Payment:
+
+₹1,000
+
+Balance:
+
+₹3,250
+
+The exact same values must appear in:
+
+Trip
+Dashboard
+Payment
+Customer Copy
+PDF
+Excel
+Reports
+
+========================================================
+110. SECOND PAYMENT TEST
+========================================================
+
+Customer Total:
+
+₹4,250
+
+Payment 1:
+
+₹1,000
+
+Payment 2:
+
+₹2,000
+
+Payment 3:
+
+₹1,250
+
+Balance:
+
+₹0
+
+Payment Status:
+
+Fully Paid
+
+========================================================
+111. DRIVER KM TEST
+========================================================
+
+Starting KM:
+
+82,450
+
+Ending KM:
+
+82,675
+
+Actual KM:
+
+225 KM
+
+Ensure:
+
+225 >= 0
+
+Store all values.
+
+========================================================
+112. NOTIFICATION TEST
+========================================================
+
+When Driver clicks:
+
+Start Trip
+
+Owner receives:
+
+"Driver has started trip NG-2026-000001."
+
+When Driver clicks:
+
+Reached Pickup
+
+Owner receives notification.
+
+When Driver clicks:
+
+Completed
+
+Owner receives notification.
+
+========================================================
+113. ROLE TEST
+========================================================
+
+Create:
+
+Owner Account
+
+Driver Account
+
+Test:
+
+Owner login → Owner Dashboard
+
+Driver login → Driver Dashboard
+
+Driver manually accesses:
+
+/owner/dashboard
+
+Must receive:
+
+403 / redirect.
+
+Driver API access to reports:
+
+Must receive:
+
+403.
+
+Driver cannot modify fare.
+
+Must receive:
+
+403.
+
+========================================================
+114. DATABASE FETCH TEST
+========================================================
+
+Create customer.
+
+Refresh browser.
+
+Customer must still exist.
+
+Create trip.
+
+Refresh.
+
+Trip must still exist.
+
+Add payment.
+
+Refresh.
+
+Payment must still exist.
+
+Update status.
+
+Refresh.
+
+Status must still exist.
+
+This proves data is actually persisted.
+
+========================================================
+115. NO FAKE SUCCESS
+========================================================
+
+Never show:
+
+"Saved successfully"
+
+unless backend actually confirms success.
+
+Never show:
+
+"Payment successful"
+
+unless payment record is actually created.
+
+Never show:
+
+"Route calculated"
+
+unless routing API actually returns route.
+
+========================================================
+116. CONSOLE CLEANUP
+========================================================
+
+Before completion:
+
+No unnecessary console errors.
+
+No React warnings.
+
+No failed API requests.
+
+No broken images.
+
+No missing keys.
+
+No unhandled promise rejection.
+
+No TypeScript errors.
+
+========================================================
+117. API TESTING
+========================================================
+
+Test APIs independently.
+
+Test:
+
+Authentication
+Customers
+Trips
+Payments
+Expenses
+Reports
+Notifications
+Role restrictions
+
+========================================================
+118. END-TO-END TEST
+========================================================
+
+Perform this complete test:
+
+1. Owner login
+2. Create customer
+3. Create enquiry
+4. Convert enquiry to trip
+5. Select Pickup
+6. Select Destination
+7. Select map pins
+8. Add stop
+9. Calculate route
+10. Select route
+11. Verify distance
+12. Verify toll if available
+13. Set Billing KM
+14. Set Rate/KM
+15. Add Parking
+16. Add Other Charges
+17. Add Advance
+18. Verify Total
+19. Verify Balance
+20. Save trip
+21. Refresh
+22. Verify trip
+23. Driver login
+24. Driver sees permitted trip
+25. Driver navigates
+26. Driver enters Starting KM
+27. Driver starts trip
+28. Owner receives notification
+29. Driver updates status
+30. Driver adds expense
+31. Driver enters Ending KM
+32. Driver completes trip
+33. Owner sees completion
+34. Owner adds payment
+35. Verify balance
+36. Generate customer copy
+37. Generate PDF
+38. Generate Excel
+39. Open Daily Report
+40. Open Weekly Report
+41. Open Monthly Report
+42. Verify calculations
+43. Verify audit logs
+
+========================================================
+119. PERFORMANCE
+========================================================
+
+Optimize:
+
+Database queries
+API responses
+Google Maps calls
+Images
+Charts
+Reports
+Excel generation
+
+Use:
+
+Pagination
+Indexes
+Caching where appropriate
+Debouncing
+Lazy loading
+
+========================================================
+120. FINAL UI QUALITY
+========================================================
+
+The application should look like a professional commercial SaaS product.
+
+Do not make it look like:
+
+College project
+Basic CRUD application
+Template dashboard
+Static admin panel
+
+Use:
+
+Consistent spacing
+Clear hierarchy
+Professional cards
+Good typography
+Responsive tables
+Proper forms
+Useful empty states
+Good loading states
+Good error states
+
+========================================================
+121. FINAL ARCHITECTURE
+========================================================
+
+Recommended stack:
+
+Frontend:
+
+React / Next.js
+TypeScript
+Tailwind CSS
+
+Backend:
+
+Node.js / Next.js API
+
+Database:
+
+PostgreSQL
+
+ORM:
+
+Prisma or Drizzle
+
+Validation:
+
+Zod
+
+Authentication:
+
+Secure session/JWT architecture
+
+Maps:
+
+Google Maps Platform
+
+Realtime:
+
+Socket.IO / WebSocket / Supabase Realtime
+
+Excel:
+
+ExcelJS
+
+PDF:
+
+Professional PDF library
+
+Use the existing project stack if it is already stable.
+
+Do not rewrite the entire project unnecessarily.
+
+========================================================
+122. ENVIRONMENT VARIABLES
+========================================================
+
+Use .env:
+
+DATABASE_URL
+SESSION_SECRET
+GOOGLE_MAPS_API_KEY
+GOOGLE_MAPS_SERVER_KEY if required
+Other required secrets
+
+Never commit .env.
+
+Create/update:
+
+.env.example
+
+========================================================
+123. MIGRATION
+========================================================
+
+If existing database exists:
+
+Do NOT destroy production data.
+
+Create migrations.
+
+Backup before destructive migration.
+
+Preserve existing customer/trip/payment records.
+
+========================================================
+124. SEED DATA
+========================================================
+
+For development only, create optional seed data.
+
+Clearly separate:
+
+Development seed data
+
+from
+
+Production data.
+
+Do not display fake seed data in production.
+
+========================================================
+125. FINAL ACCEPTANCE CRITERIA
+========================================================
+
+The project is NOT complete until:
+
+AUTHENTICATION WORKS
+
+RBAC WORKS
+
+OWNER WORKSPACE WORKS
+
+DRIVER WORKSPACE WORKS
+
+CUSTOMERS WORK
+
+ENQUIRIES WORK
+
+TRIPS WORK
+
+GOOGLE MAPS WORK
+
+LOCATION SEARCH WORKS
+
+MAP PIN SELECTION WORKS
+
+ROUTE CALCULATION WORKS
+
+STOPS WORK
+
+TOLL ESTIMATION WORKS WHERE AVAILABLE
+
+MANUAL TOLL WORKS
+
+BILLING KM WORKS
+
+RATE/KM WORKS
+
+FARE CALCULATION WORKS
+
+PARKING WORKS
+
+OTHER CHARGES WORK
+
+ADVANCE WORKS
+
+MULTIPLE PAYMENTS WORK
+
+BALANCE WORKS
+
+DRIVER START KM WORKS
+
+DRIVER END KM WORKS
+
+ACTUAL KM WORKS
+
+DRIVER STATUS WORKS
+
+DRIVER EXPENSES WORK
+
+OWNER EXPENSE APPROVAL WORKS
+
+NOTIFICATIONS WORK
+
+REAL-TIME UPDATES WORK WHERE IMPLEMENTED
+
+CUSTOMER COPY WORKS
+
+PDF WORKS
+
+EXCEL WORKS
+
+DAILY REPORT WORKS
+
+WEEKLY REPORT WORKS
+
+MONTHLY REPORT WORKS
+
+SEARCH WORKS
+
+FILTERS WORK
+
+PAGINATION WORKS
+
+AUDIT LOG WORKS
+
+SECURITY WORKS
+
+DATABASE PERSISTENCE WORKS
+
+MOBILE UI WORKS
+
+DESKTOP UI WORKS
+
+NO FAKE DATA
+
+NO DEAD BUTTONS
+
+NO BROKEN API
+
+NO ROLE DATA LEAK
+
+NO UNHANDLED ERRORS
+
+========================================================
+126. IMPORTANT FINAL INSTRUCTION
+========================================================
+
+Do not rush into coding.
+
+First:
+
+AUDIT
+→ PLAN
+→ DATABASE
+→ AUTH/RBAC
+→ BACKEND
+→ API
+→ FRONTEND
+→ GOOGLE MAPS
+→ FARE ENGINE
+→ OWNER
+→ DRIVER
+→ PAYMENTS
+→ NOTIFICATIONS
+→ REPORTS
+→ EXPORTS
+→ SECURITY
+→ TESTING
+→ POLISH
+
+After implementation, run a complete production audit.
+
+For every feature report:
+
+STATUS:
+WORKING / PARTIAL / NOT WORKING
+
+Do not claim a feature is working if it has not actually been tested.
+
+The final result must be a genuinely functional NG Travels Travel Management System where:
+
+OWNER controls the business.
+
+DRIVER handles operational trip execution.
+
+CUSTOMER information is managed properly.
+
+GOOGLE MAPS handles route planning.
+
+FARE is calculated accurately.
+
+PAYMENTS are tracked accurately.
+
+EXPENSES are tracked separately.
+
+NOTIFICATIONS keep users informed.
+
+REPORTS use real database data.
+
+EXCEL/PDF contain real calculated values.
+
+RBAC prevents unauthorized access.
+
+Every important action is auditable.
+
+The application must be ready for real-world daily use.

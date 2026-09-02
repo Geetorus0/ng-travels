@@ -12,14 +12,14 @@ import {
 } from 'lucide-react';
 import {
   getGetCustomerQueryKey, getGetDashboardQueryKey, getGetReportSummaryQueryKey,
-  getGetTripQueryKey, getListCustomersQueryKey, getListNotificationsQueryKey,
+  getGetTripQueryKey, getGetSettingsQueryKey, getListCustomersQueryKey, getListNotificationsQueryKey,
   getListTripsQueryKey, getListAuditLogsQueryKey, getListTripExpensesQueryKey,
   getListTripPaymentsQueryKey, useArchiveCustomer, useCreateCustomer,
   useCreateTrip, useCreateTripExpense, useCreateTripPayment, useGetCustomer,
-  useGetDashboard, useGetReportSummary, useGetTrip, useListAuditLogs,
+  useGetDashboard, useGetReportSummary, useGetSettings, useGetTrip, useListAuditLogs,
   useListCustomers, useListNotifications, useListTripExpenses, useListTripPayments,
   useListTrips, useMarkNotificationRead, useUpdateCustomer, useUpdateTrip,
-  useUpdateTripOperations, useUpdateTripStatus,
+  useUpdateSettings, useUpdateTripOperations, useUpdateTripStatus,
 } from '@workspace/api-client-react';
 import type { Customer, CustomerInput, ExpenseInput, PaymentInput, TripInput, TripUpdate } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -91,6 +91,7 @@ const clerkAppearance = {
 };
 
 const money = (value?: number | null) => `₹${Math.round(value ?? 0).toLocaleString('en-IN')}`;
+const moneyExact = (value?: number | null) => `₹${(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dateLabel = (value?: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const shortDate = (value?: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
 const initials = (name?: string) => (name ?? 'NG').split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
@@ -107,17 +108,17 @@ function Button({ children, className = '', variant = 'primary', onClick, type =
   return <button data-testid={testId} type={type} disabled={disabled} onClick={onClick} className={`focus-ring pressable inline-flex items-center justify-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold disabled:pointer-events-none disabled:opacity-50 ${styles[variant]} ${className}`}>{children}</button>;
 }
 
-function Field({ label, value, onChange, placeholder, type = 'text', required = false, multiline = false, testId }: {
-  label: string; value?: string | number; onChange?: (value: string) => void; placeholder?: string; type?: string; required?: boolean; multiline?: boolean; testId: string;
+function Field({ label, value, onChange, placeholder, type = 'text', required = false, multiline = false, step, min, testId }: {
+  label: string; value?: string | number; onChange?: (value: string) => void; placeholder?: string; type?: string; required?: boolean; multiline?: boolean; step?: string; min?: string; testId: string;
 }) {
   const common = { value: value ?? '', required, placeholder, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(event.target.value), className: 'focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary' };
-  return <label className="block text-xs font-bold text-foreground/80"><span>{label}{required && <span className="ml-1 text-accent">*</span>}</span>{multiline ? <textarea data-testid={testId} {...common} rows={3} /> : <input data-testid={testId} {...common} type={type} />}</label>;
+  return <label className="block text-xs font-bold text-foreground/80"><span>{label}{required && <span className="ml-1 text-accent">*</span>}</span>{multiline ? <textarea data-testid={testId} {...common} rows={3} /> : <input data-testid={testId} {...common} type={type} step={step} min={min} />}</label>;
 }
 
 function StatusPill({ status }: { status?: string }) {
-  const label = (status ?? 'pending').replaceAll('_', ' ');
+  const label = (status ?? 'upcoming').replaceAll('_', ' ');
   const tone = label.includes('complete') ? 'bg-primary/12 text-primary' : label.includes('cancel') ? 'bg-destructive/12 text-destructive' : label.includes('progress') || label.includes('start') ? 'bg-accent/20 text-accent-foreground' : 'bg-secondary text-secondary-foreground';
-  return <span data-testid={`status-${status ?? 'pending'}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>;
+  return <span data-testid={`status-${status ?? 'upcoming'}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>;
 }
 
 function Skeleton({ className = '' }: { className?: string }) { return <div className={`skeleton rounded-lg ${className}`} />; }
@@ -159,11 +160,15 @@ function Metric({ icon: Icon, label, value, note, accent = false, trend }: { ico
 
 function DashboardPage() {
   const query = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
+  const { user } = useUser();
   if (query.isLoading) return <LoadingState label="Syncing today’s runs" />;
   if (query.isError) return <ErrorState retry={() => query.refetch()} />;
   const data = query.data;
   const metrics = data?.metrics;
-  return <div className="stagger"><PageHeader eyebrow={data?.date ? dateLabel(data.date) : 'Monday, 21 October'} title="Good morning, Arjun." copy="Here’s what needs your attention today." action={<Link href="/trips/new" data-testid="link-create-trip" className="focus-ring"><Button><Plus size={16} />New trip</Button></Link>} />
+  const displayName = user?.firstName || user?.username || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  return <div className="stagger"><PageHeader eyebrow={data?.date ? dateLabel(data.date) : 'Today'} title={`${greeting}, ${displayName}.`} copy="Here’s what needs your attention today." action={<Link href="/trips/new" data-testid="link-create-trip" className="focus-ring"><Button><Plus size={16} />New trip</Button></Link>} />
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric icon={CalendarDays} label="Today’s trips" value={String(metrics?.todaysTrips ?? 0)} note={`${metrics?.started ?? 0} started · ${metrics?.completedToday ?? 0} completed`} accent /><Metric icon={CircleDollarSign} label="Collection today" value={money(metrics?.todaysCollection)} note={`${money(metrics?.paymentPending)} still pending`} trend="8.4%" /><Metric icon={Fuel} label="Expenses today" value={money(metrics?.todaysExpenses)} note="Operational spend" /><Metric icon={TrendingUp} label="Today’s profit" value={money(metrics?.todaysProfit)} note="After recorded expenses" accent /></div>
     <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_.85fr]"><section className="surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="eyebrow mb-1">Live schedule</p><h2 className="font-extrabold">Today’s runs</h2></div><Link href="/trips" data-testid="link-view-all-trips" className="text-xs font-bold text-primary hover:underline">View all <ChevronRight className="inline" size={13} /></Link></div><div className="divide-y">{(data?.schedule ?? []).length ? data?.schedule.map((item) => <Link href={`/trips/${item.id}`} data-testid={`row-schedule-${item.id}`} key={item.id} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/60"><div className="w-12 shrink-0"><p className="mono text-xs font-bold">{item.time}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.bookingId}</p></div><div className="h-9 w-px bg-border" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{item.pickup} <span className="mx-1 font-normal text-muted-foreground">to</span> {item.destination}</p><p className="mt-1 text-xs text-muted-foreground">{item.customerName}</p></div><StatusPill status={item.status} /><ChevronRight size={16} className="text-muted-foreground" /></Link>) : <EmptyState icon={CalendarDays} title="No runs on the board" copy="New bookings will appear here as soon as they’re added." action={<Link href="/trips/new"><Button><Plus size={14} />Add a trip</Button></Link>} />}</div></section><section className="surface rounded-2xl p-5"><div className="flex items-center justify-between"><div><p className="eyebrow mb-1">Pulse</p><h2 className="font-extrabold">Recent activity</h2></div><Sparkles className="text-accent" size={18} /></div><div className="mt-5 space-y-5">{(data?.recentActivity ?? []).length ? data?.recentActivity.map((item) => <div data-testid={`activity-${item.id}`} key={item.id} className="flex gap-3"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" /><div><p className="text-sm font-bold">{item.title}</p><p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.detail}</p><p className="mono mt-1.5 text-[10px] text-muted-foreground">{item.timestamp}</p></div></div>) : <p className="py-8 text-center text-sm text-muted-foreground">No recent activity.</p>}</div></section></div>
     <section className="mt-5 grid gap-5 md:grid-cols-3"><div className="surface rounded-2xl p-5"><p className="eyebrow">This week</p><p className="mt-3 text-2xl font-extrabold">{money(metrics?.weeklyProfit)}</p><p className="mt-1 text-xs text-muted-foreground">profit · {money(metrics?.weeklyRevenue)} revenue</p><div className="mt-5 flex h-2 gap-1 overflow-hidden rounded-full bg-muted"><span className="w-[66%] rounded-full bg-primary" /><span className="w-[20%] rounded-full bg-accent" /></div></div><div className="surface rounded-2xl p-5"><p className="eyebrow">This month</p><p className="mt-3 text-2xl font-extrabold">{money(metrics?.monthlyRevenue)}</p><p className="mt-1 text-xs text-muted-foreground">revenue · {money(metrics?.monthlyExpenses)} costs</p><div className="mt-5 flex items-center gap-2 text-xs font-bold text-primary"><ArrowUpRight size={14} />Healthy operating margin</div></div><div className="rounded-2xl bg-accent p-5 text-accent-foreground"><p className="eyebrow text-accent-foreground/60">Quick action</p><p className="mt-3 text-lg font-extrabold">Close the loop on a run.</p><p className="mt-1 text-xs leading-relaxed text-accent-foreground/75">Record a payment or expense from any trip detail.</p><Link href="/trips" data-testid="link-quick-action" className="mt-5 inline-flex items-center gap-2 text-xs font-extrabold underline underline-offset-4">Open trip board <ArrowUpRight size={14} /></Link></div></section>
@@ -202,15 +207,422 @@ function TripsPage() {
   const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [date, setDate] = useState('');
   const params = useMemo(() => ({ search: search || undefined, status: status || undefined, date: date || undefined, page: 1, limit: 50 }), [search, status, date]);
   const query = useListTrips(params, { query: { queryKey: getListTripsQueryKey(params) } });
-  return <div><PageHeader eyebrow="Trip board" title="Trips" copy="Every booking, route and rupee in one dependable view." action={<Link href="/trips/new"><Button testId="button-new-trip"><Plus size={16} />New trip</Button></Link>} /><div className="surface mb-5 flex flex-col gap-3 rounded-2xl p-3 lg:flex-row"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><input data-testid="input-search-trips" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search booking, customer or route" className="focus-ring w-full rounded-lg bg-muted/70 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><div className="flex gap-2 overflow-auto"><select data-testid="select-trip-status" value={status} onChange={(event) => setStatus(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold"><option value="">All statuses</option><option value="pending">Pending</option><option value="started">Started</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input data-testid="input-trip-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold" /></div></div>{query.isLoading ? <LoadingState label="Loading trip board" /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data?.items ?? []).length === 0 ? <EmptyState icon={Navigation} title="No trips match those filters" copy="Try widening the date or status filter, or create a fresh booking." action={<Link href="/trips/new"><Button><Plus size={14} />Create a trip</Button></Link>} /> : <div className="surface overflow-hidden rounded-2xl"><div className="hidden grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] gap-4 border-b bg-muted/40 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground md:grid"><span>Booking</span><span>Route</span><span>Customer</span><span>When</span><span>Status</span><span /></div><div className="divide-y">{query.data?.items.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-trip-${trip.id}`} key={trip.id} className="grid grid-cols-1 gap-3 px-5 py-4 transition-colors hover:bg-muted/50 md:grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] md:items-center md:gap-4"><div><p className="mono text-xs font-bold text-primary">{trip.bookingId}</p><p className="mt-1 text-[10px] text-muted-foreground">{trip.tripType}</p></div><div className="flex items-start gap-2 text-sm font-bold"><MapPin className="mt-0.5 shrink-0 text-accent" size={14} /><span>{trip.pickup.name} <span className="mx-1 font-normal text-muted-foreground">to</span> {trip.destination.name}</span></div><p className="text-sm font-bold">{trip.customerName}<span className="mt-1 block text-xs font-normal text-muted-foreground">{trip.customerMobile}</span></p><p className="text-xs font-bold">{shortDate(trip.startDate)}<span className="mt-1 block mono text-[10px] font-normal text-muted-foreground">{trip.startTime}</span></p><StatusPill status={trip.status} /><ChevronRight className="hidden text-muted-foreground md:block" size={16} /></Link>)}</div></div>}</div>;
+  return <div><PageHeader eyebrow="Trip board" title="Trips" copy="Every booking, route and rupee in one dependable view." action={<Link href="/trips/new"><Button testId="button-new-trip"><Plus size={16} />New trip</Button></Link>} /><div className="surface mb-5 flex flex-col gap-3 rounded-2xl p-3 lg:flex-row"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><input data-testid="input-search-trips" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search booking, customer or route" className="focus-ring w-full rounded-lg bg-muted/70 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><div className="flex gap-2 overflow-auto"><select data-testid="select-trip-status" value={status} onChange={(event) => setStatus(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold"><option value="">All statuses</option><option value="upcoming">Upcoming</option><option value="started">Started</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input data-testid="input-trip-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold" /></div></div>{query.isLoading ? <LoadingState label="Loading trip board" /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data?.items ?? []).length === 0 ? <EmptyState icon={Navigation} title="No trips match those filters" copy="Try widening the date or status filter, or create a fresh booking." action={<Link href="/trips/new"><Button><Plus size={14} />Create a trip</Button></Link>} /> : <div className="surface overflow-hidden rounded-2xl"><div className="hidden grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] gap-4 border-b bg-muted/40 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground md:grid"><span>Booking</span><span>Route</span><span>Customer</span><span>When</span><span>Status</span><span /></div><div className="divide-y">{query.data?.items.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-trip-${trip.id}`} key={trip.id} className="grid grid-cols-1 gap-3 px-5 py-4 transition-colors hover:bg-muted/50 md:grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] md:items-center md:gap-4"><div><p className="mono text-xs font-bold text-primary">{trip.bookingId}</p><p className="mt-1 text-[10px] text-muted-foreground">{trip.tripType}</p></div><div className="flex items-start gap-2 text-sm font-bold"><MapPin className="mt-0.5 shrink-0 text-accent" size={14} /><span>{trip.pickup.name} <span className="mx-1 font-normal text-muted-foreground">to</span> {trip.destination.name}</span></div><p className="text-sm font-bold">{trip.customerName}<span className="mt-1 block text-xs font-normal text-muted-foreground">{trip.customerMobile}</span></p><p className="text-xs font-bold">{shortDate(trip.startDate)}<span className="mt-1 block mono text-[10px] font-normal text-muted-foreground">{trip.startTime}</span></p><StatusPill status={trip.status} /><ChevronRight className="hidden text-muted-foreground md:block" size={16} /></Link>)}</div></div>}</div>;
 }
 
 function TripFormPage() {
-  const [, setLocation] = useLocation(); const create = useCreateTrip();
-  const [form, setForm] = useState({ customerId: '', customerName: '', customerMobile: '', tripType: 'one_way', pickup: '', destination: '', startDate: new Date().toISOString().slice(0, 10), startTime: '09:00', returnDate: '', returnTime: '', passengerCount: '1', billingKm: '', ratePerKm: '', toll: '0', parking: '0', otherCharges: '0', advance: '0', notes: '', specialInstructions: '' });
-  const set = (key: string) => (value: string) => setForm((old) => ({ ...old, [key]: value }));
-  const submit = (event: React.FormEvent) => { event.preventDefault(); const payload: TripInput = { customerId: Number(form.customerId), customerName: form.customerName, customerMobile: form.customerMobile, tripType: form.tripType, pickup: { name: form.pickup, address: form.pickup }, destination: { name: form.destination, address: form.destination }, startDate: form.startDate, startTime: form.startTime, returnDate: form.returnDate || undefined, returnTime: form.returnTime || undefined, passengerCount: Number(form.passengerCount), billingKm: Number(form.billingKm), ratePerKm: Number(form.ratePerKm), toll: Number(form.toll), parking: Number(form.parking), otherCharges: Number(form.otherCharges), advance: Number(form.advance), notes: form.notes || undefined, specialInstructions: form.specialInstructions || undefined }; create.mutate({ data: payload }, { onSuccess: (trip) => { queryClient.invalidateQueries({ queryKey: getListTripsQueryKey() }); setLocation(`/trips/${trip.id}`); } }); };
-  return <div className="mx-auto max-w-4xl"><PageHeader eyebrow="New booking" title="Plan a trip" copy="Capture the route first. Fare and payment stay transparent all the way through." action={<Link href="/trips"><Button variant="outline"><ArrowLeft size={15} />Back to trips</Button></Link>} /><form onSubmit={submit} className="space-y-5"><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-5 flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">01</span><div><h2 className="font-extrabold">Passenger</h2><p className="text-xs text-muted-foreground">Who is this booking for?</p></div></div><div className="grid gap-4 sm:grid-cols-3"><Field label="Customer ID" required type="number" value={form.customerId} onChange={set('customerId')} placeholder="e.g. 104" testId="input-trip-customer-id" /><Field label="Customer name" required value={form.customerName} onChange={set('customerName')} testId="input-trip-customer-name" /><Field label="Mobile" required value={form.customerMobile} onChange={set('customerMobile')} testId="input-trip-customer-mobile" /></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-5 flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">02</span><div><h2 className="font-extrabold">Route & timing</h2><p className="text-xs text-muted-foreground">The details your driver needs at a glance.</p></div></div><div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold text-foreground/80"><span>Trip type</span><select data-testid="select-trip-type" value={form.tripType} onChange={(event) => set('tripType')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="one_way">One way</option><option value="round_trip">Round trip</option><option value="local">Local</option><option value="airport">Airport transfer</option></select></label><Field label="Passengers" required type="number" value={form.passengerCount} onChange={set('passengerCount')} testId="input-trip-passengers" /><Field label="Pickup" required value={form.pickup} onChange={set('pickup')} placeholder="Pickup point" testId="input-trip-pickup" /><Field label="Destination" required value={form.destination} onChange={set('destination')} placeholder="Destination" testId="input-trip-destination" /><Field label="Start date" required type="date" value={form.startDate} onChange={set('startDate')} testId="input-trip-start-date" /><Field label="Start time" required type="time" value={form.startTime} onChange={set('startTime')} testId="input-trip-start-time" /><Field label="Return date" type="date" value={form.returnDate} onChange={set('returnDate')} testId="input-trip-return-date" /><Field label="Return time" type="time" value={form.returnTime} onChange={set('returnTime')} testId="input-trip-return-time" /></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-5 flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">03</span><div><h2 className="font-extrabold">Fare & collection</h2><p className="text-xs text-muted-foreground">Build the customer total from real route inputs.</p></div></div><div className="grid gap-4 sm:grid-cols-3"><Field label="Billing kilometres" required type="number" value={form.billingKm} onChange={set('billingKm')} testId="input-trip-billing-km" /><Field label="Rate per kilometre" required type="number" value={form.ratePerKm} onChange={set('ratePerKm')} testId="input-trip-rate" /><Field label="Advance received" type="number" value={form.advance} onChange={set('advance')} testId="input-trip-advance" /><Field label="Toll" type="number" value={form.toll} onChange={set('toll')} testId="input-trip-toll" /><Field label="Parking" type="number" value={form.parking} onChange={set('parking')} testId="input-trip-parking" /><Field label="Other charges" type="number" value={form.otherCharges} onChange={set('otherCharges')} testId="input-trip-other" /></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="grid gap-4 sm:grid-cols-2"><Field label="Internal notes" multiline value={form.notes} onChange={set('notes')} testId="input-trip-notes" /><Field label="Special instructions" multiline value={form.specialInstructions} onChange={set('specialInstructions')} testId="input-trip-instructions" /></div></section><div className="flex justify-end gap-3 pb-5"><Link href="/trips"><Button variant="outline">Cancel</Button></Link><Button type="submit" disabled={create.isPending}>{create.isPending && <Loader2 className="animate-spin" size={14} />}Create trip</Button></div></form></div>;
+  const [, setLocation] = useLocation();
+  const create = useCreateTrip();
+  const customerParams = { page: 1, limit: 100 };
+  const customers = useListCustomers(customerParams, {
+    query: { queryKey: getListCustomersQueryKey(customerParams) },
+  });
+  const [form, setForm] = useState({
+    customerId: '',
+    tripType: 'one_way',
+    pickup: '',
+    destination: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    startTime: '09:00',
+    returnDate: '',
+    returnTime: '',
+    passengerCount: '1',
+    billingKm: '',
+    ratePerKm: '',
+    toll: '',
+    parking: '0',
+    otherCharges: '0',
+    advance: '0',
+    notes: '',
+    specialInstructions: '',
+  });
+  const set = (key: string) => (value: string) =>
+    setForm((old) => ({ ...old, [key]: value }));
+  const selectedCustomer = customers.data?.items?.find(
+    (customer) => String(customer.id) === form.customerId,
+  );
+  const billingKm = Number(form.billingKm) || 0;
+  const ratePerKm = Number(form.ratePerKm) || 0;
+  const toll = Number(form.toll) || 0;
+  const parking = Number(form.parking) || 0;
+  const otherCharges = Number(form.otherCharges) || 0;
+  const paid = Number(form.advance) || 0;
+  const baseFare = Math.round(billingKm * ratePerKm * 100) / 100;
+  const customerTotal =
+    Math.round((baseFare + toll + parking + otherCharges) * 100) / 100;
+  const balance = Math.max(
+    0,
+    Math.round((customerTotal - paid) * 100) / 100,
+  );
+  const credit = Math.max(0, Math.round((paid - customerTotal) * 100) / 100);
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCustomer || billingKm <= 0 || ratePerKm <= 0) return;
+    const payload: TripInput = {
+      customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
+      customerMobile: selectedCustomer.mobile,
+      tripType: form.tripType,
+      pickup: { name: form.pickup, address: form.pickup },
+      destination: { name: form.destination, address: form.destination },
+      startDate: form.startDate,
+      startTime: form.startTime,
+      returnDate: form.returnDate || undefined,
+      returnTime: form.returnTime || undefined,
+      passengerCount: Number(form.passengerCount),
+      billingKm,
+      ratePerKm,
+      toll: form.toll === '' ? undefined : toll,
+      parking,
+      otherCharges,
+      advance: paid,
+      notes: form.notes || undefined,
+      specialInstructions: form.specialInstructions || undefined,
+    };
+    create.mutate(
+      { data: payload },
+      {
+        onSuccess: (trip) => {
+          queryClient.invalidateQueries({ queryKey: getListTripsQueryKey() });
+          setLocation(`/trips/${trip.id}`);
+        },
+      },
+    );
+  };
+  return (
+    <div className="mx-auto max-w-4xl">
+      <PageHeader
+        eyebrow="New booking"
+        title="Plan a trip"
+        copy="Capture the route first. Fare and payment stay transparent all the way through."
+        action={
+          <Link href="/trips">
+            <Button variant="outline">
+              <ArrowLeft size={15} />Back to trips
+            </Button>
+          </Link>
+        }
+      />
+      <form onSubmit={submit} className="space-y-5">
+        <section className="surface rounded-2xl p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
+              01
+            </span>
+            <div>
+              <h2 className="font-extrabold">Passenger</h2>
+              <p className="text-xs text-muted-foreground">
+                Select an existing customer record.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-bold text-foreground/80">
+              <span>
+                Customer<span className="ml-1 text-accent">*</span>
+              </span>
+              <select
+                required
+                data-testid="select-trip-customer"
+                value={form.customerId}
+                onChange={(event) => set('customerId')(event.target.value)}
+                className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
+              >
+                <option value="">Select customer</option>
+                {(customers.data?.items ?? []).map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} · {customer.mobile}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-lg border border-dashed bg-muted/35 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Selected contact
+              </p>
+              <p className="mt-1 text-sm font-bold">
+                {selectedCustomer?.name ?? 'Choose a customer'}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {selectedCustomer?.mobile ?? 'Customer details will be used on the booking'}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="surface rounded-2xl p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
+              02
+            </span>
+            <div>
+              <h2 className="font-extrabold">Route & timing</h2>
+              <p className="text-xs text-muted-foreground">
+                Use clear locations now; live Google route data is unavailable.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-bold text-foreground/80">
+              <span>Trip type</span>
+              <select
+                data-testid="select-trip-type"
+                value={form.tripType}
+                onChange={(event) => set('tripType')(event.target.value)}
+                className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
+              >
+                <option value="one_way">One way</option>
+                <option value="round_trip">Round trip</option>
+                <option value="local">Local</option>
+                <option value="airport">Airport transfer</option>
+              </select>
+            </label>
+            <Field
+              label="Passengers"
+              required
+              type="number"
+              min="1"
+              value={form.passengerCount}
+              onChange={set('passengerCount')}
+              testId="input-trip-passengers"
+            />
+            <Field
+              label="Pickup"
+              required
+              value={form.pickup}
+              onChange={set('pickup')}
+              placeholder="Pickup point"
+              testId="input-trip-pickup"
+            />
+            <Field
+              label="Destination"
+              required
+              value={form.destination}
+              onChange={set('destination')}
+              placeholder="Destination"
+              testId="input-trip-destination"
+            />
+            <Field
+              label="Start date"
+              required
+              type="date"
+              value={form.startDate}
+              onChange={set('startDate')}
+              testId="input-trip-start-date"
+            />
+            <Field
+              label="Start time"
+              required
+              type="time"
+              value={form.startTime}
+              onChange={set('startTime')}
+              testId="input-trip-start-time"
+            />
+            <Field
+              label="Return date"
+              type="date"
+              value={form.returnDate}
+              onChange={set('returnDate')}
+              testId="input-trip-return-date"
+            />
+            <Field
+              label="Return time"
+              type="time"
+              value={form.returnTime}
+              onChange={set('returnTime')}
+              testId="input-trip-return-time"
+            />
+          </div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+            <div className="flex min-h-44 flex-col justify-between rounded-xl border border-dashed border-accent/50 bg-accent/5 p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-accent/15 p-2 text-accent-foreground">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <p className="font-extrabold">Google Maps unavailable</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Connect Google Maps Platform to enable Places selection,
+                    route drawing, automatic distance, duration, traffic and toll estimates.
+                  </p>
+                </div>
+              </div>
+              <p className="mt-5 text-xs font-bold text-accent-foreground">
+                No route values are being invented.
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="eyebrow">Route summary</p>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Distance
+                  </p>
+                  <p className="mt-1 text-sm font-extrabold">Unavailable</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    Google route required
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Duration
+                  </p>
+                  <p className="mt-1 text-sm font-extrabold">Unavailable</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    No fabricated estimate
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="surface rounded-2xl p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
+              03
+            </span>
+            <div>
+              <h2 className="font-extrabold">Fare & collection</h2>
+              <p className="text-xs text-muted-foreground">
+                Billing KM is a manual fallback until a real Google route is available.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label="Billing KM"
+              required
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={form.billingKm}
+              onChange={set('billingKm')}
+              placeholder="Enter fallback KM"
+              testId="input-trip-billing-km"
+            />
+            <Field
+              label="Rate per KM"
+              required
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={form.ratePerKm}
+              onChange={set('ratePerKm')}
+              testId="input-trip-rate"
+            />
+            <Field
+              label="Advance / paid"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.advance}
+              onChange={set('advance')}
+              testId="input-trip-advance"
+            />
+            <Field
+              label="Final toll override"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.toll}
+              onChange={set('toll')}
+              placeholder="Toll unavailable"
+              testId="input-trip-toll"
+            />
+            <Field
+              label="Parking"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.parking}
+              onChange={set('parking')}
+              testId="input-trip-parking"
+            />
+            <Field
+              label="Other charges"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.otherCharges}
+              onChange={set('otherCharges')}
+              testId="input-trip-other"
+            />
+          </div>
+          <div className="mt-5 rounded-xl bg-sidebar p-5 text-sidebar-foreground">
+            <div className="flex items-center justify-between">
+              <p className="eyebrow text-sidebar-foreground/55">Fare preview</p>
+              <span className="text-[10px] font-bold text-sidebar-foreground/50">
+                Server recalculates on save
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
+                  Base fare
+                </p>
+                <p className="mt-1 text-lg font-extrabold">{moneyExact(baseFare)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
+                  Customer total
+                </p>
+                <p className="mt-1 text-lg font-extrabold">{moneyExact(customerTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
+                  Balance
+                </p>
+                <p className="mt-1 text-lg font-extrabold">{moneyExact(balance)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
+                  Credit
+                </p>
+                <p className="mt-1 text-lg font-extrabold">{moneyExact(credit)}</p>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-sidebar-foreground/55">
+              Toll estimate unavailable until Google Maps is connected. Enter a final toll only when the business has a confirmed amount.
+            </p>
+          </div>
+        </section>
+
+        <section className="surface rounded-2xl p-5 md:p-7">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Internal notes"
+              multiline
+              value={form.notes}
+              onChange={set('notes')}
+              testId="input-trip-notes"
+            />
+            <Field
+              label="Special instructions"
+              multiline
+              value={form.specialInstructions}
+              onChange={set('specialInstructions')}
+              testId="input-trip-instructions"
+            />
+          </div>
+        </section>
+        {create.isError && (
+          <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm font-bold text-destructive">
+            Couldn’t save this trip. Check the required fields and try again.
+          </p>
+        )}
+        <div className="flex justify-end gap-3 pb-5">
+          <Link href="/trips">
+            <Button variant="outline">Cancel</Button>
+          </Link>
+          <Button type="submit" disabled={create.isPending || !selectedCustomer}>
+            {create.isPending && <Loader2 className="animate-spin" size={14} />}
+            {create.isPending ? 'Saving trip…' : 'Save trip'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 function TripDetailPage({ driverView = false }: { driverView?: boolean }) {
@@ -235,7 +647,61 @@ function NotificationsPage() { const query = useListNotifications({ query: { que
 
 function AuditLogsPage() { const query = useListAuditLogs({ query: { queryKey: getListAuditLogsQueryKey() } }); return <div><PageHeader eyebrow="Accountability" title="Audit logs" copy="A quiet, complete history of important workspace changes." /><div className="surface overflow-hidden rounded-2xl">{query.isLoading ? <div className="p-5"><LoadingState /></div> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data ?? []).length ? <div className="divide-y">{query.data?.map((log) => <div data-testid={`row-audit-${log.id}`} key={log.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_1fr_.8fr_1.3fr] sm:items-center"><div><p className="text-sm font-extrabold capitalize">{log.action.replaceAll('_', ' ')}</p><p className="mono mt-1 text-[10px] text-muted-foreground">{log.entity} · {log.entityId}</p></div><p className="text-xs text-muted-foreground">{log.actorName || 'System'}</p><p className="mono text-[10px] text-muted-foreground">{new Date(log.createdAt).toLocaleString('en-IN')}</p><p className="truncate text-xs text-muted-foreground">{log.newValue || log.oldValue || 'Record updated'}</p></div>)}</div> : <EmptyState icon={ShieldCheck} title="No audit events yet" copy="Changes to trips, customers and payments will appear here." />}</div></div>; }
 
-function SettingsPage() { const [saved, setSaved] = useState(false); const [form, setForm] = useState({ company: 'NG Travels', mobile: '+91 98450 21867', email: 'hello@ngtravels.in', currency: 'INR', timezone: 'Asia/Kolkata', defaultRate: '18' }); const set = (key: string) => (value: string) => setForm({ ...form, [key]: value }); return <div className="mx-auto max-w-4xl"><PageHeader eyebrow="Workspace controls" title="Settings" copy="Keep the operating defaults close to the way your business actually runs." /><div className="grid gap-5 lg:grid-cols-[.75fr_1.25fr]"><div className="surface h-fit rounded-2xl p-2"><div className="rounded-xl bg-primary/10 px-4 py-3 text-sm font-extrabold text-primary">Company profile</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Operations defaults</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Notifications</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Security</div></div><div className="space-y-5"><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6 flex items-center justify-between"><div><p className="eyebrow mb-1">Company profile</p><h2 className="font-extrabold">The details customers see</h2></div><Settings2 className="text-primary" size={19} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Business name" value={form.company} onChange={set('company')} testId="input-setting-company" /><Field label="Phone" value={form.mobile} onChange={set('mobile')} testId="input-setting-mobile" /><Field label="Email" type="email" value={form.email} onChange={set('email')} testId="input-setting-email" /><label className="block text-xs font-bold">Currency<select data-testid="select-setting-currency" value={form.currency} onChange={(event) => set('currency')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="INR">INR · Indian Rupee</option><option value="USD">USD · US Dollar</option></select></label></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6"><p className="eyebrow mb-1">Operations defaults</p><h2 className="font-extrabold">Make new trips faster</h2></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Timezone" value={form.timezone} onChange={set('timezone')} testId="input-setting-timezone" /><Field label="Default rate per kilometre" type="number" value={form.defaultRate} onChange={set('defaultRate')} testId="input-setting-rate" /></div><div className="mt-5 flex items-center justify-between border-t pt-5"><span className={`text-xs font-bold ${saved ? 'text-primary' : 'text-muted-foreground'}`}>{saved ? 'Saved just now' : 'Changes are local until saved'}</span><Button onClick={() => { setSaved(true); window.setTimeout(() => setSaved(false), 2400); }} testId="button-save-settings"><Check size={14} />Save settings</Button></div></section></div></div></div>; }
+function SettingsPage() {
+  const queryClient = useQueryClient();
+  const settings = useGetSettings({
+    query: { queryKey: getGetSettingsQueryKey() },
+  });
+  const update = useUpdateSettings();
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState({
+    company: "NG Travels",
+    mobile: "+91 98450 21867",
+    email: "hello@ngtravels.in",
+    currency: "INR",
+    timezone: "Asia/Kolkata",
+    defaultRate: "18",
+  });
+
+  useEffect(() => {
+    if (!settings.data) return;
+    setForm({
+      company: settings.data.company,
+      mobile: settings.data.mobile,
+      email: settings.data.email,
+      currency: settings.data.currency,
+      timezone: settings.data.timezone,
+      defaultRate: String(settings.data.defaultRate),
+    });
+  }, [settings.data]);
+
+  const set = (key: keyof typeof form) => (value: string) =>
+    setForm((old) => ({ ...old, [key]: value }));
+  const save = () => {
+    update.mutate(
+      {
+        data: {
+          company: form.company,
+          mobile: form.mobile,
+          email: form.email,
+          currency: form.currency,
+          timezone: form.timezone,
+          defaultRate: Number(form.defaultRate) || 0,
+        },
+      },
+      {
+        onSuccess: (next) => {
+          queryClient.setQueryData(getGetSettingsQueryKey(), next);
+          setSaved(true);
+          window.setTimeout(() => setSaved(false), 2400);
+        },
+      },
+    );
+  };
+  if (settings.isLoading) return <LoadingState label="Loading workspace settings" />;
+  if (settings.isError) return <ErrorState retry={() => settings.refetch()} />;
+  return <div className="mx-auto max-w-4xl"><PageHeader eyebrow="Workspace controls" title="Settings" copy="Keep the operating defaults close to the way your business actually runs." /><div className="grid gap-5 lg:grid-cols-[.75fr_1.25fr]"><div className="surface h-fit rounded-2xl p-2"><div className="rounded-xl bg-primary/10 px-4 py-3 text-sm font-extrabold text-primary">Company profile</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Operations defaults</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Notifications</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Security</div></div><div className="space-y-5"><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6 flex items-center justify-between"><div><p className="eyebrow mb-1">Company profile</p><h2 className="font-extrabold">The details customers see</h2></div><Settings2 className="text-primary" size={19} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Business name" value={form.company} onChange={set('company')} testId="input-setting-company" /><Field label="Phone" value={form.mobile} onChange={set('mobile')} testId="input-setting-mobile" /><Field label="Email" type="email" value={form.email} onChange={set('email')} testId="input-setting-email" /><label className="block text-xs font-bold">Currency<select data-testid="select-setting-currency" value={form.currency} onChange={(event) => set('currency')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="INR">INR · Indian Rupee</option><option value="USD">USD · US Dollar</option></select></label></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6"><p className="eyebrow mb-1">Operations defaults</p><h2 className="font-extrabold">Make new trips faster</h2></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Timezone" value={form.timezone} onChange={set('timezone')} testId="input-setting-timezone" /><Field label="Default rate per kilometre" type="number" min="0" step="0.01" value={form.defaultRate} onChange={set('defaultRate')} testId="input-setting-rate" /></div><div className="mt-5 flex items-center justify-between border-t pt-5"><span className={`text-xs font-bold ${saved ? 'text-primary' : 'text-muted-foreground'}`}>{saved ? 'Saved just now' : 'Changes are saved to the workspace'}</span><Button onClick={save} disabled={update.isPending} testId="button-save-settings">{update.isPending && <Loader2 className="animate-spin" size={14} />}{update.isPending ? 'Saving…' : <><Check size={14} />Save settings</>}</Button></div>{update.isError && <p className="mt-3 text-xs font-bold text-destructive">Couldn’t save settings. Try again.</p>}</section></div></div></div>;
+}
 
 function DriverHome() { const trips = useListTrips({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }, { query: { queryKey: getListTripsQueryKey({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }) } }); return <div className="mx-auto max-w-xl"><div className="mb-7 flex items-center justify-between"><Link href="/dashboard" data-testid="link-driver-brand" className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span className="text-sm font-extrabold">NG Travels</span></Link><span className="rounded-full bg-primary/10 px-3 py-1.5 text-[10px] font-extrabold text-primary">Driver view</span></div><div className="rounded-2xl bg-sidebar p-6 text-sidebar-foreground"><p className="eyebrow text-sidebar-foreground/55">Today · {dateLabel(new Date().toISOString().slice(0, 10))}</p><h1 className="mt-3 text-3xl font-extrabold">Your runs, at a glance.</h1><p className="mt-2 text-sm text-sidebar-foreground/65">Stay focused on the next pickup.</p><div className="mt-7 flex items-center gap-7"><div><p className="text-3xl font-extrabold text-accent">{trips.data?.items.length ?? 0}</p><p className="mt-1 text-xs text-sidebar-foreground/60">assigned today</p></div><div className="h-10 w-px bg-sidebar-border" /><div><p className="text-3xl font-extrabold">{(trips.data?.items ?? []).filter((trip) => trip.status === 'completed').length}</p><p className="mt-1 text-xs text-sidebar-foreground/60">completed</p></div></div></div><div className="mt-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-extrabold">Next on your route</h2><Link href="/driver/trips" className="text-xs font-bold text-primary">All trips</Link></div>{trips.isLoading ? <LoadingState /> : (trips.data?.items ?? []).length ? <div className="space-y-3">{trips.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`card-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex items-center justify-between"><span className="mono text-[10px] font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><div className="mt-4 flex gap-3"><div className="flex flex-col items-center pt-1"><span className="h-2.5 w-2.5 rounded-full border-2 border-primary" /><span className="my-1 h-7 w-px bg-border" /><span className="h-2.5 w-2.5 rounded-full bg-accent" /></div><div className="space-y-3 text-sm font-bold"><p>{trip.pickup.name}<span className="ml-2 text-xs font-normal text-muted-foreground">{trip.startTime}</span></p><p>{trip.destination.name}</p></div></div></Link>)}</div> : <EmptyState icon={Navigation} title="No trips assigned today" copy="Your next assignment will appear here." />}</div></div>; }
 function DriverTripsPage() { const query = useListTrips({ page: 1, limit: 50 }, { query: { queryKey: getListTripsQueryKey({ page: 1, limit: 50 }) } }); return <div className="mx-auto max-w-2xl"><div className="mb-6 flex items-center gap-3"><Link href="/driver" className="rounded-lg p-2 hover:bg-muted"><ArrowLeft size={18} /></Link><div><p className="eyebrow">Driver view</p><h1 className="text-xl font-extrabold">Your trips</h1></div></div>{query.isLoading ? <LoadingState /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : <div className="space-y-3">{query.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`row-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex justify-between"><span className="mono text-xs font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><p className="mt-3 text-sm font-extrabold">{trip.pickup.name} <span className="font-normal text-muted-foreground">to</span> {trip.destination.name}</p><div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>{shortDate(trip.startDate)} · {trip.startTime}</span><span>{trip.customerName}</span></div></Link>)}</div>}</div>; }
