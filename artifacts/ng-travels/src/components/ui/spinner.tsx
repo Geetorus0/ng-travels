@@ -1,12 +1,12 @@
 import { cn } from '@/lib/utils';
-import { Loader2Icon } from 'lucide-react';
+import { Compass } from 'lucide-react';
 
 function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
   return (
-    <Loader2Icon
+    <Compass
       role="status"
-      aria-label="Loading"
-      className={cn('size-4 animate-spin', className)}
+      aria-label="NG Travels Operations Loading"
+      className={cn('size-4 text-amber-400 animate-spin', className)}
       {...props}
     />
   );

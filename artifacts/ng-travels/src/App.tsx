@@ -1,748 +1,1175 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
-import { shadcn } from '@clerk/themes';
+import React, { type ReactNode, createContext, useContext, useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ClerkProvider, useClerk, useUser } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import { shadcn } from "@clerk/themes";
 import {
   Archive, ArrowLeft, ArrowUpRight, BarChart3, Bell, CalendarDays,
   Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, Clock3,
-  Download, FileText, Fuel, LayoutDashboard, Loader2, LogOut, MapPin, Menu,
+  Download, FileText, Fuel, LayoutDashboard, LogOut, MapPin, Menu,
   Navigation, Pencil, Plus, Receipt, RefreshCw, Search, Settings2, ShieldCheck,
-  SlidersHorizontal, Sparkles, TrendingUp, Users, WalletCards, X, XCircle
-} from 'lucide-react';
-import {
-  getGetCustomerQueryKey, getGetDashboardQueryKey, getGetReportSummaryQueryKey,
-  getGetTripQueryKey, getGetSettingsQueryKey, getListCustomersQueryKey, getListNotificationsQueryKey,
-  getListTripsQueryKey, getListAuditLogsQueryKey, getListTripExpensesQueryKey,
-  getListTripPaymentsQueryKey, useArchiveCustomer, useCreateCustomer,
-  useCreateTrip, useCreateTripExpense, useCreateTripPayment, useGetCustomer,
-  useGetDashboard, useGetReportSummary, useGetSettings, useGetTrip, useListAuditLogs,
-  useListCustomers, useListNotifications, useListTripExpenses, useListTripPayments,
-  useListTrips, useMarkNotificationRead, useUpdateCustomer, useUpdateTrip,
-  useUpdateSettings, useUpdateTripOperations, useUpdateTripStatus,
-} from '@workspace/api-client-react';
-import type { Customer, CustomerInput, ExpenseInput, PaymentInput, TripInput, TripUpdate } from '@workspace/api-client-react';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Redirect, Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
+  SlidersHorizontal, Sparkles, TrendingUp, Users, WalletCards, X, XCircle,
+  Car, FileQuestion, Radio, Smartphone, AlertTriangle, AlertCircle, Eye, EyeOff,
+  Lock, Mail, KeyRound
+} from "lucide-react";
+import { Redirect, Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from "wouter";
+
+import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AppSplashLoader, ButtonLoader } from "@/components/loading";
+import { syncEngine } from "@/lib/syncEngine";
+
+// Initialize universal sync engine (standalone offline + remote sync)
+syncEngine.init();
+
+// Modular Layouts
+import { OwnerLayout } from "@/components/layout/OwnerLayout";
+import { DriverLayout } from "@/components/layout/DriverLayout";
+
+// Modular Modals & Vouchers
+import { CreateTripModal } from "@/components/trips/CreateTripModal";
+import { CancelTripModal } from "@/components/trips/CancelTripModal";
+import { PaymentRecordModal } from "@/components/trips/PaymentRecordModal";
+import { CustomerCopyModal } from "@/components/vouchers/CustomerCopyModal";
+import { PaymentReceiptModal } from "@/components/vouchers/PaymentReceiptModal";
+import { DriverKmModal } from "@/components/driver/DriverKmModal";
+import { DriverExpenseModal } from "@/components/driver/DriverExpenseModal";
+
+// Modular Owner Pages
+import { DashboardPage } from "@/pages/owner/DashboardPage";
+import { LiveTripsPage } from "@/pages/owner/LiveTripsPage";
+import { CalendarPage } from "@/pages/owner/CalendarPage";
+import { RoutePlannerPage } from "@/pages/owner/RoutePlannerPage";
+import { TripsPage } from "@/pages/owner/TripsPage";
+import { TripDetailPage } from "@/pages/owner/TripDetailPage";
+import { CustomersPage } from "@/pages/owner/CustomersPage";
+import { EnquiriesPage } from "@/pages/owner/EnquiriesPage";
+import { DriversPage } from "@/pages/owner/DriversPage";
+import { PaymentsPage } from "@/pages/owner/PaymentsPage";
+import { ExpensesPage } from "@/pages/owner/ExpensesPage";
+import { ReportsPage } from "@/pages/owner/ReportsPage";
+import { AnalyticsPage } from "@/pages/owner/AnalyticsPage";
+import { NotificationsPage } from "@/pages/owner/NotificationsPage";
+import { AuditLogsPage } from "@/pages/owner/AuditLogsPage";
+import { SettingsPage } from "@/pages/owner/SettingsPage";
+import { VehiclesPage } from "@/pages/owner/VehiclesPage";
+
+// Modular Driver Pages
+import { DriverDashboardPage } from "@/pages/driver/DriverDashboardPage";
+import { DriverTodayPage } from "@/pages/driver/DriverTodayPage";
+import { DriverCurrentTripPage } from "@/pages/driver/DriverCurrentTripPage";
+import { DriverExpensesPage } from "@/pages/driver/DriverExpensesPage";
+import { DriverProfilePage } from "@/pages/driver/DriverProfilePage";
+import { DriverVehiclePage } from "@/pages/driver/DriverVehiclePage";
+import { DriverHistoryPage } from "@/pages/driver/DriverHistoryPage";
 
 const queryClient = new QueryClient();
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const rawClerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const hasClerkKey = Boolean(rawClerkKey && rawClerkKey.trim() !== "" && !rawClerkKey.includes("undefined"));
+const clerkPubKey = hasClerkKey
+  ? rawClerkKey
+  : (publishableKeyFromHost(window.location.hostname, undefined) || "");
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string) {
   return basePath && path.startsWith(basePath)
-    ? path.slice(basePath.length) || '/'
+    ? path.slice(basePath.length) || "/"
     : path;
 }
 
-const clerkAppearance = {
-  theme: shadcn,
-  cssLayerName: 'clerk',
-  options: {
-    logoPlacement: 'inside' as const,
-    logoLinkUrl: basePath || '/',
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
-  },
-  variables: {
-    colorPrimary: '#287d70',
-    colorForeground: '#18353a',
-    colorMutedForeground: '#637477',
-    colorDanger: '#bd453e',
-    colorBackground: '#fbfaf7',
-    colorInput: '#f4f0e8',
-    colorInputForeground: '#18353a',
-    colorNeutral: '#dcd5c9',
-    fontFamily: 'Manrope, sans-serif',
-    borderRadius: '0.85rem',
-  },
-  elements: {
-    rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#fbfaf7] rounded-2xl w-[440px] max-w-full overflow-hidden',
-    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-[#18353a] font-extrabold',
-    headerSubtitle: 'text-[#637477]',
-    socialButtonsBlockButtonText: 'text-[#18353a] font-bold',
-    formFieldLabel: 'text-[#18353a] font-bold',
-    footerActionLink: 'text-[#287d70] font-bold',
-    footerActionText: 'text-[#637477]',
-    dividerText: 'text-[#637477]',
-    identityPreviewEditButton: 'text-[#287d70]',
-    formFieldSuccessText: 'text-[#287d70]',
-    alertText: 'text-[#bd453e]',
-    logoBox: 'rounded-xl',
-    logoImage: 'rounded-xl',
-    socialButtonsBlockButton: 'border-[#dcd5c9] bg-[#f4f0e8] hover:bg-[#ebe5da]',
-    formButtonPrimary: 'bg-[#287d70] hover:bg-[#236c61] text-white font-bold',
-    formFieldInput: 'border-[#dcd5c9] bg-[#f4f0e8] text-[#18353a]',
-    footerAction: 'bg-transparent',
-    dividerLine: 'bg-[#dcd5c9]',
-    alert: 'border-[#bd453e]/30 bg-[#bd453e]/10',
-    otpCodeFieldInput: 'border-[#dcd5c9] bg-[#f4f0e8]',
-    formFieldRow: 'mb-4',
-    main: 'bg-transparent',
-  },
-};
-
-const money = (value?: number | null) => `₹${Math.round(value ?? 0).toLocaleString('en-IN')}`;
-const moneyExact = (value?: number | null) => `₹${(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const dateLabel = (value?: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-const shortDate = (value?: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
-const initials = (name?: string) => (name ?? 'NG').split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
-
-function Button({ children, className = '', variant = 'primary', onClick, type = 'button', disabled = false, testId }: {
-  children: ReactNode; className?: string; variant?: 'primary' | 'quiet' | 'outline' | 'danger'; onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean; testId?: string;
-}) {
-  const styles = {
-    primary: 'bg-primary text-primary-foreground border-primary hover:brightness-105',
-    quiet: 'bg-secondary text-secondary-foreground border-secondary hover:bg-muted',
-    outline: 'bg-transparent text-foreground border-border hover:bg-muted',
-    danger: 'bg-destructive text-destructive-foreground border-destructive hover:brightness-105',
-  };
-  return <button data-testid={testId} type={type} disabled={disabled} onClick={onClick} className={`focus-ring pressable inline-flex items-center justify-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold disabled:pointer-events-none disabled:opacity-50 ${styles[variant]} ${className}`}>{children}</button>;
+export interface AuthUser {
+  id?: number;
+  fullName?: string;
+  firstName?: string;
+  username?: string;
+  role: "owner" | "admin" | "driver";
+  driverId?: number | null;
+  phone?: string | null;
+  email?: string | null;
+  primaryEmailAddress?: { emailAddress: string };
 }
 
-function Field({ label, value, onChange, placeholder, type = 'text', required = false, multiline = false, step, min, testId }: {
-  label: string; value?: string | number; onChange?: (value: string) => void; placeholder?: string; type?: string; required?: boolean; multiline?: boolean; step?: string; min?: string; testId: string;
-}) {
-  const common = { value: value ?? '', required, placeholder, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(event.target.value), className: 'focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary' };
-  return <label className="block text-xs font-bold text-foreground/80"><span>{label}{required && <span className="ml-1 text-accent">*</span>}</span>{multiline ? <textarea data-testid={testId} {...common} rows={3} /> : <input data-testid={testId} {...common} type={type} step={step} min={min} />}</label>;
+export interface AuthContextType {
+  user: AuthUser | null;
+  isSignedIn: boolean;
+  isLoaded: boolean;
+  signOut: (options?: { redirectUrl?: string }) => Promise<void>;
+  signInWithCredentials: (params: {
+    type: "admin" | "driver";
+    email?: string;
+    password?: string;
+    identifier?: string;
+    pin?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  switchRole: (role: "admin" | "driver") => void;
 }
 
-function StatusPill({ status }: { status?: string }) {
-  const label = (status ?? 'upcoming').replaceAll('_', ' ');
-  const tone = label.includes('complete') ? 'bg-primary/12 text-primary' : label.includes('cancel') ? 'bg-destructive/12 text-destructive' : label.includes('progress') || label.includes('start') ? 'bg-accent/20 text-accent-foreground' : 'bg-secondary text-secondary-foreground';
-  return <span data-testid={`status-${status ?? 'upcoming'}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>;
-}
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isSignedIn: false,
+  isLoaded: false,
+  signOut: async () => {},
+  signInWithCredentials: async () => ({ success: false, error: "Uninitialized" }),
+  switchRole: () => {},
+});
 
-function Skeleton({ className = '' }: { className?: string }) { return <div className={`skeleton rounded-lg ${className}`} />; }
-function LoadingState({ label = 'Loading workspace' }: { label?: string }) { return <div className="space-y-5"><div className="flex items-center justify-between"><Skeleton className="h-8 w-48" /><Skeleton className="h-9 w-28" /></div><div className="grid gap-4 md:grid-cols-4">{[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-32" />)}</div><Skeleton className="h-72 w-full" /><p className="eyebrow text-center">{label}</p></div>; }
-function ErrorState({ retry }: { retry?: () => void }) { return <div className="surface flex min-h-56 flex-col items-center justify-center rounded-2xl p-8 text-center"><XCircle className="mb-3 text-destructive" size={28} /><h3 className="font-extrabold">Couldn’t load this view</h3><p className="mt-1 max-w-sm text-sm text-muted-foreground">The workspace is still reachable. Try the request again in a moment.</p><Button variant="outline" onClick={retry} className="mt-5"><RefreshCw size={14} /> Try again</Button></div>; }
-function EmptyState({ icon: Icon = Archive, title, copy, action }: { icon?: typeof Archive; title: string; copy: string; action?: ReactNode }) { return <div className="surface flex min-h-56 flex-col items-center justify-center rounded-2xl p-8 text-center"><div className="mb-4 rounded-2xl bg-secondary p-3 text-primary"><Icon size={24} /></div><h3 className="font-extrabold">{title}</h3><p className="mt-1 max-w-sm text-sm text-muted-foreground">{copy}</p>{action && <div className="mt-5">{action}</div>}</div>; }
+export function ProductionAuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-const navGroups = [
-  { label: 'Workspace', links: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }, { href: '/trips', label: 'Trips', icon: Navigation }, { href: '/customers', label: 'Customers', icon: Users }] },
-  { label: 'Money', links: [{ href: '/payments', label: 'Payments', icon: WalletCards }, { href: '/expenses', label: 'Expenses', icon: Fuel }, { href: '/reports', label: 'Reports', icon: BarChart3 }] },
-  { label: 'System', links: [{ href: '/notifications', label: 'Notifications', icon: Bell }, { href: '/audit-logs', label: 'Audit logs', icon: ShieldCheck }, { href: '/settings', label: 'Settings', icon: Settings2 }] },
-];
+  // Restore authenticated session from server on mount
+  useEffect(() => {
+    let isMounted = true;
 
-function Shell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [toast, setToast] = useState('');
-  const { signOut } = useClerk();
-  const { user } = useUser();
-  const unreadQuery = useListNotifications({ query: { queryKey: getListNotificationsQueryKey() } });
-  const unread = (unreadQuery.data ?? []).filter((item) => !item.isRead).length;
-  const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2600); };
-  if (location.startsWith('/sign-in') || location.startsWith('/sign-up')) return <>{children}</>;
-  return <div className="noise flex min-h-[100dvh] bg-background">
-    <aside className={`fixed inset-y-0 left-0 z-40 flex w-[250px] -translate-x-full flex-col bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:relative md:translate-x-0 ${mobileOpen ? 'translate-x-0' : ''}`}>
-      <div className="mb-8 flex items-center justify-between px-2"><Link href="/dashboard" data-testid="link-brand" className="focus-ring flex items-center gap-2.5 rounded-lg"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span><span className="block text-sm font-extrabold tracking-tight">NG Travels</span><span className="eyebrow mt-1 block text-sidebar-foreground/55">Operations desk</span></span></Link><button data-testid="button-close-sidebar" onClick={() => setMobileOpen(false)} className="text-sidebar-foreground/60 md:hidden"><X size={18} /></button></div>
-      <div className="mb-7 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[10px] font-black text-primary-foreground">{initials(user?.fullName ?? user?.primaryEmailAddress?.emailAddress)}</span><div><p className="truncate text-xs font-bold">{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Workspace user'}</p><p className="mt-0.5 text-[10px] text-sidebar-foreground/55">Authenticated account</p></div><ChevronDown className="ml-auto text-sidebar-foreground/55" size={14} /></div></div>
-      <nav className="flex-1 space-y-6">{navGroups.map((group) => <div key={group.label}><p className="eyebrow mb-2 px-3 text-sidebar-foreground/45">{group.label}</p><div className="space-y-1">{group.links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} data-testid={`link-nav-${label.toLowerCase().replace(' ', '-')}`} onClick={() => setMobileOpen(false)} className={`focus-ring flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${location === href || (href !== '/dashboard' && location.startsWith(href)) ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === 'Notifications' && unread > 0 && <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-foreground">{unread}</span>}</Link>)}</div></div>)}</nav>
-       <div className="border-t border-sidebar-border pt-4"><button onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"><LogOut size={17} />Sign out</button></div>
-    </aside>
-    {mobileOpen && <button aria-label="Close navigation" data-testid="button-mobile-backdrop" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-sidebar/40 md:hidden" />}
-    <main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b bg-background/90 px-5 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button data-testid="button-open-sidebar" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="eyebrow hidden sm:block">{location === '/dashboard' || location === '/' ? 'Today’s command centre' : 'NG Travels'}</p><p className="text-sm font-extrabold capitalize">{location.split('/')[1]?.replace('-', ' ') || 'Dashboard'}</p></div></div><div className="flex items-center gap-2"><Link href="/notifications" data-testid="link-header-notifications" className="focus-ring relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Bell size={18} />{unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />}</Link><div className="hidden h-7 w-px bg-border sm:block" /><button onClick={() => flash('Workspace is up to date')} data-testid="button-status-check" className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted sm:flex"><span className="h-2 w-2 rounded-full bg-primary" />All systems go</button></div></header><div className="mx-auto max-w-[1440px] px-5 py-7 md:px-8 lg:px-10"><div key={location} className="page-in">{children}</div></div></main>
-    {toast && <div data-testid="status-toast" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-sidebar px-4 py-3 text-xs font-bold text-sidebar-foreground shadow-xl"><CheckCircle2 size={16} className="text-accent" />{toast}</div>}
-  </div>;
-}
-
-function PageHeader({ eyebrow, title, copy, action }: { eyebrow: string; title: string; copy?: string; action?: ReactNode }) { return <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="eyebrow mb-2 text-primary">{eyebrow}</p><h1 className="text-2xl font-extrabold tracking-tight md:text-[30px]">{title}</h1>{copy && <p className="mt-2 text-sm text-muted-foreground">{copy}</p>}</div>{action}</div>; }
-function Metric({ icon: Icon, label, value, note, accent = false, trend }: { icon: typeof TrendingUp; label: string; value: string; note: string; accent?: boolean; trend?: string }) { return <div className={`surface rounded-2xl p-4 ${accent ? 'border-primary/30 bg-primary/[.045]' : ''}`}><div className="flex items-start justify-between"><div className={`rounded-lg p-2 ${accent ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}><Icon size={17} /></div>{trend && <span className="flex items-center gap-1 text-[10px] font-bold text-primary"><ArrowUpRight size={12} />{trend}</span>}</div><p className="mt-5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p><p data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`} className="mt-1 text-2xl font-extrabold tracking-tight">{value}</p><p className="mt-1 text-xs text-muted-foreground">{note}</p></div>; }
-
-function DashboardPage() {
-  const query = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
-  const { user } = useUser();
-  if (query.isLoading) return <LoadingState label="Syncing today’s runs" />;
-  if (query.isError) return <ErrorState retry={() => query.refetch()} />;
-  const data = query.data;
-  const metrics = data?.metrics;
-  const displayName = user?.firstName || user?.username || 'there';
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  return <div className="stagger"><PageHeader eyebrow={data?.date ? dateLabel(data.date) : 'Today'} title={`${greeting}, ${displayName}.`} copy="Here’s what needs your attention today." action={<Link href="/trips/new" data-testid="link-create-trip" className="focus-ring"><Button><Plus size={16} />New trip</Button></Link>} />
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric icon={CalendarDays} label="Today’s trips" value={String(metrics?.todaysTrips ?? 0)} note={`${metrics?.started ?? 0} started · ${metrics?.completedToday ?? 0} completed`} accent /><Metric icon={CircleDollarSign} label="Collection today" value={money(metrics?.todaysCollection)} note={`${money(metrics?.paymentPending)} still pending`} trend="8.4%" /><Metric icon={Fuel} label="Expenses today" value={money(metrics?.todaysExpenses)} note="Operational spend" /><Metric icon={TrendingUp} label="Today’s profit" value={money(metrics?.todaysProfit)} note="After recorded expenses" accent /></div>
-    <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_.85fr]"><section className="surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="eyebrow mb-1">Live schedule</p><h2 className="font-extrabold">Today’s runs</h2></div><Link href="/trips" data-testid="link-view-all-trips" className="text-xs font-bold text-primary hover:underline">View all <ChevronRight className="inline" size={13} /></Link></div><div className="divide-y">{(data?.schedule ?? []).length ? data?.schedule.map((item) => <Link href={`/trips/${item.id}`} data-testid={`row-schedule-${item.id}`} key={item.id} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/60"><div className="w-12 shrink-0"><p className="mono text-xs font-bold">{item.time}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.bookingId}</p></div><div className="h-9 w-px bg-border" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{item.pickup} <span className="mx-1 font-normal text-muted-foreground">to</span> {item.destination}</p><p className="mt-1 text-xs text-muted-foreground">{item.customerName}</p></div><StatusPill status={item.status} /><ChevronRight size={16} className="text-muted-foreground" /></Link>) : <EmptyState icon={CalendarDays} title="No runs on the board" copy="New bookings will appear here as soon as they’re added." action={<Link href="/trips/new"><Button><Plus size={14} />Add a trip</Button></Link>} />}</div></section><section className="surface rounded-2xl p-5"><div className="flex items-center justify-between"><div><p className="eyebrow mb-1">Pulse</p><h2 className="font-extrabold">Recent activity</h2></div><Sparkles className="text-accent" size={18} /></div><div className="mt-5 space-y-5">{(data?.recentActivity ?? []).length ? data?.recentActivity.map((item) => <div data-testid={`activity-${item.id}`} key={item.id} className="flex gap-3"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" /><div><p className="text-sm font-bold">{item.title}</p><p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.detail}</p><p className="mono mt-1.5 text-[10px] text-muted-foreground">{item.timestamp}</p></div></div>) : <p className="py-8 text-center text-sm text-muted-foreground">No recent activity.</p>}</div></section></div>
-    <section className="mt-5 grid gap-5 md:grid-cols-3"><div className="surface rounded-2xl p-5"><p className="eyebrow">This week</p><p className="mt-3 text-2xl font-extrabold">{money(metrics?.weeklyProfit)}</p><p className="mt-1 text-xs text-muted-foreground">profit · {money(metrics?.weeklyRevenue)} revenue</p><div className="mt-5 flex h-2 gap-1 overflow-hidden rounded-full bg-muted"><span className="w-[66%] rounded-full bg-primary" /><span className="w-[20%] rounded-full bg-accent" /></div></div><div className="surface rounded-2xl p-5"><p className="eyebrow">This month</p><p className="mt-3 text-2xl font-extrabold">{money(metrics?.monthlyRevenue)}</p><p className="mt-1 text-xs text-muted-foreground">revenue · {money(metrics?.monthlyExpenses)} costs</p><div className="mt-5 flex items-center gap-2 text-xs font-bold text-primary"><ArrowUpRight size={14} />Healthy operating margin</div></div><div className="rounded-2xl bg-accent p-5 text-accent-foreground"><p className="eyebrow text-accent-foreground/60">Quick action</p><p className="mt-3 text-lg font-extrabold">Close the loop on a run.</p><p className="mt-1 text-xs leading-relaxed text-accent-foreground/75">Record a payment or expense from any trip detail.</p><Link href="/trips" data-testid="link-quick-action" className="mt-5 inline-flex items-center gap-2 text-xs font-extrabold underline underline-offset-4">Open trip board <ArrowUpRight size={14} /></Link></div></section>
-  </div>;
-}
-
-function CustomerForm({ customer, onDone }: { customer?: Customer; onDone: () => void }) {
-  const [form, setForm] = useState({ name: customer?.name ?? '', mobile: customer?.mobile ?? '', whatsapp: customer?.whatsapp ?? '', email: customer?.email ?? '', address: customer?.address ?? '', notes: customer?.notes ?? '' });
-  const create = useCreateCustomer(); const update = useUpdateCustomer(); const archive = useArchiveCustomer();
-  const saving = create.isPending || update.isPending;
-  const submit = (event: React.FormEvent) => { event.preventDefault(); const data: CustomerInput = { name: form.name, mobile: form.mobile, whatsapp: form.whatsapp || undefined, email: form.email || undefined, address: form.address || undefined, notes: form.notes || undefined }; if (customer) update.mutate({ id: customer.id, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() }); onDone(); } }); else create.mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() }); onDone(); } }); };
-  return <form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Full name" required value={form.name} onChange={(value) => setForm({ ...form, name: value })} testId="input-customer-name" /><Field label="Mobile" required value={form.mobile} onChange={(value) => setForm({ ...form, mobile: value })} testId="input-customer-mobile" /><Field label="WhatsApp" value={form.whatsapp} onChange={(value) => setForm({ ...form, whatsapp: value })} testId="input-customer-whatsapp" /><Field label="Email" type="email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} testId="input-customer-email" /></div><Field label="Address" value={form.address} onChange={(value) => setForm({ ...form, address: value })} testId="input-customer-address" /><Field label="Notes" multiline value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} testId="input-customer-notes" /><div className="flex items-center justify-between pt-2">{customer ? <Button variant="danger" type="button" onClick={() => { if (window.confirm('Archive this customer?')) archive.mutate({ id: customer.id }, { onSuccess: onDone }); }}><Archive size={14} />Archive</Button> : <span />}{<Button type="submit" disabled={saving}>{saving && <Loader2 className="animate-spin" size={14} />}{customer ? 'Save changes' : 'Create customer'}</Button>}</div></form>;
-}
-
-function CustomerDetailPage() {
-  const params = useParams<{ id: string }>();
-  const id = Number(params.id);
-  const query = useGetCustomer(id, { query: { queryKey: getGetCustomerQueryKey(id), enabled: Number.isFinite(id) } });
-  const [editing, setEditing] = useState(false);
-  if (query.isLoading) return <LoadingState label="Opening customer record" />;
-  if (query.isError || !query.data) return <ErrorState retry={() => query.refetch()} />;
-  const customer = query.data;
-  return <div className="mx-auto max-w-4xl"><PageHeader eyebrow={`Customer ${customer.customerId}`} title={customer.name} copy={`Added ${dateLabel(customer.createdAt.slice(0, 10))}`} action={<div className="flex gap-2"><Link href="/customers"><Button variant="outline"><ArrowLeft size={15} />Back</Button></Link><Button onClick={() => setEditing(true)}><Pencil size={14} />Edit customer</Button></div>} /><div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]"><section className="rounded-2xl bg-sidebar p-6 text-sidebar-foreground"><span className="grid h-14 w-14 place-items-center rounded-2xl bg-accent text-lg font-black text-accent-foreground">{initials(customer.name)}</span><h2 className="mt-5 text-2xl font-extrabold">{customer.name}</h2><p className="mono mt-1 text-xs text-sidebar-foreground/55">{customer.customerId}</p><div className="mt-8 space-y-4 border-t border-sidebar-border pt-5 text-sm"><p><span className="block text-[10px] uppercase tracking-wider text-sidebar-foreground/45">Mobile</span><span className="font-bold">{customer.mobile}</span></p><p><span className="block text-[10px] uppercase tracking-wider text-sidebar-foreground/45">Email</span><span className="font-bold">{customer.email || 'Not added'}</span></p><p><span className="block text-[10px] uppercase tracking-wider text-sidebar-foreground/45">Address</span><span className="font-bold">{customer.address || 'Not added'}</span></p></div></section><div className="space-y-5"><div className="grid gap-4 sm:grid-cols-3"><Metric icon={Navigation} label="Total trips" value={String(customer.totalTrips)} note="Lifetime bookings" accent /><Metric icon={CircleDollarSign} label="Total paid" value={money(customer.totalPaid)} note="Lifetime collection" /><Metric icon={Clock3} label="Pending" value={money(customer.pending)} note="Needs follow-up" /></div><section className="surface rounded-2xl p-5"><p className="eyebrow mb-1">Customer notes</p><p className="mt-3 text-sm leading-relaxed text-muted-foreground">{customer.notes || 'No notes saved for this customer.'}</p>{customer.commonDestinations?.length ? <><p className="eyebrow mb-2 mt-6">Common destinations</p><div className="flex flex-wrap gap-2">{customer.commonDestinations.map((destination) => <span key={destination} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-bold">{destination}</span>)}</div></> : null}</section></div></div>{editing && <Modal title="Edit customer" onClose={() => setEditing(false)}><CustomerForm customer={customer} onDone={() => { setEditing(false); query.refetch(); }} /></Modal>}</div>;
-}
-
-function CustomersPage() {
-  const [search, setSearch] = useState(''); const [selected, setSelected] = useState<Customer | null>(null); const [modal, setModal] = useState(false);
-  const params = useMemo(() => ({ search: search || undefined, page: 1, limit: 50 }), [search]);
-  const query = useListCustomers(params, { query: { queryKey: getListCustomersQueryKey(params) } });
-  return <div><PageHeader eyebrow="Customer book" title="Customers" copy="A clean record of every passenger and every preference." action={<Button onClick={() => { setSelected(null); setModal(true); }} testId="button-create-customer"><Plus size={16} />New customer</Button>} /><div className="surface mb-5 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><input data-testid="input-search-customers" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, mobile or customer ID" className="focus-ring w-full rounded-lg bg-muted/70 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><Button variant="outline" onClick={() => setSearch('')}><SlidersHorizontal size={15} />{search ? 'Clear search' : 'All customers'}</Button></div>{query.isLoading ? <LoadingState label="Finding customer records" /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data?.items ?? []).length === 0 ? <EmptyState icon={Users} title={search ? 'No matches found' : 'Your customer book is empty'} copy={search ? 'Try a different name, mobile number, or customer ID.' : 'Start with the people who make your work possible.'} action={<Button onClick={() => setModal(true)}><Plus size={14} />Add first customer</Button>} /> : <div className="surface overflow-hidden rounded-2xl"><div className="hidden grid-cols-[1.4fr_1fr_.7fr_.8fr_24px] gap-4 border-b bg-muted/40 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground md:grid"><span>Customer</span><span>Contact</span><span>Trips</span><span>Outstanding</span><span /></div><div className="divide-y">{query.data?.items.map((customer) => <button data-testid={`row-customer-${customer.id}`} key={customer.id} onClick={() => { setSelected(customer); setModal(true); }} className="focus-ring grid w-full grid-cols-1 gap-3 px-5 py-4 text-left transition-colors hover:bg-muted/50 md:grid-cols-[1.4fr_1fr_.7fr_.8fr_24px] md:items-center md:gap-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-extrabold text-primary">{initials(customer.name)}</span><div><p className="text-sm font-extrabold">{customer.name}</p><p className="mono mt-0.5 text-[10px] text-muted-foreground">{customer.customerId}</p></div></div><p className="text-xs text-muted-foreground">{customer.mobile}<br /><span className="text-[10px]">{customer.email || 'No email added'}</span></p><p className="text-sm font-bold">{customer.totalTrips}<span className="ml-1 text-xs font-normal text-muted-foreground">trips</span></p><p className={`text-sm font-extrabold ${customer.pending > 0 ? 'text-accent-foreground' : 'text-primary'}`}>{money(customer.pending)}</p><ChevronRight className="hidden text-muted-foreground md:block" size={16} /></button>)}</div></div>}{modal && <Modal title={selected ? 'Edit customer' : 'New customer'} onClose={() => setModal(false)}><CustomerForm customer={selected ?? undefined} onDone={() => setModal(false)} /></Modal>}</div>;
-}
-
-function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) { return <div className="fixed inset-0 z-50 grid place-items-center bg-sidebar/45 p-4 backdrop-blur-sm"><div className={`surface page-in max-h-[90dvh] w-full overflow-y-auto rounded-2xl p-5 shadow-2xl sm:p-7 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><div className="mb-6 flex items-center justify-between"><div><p className="eyebrow mb-1 text-primary">NG Travels</p><h2 className="text-xl font-extrabold">{title}</h2></div><button data-testid="button-close-modal" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"><X size={18} /></button></div>{children}</div></div>; }
-
-function TripsPage() {
-  const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [date, setDate] = useState('');
-  const params = useMemo(() => ({ search: search || undefined, status: status || undefined, date: date || undefined, page: 1, limit: 50 }), [search, status, date]);
-  const query = useListTrips(params, { query: { queryKey: getListTripsQueryKey(params) } });
-  return <div><PageHeader eyebrow="Trip board" title="Trips" copy="Every booking, route and rupee in one dependable view." action={<Link href="/trips/new"><Button testId="button-new-trip"><Plus size={16} />New trip</Button></Link>} /><div className="surface mb-5 flex flex-col gap-3 rounded-2xl p-3 lg:flex-row"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><input data-testid="input-search-trips" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search booking, customer or route" className="focus-ring w-full rounded-lg bg-muted/70 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><div className="flex gap-2 overflow-auto"><select data-testid="select-trip-status" value={status} onChange={(event) => setStatus(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold"><option value="">All statuses</option><option value="upcoming">Upcoming</option><option value="started">Started</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input data-testid="input-trip-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="focus-ring rounded-lg border bg-background px-3 py-2 text-xs font-bold" /></div></div>{query.isLoading ? <LoadingState label="Loading trip board" /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data?.items ?? []).length === 0 ? <EmptyState icon={Navigation} title="No trips match those filters" copy="Try widening the date or status filter, or create a fresh booking." action={<Link href="/trips/new"><Button><Plus size={14} />Create a trip</Button></Link>} /> : <div className="surface overflow-hidden rounded-2xl"><div className="hidden grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] gap-4 border-b bg-muted/40 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground md:grid"><span>Booking</span><span>Route</span><span>Customer</span><span>When</span><span>Status</span><span /></div><div className="divide-y">{query.data?.items.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-trip-${trip.id}`} key={trip.id} className="grid grid-cols-1 gap-3 px-5 py-4 transition-colors hover:bg-muted/50 md:grid-cols-[1fr_1.35fr_1fr_.7fr_.8fr_20px] md:items-center md:gap-4"><div><p className="mono text-xs font-bold text-primary">{trip.bookingId}</p><p className="mt-1 text-[10px] text-muted-foreground">{trip.tripType}</p></div><div className="flex items-start gap-2 text-sm font-bold"><MapPin className="mt-0.5 shrink-0 text-accent" size={14} /><span>{trip.pickup.name} <span className="mx-1 font-normal text-muted-foreground">to</span> {trip.destination.name}</span></div><p className="text-sm font-bold">{trip.customerName}<span className="mt-1 block text-xs font-normal text-muted-foreground">{trip.customerMobile}</span></p><p className="text-xs font-bold">{shortDate(trip.startDate)}<span className="mt-1 block mono text-[10px] font-normal text-muted-foreground">{trip.startTime}</span></p><StatusPill status={trip.status} /><ChevronRight className="hidden text-muted-foreground md:block" size={16} /></Link>)}</div></div>}</div>;
-}
-
-function TripFormPage() {
-  const [, setLocation] = useLocation();
-  const create = useCreateTrip();
-  const customerParams = { page: 1, limit: 100 };
-  const customers = useListCustomers(customerParams, {
-    query: { queryKey: getListCustomersQueryKey(customerParams) },
-  });
-  const [form, setForm] = useState({
-    customerId: '',
-    tripType: 'one_way',
-    pickup: '',
-    destination: '',
-    startDate: new Date().toISOString().slice(0, 10),
-    startTime: '09:00',
-    returnDate: '',
-    returnTime: '',
-    passengerCount: '1',
-    billingKm: '',
-    ratePerKm: '',
-    toll: '',
-    parking: '0',
-    otherCharges: '0',
-    advance: '0',
-    notes: '',
-    specialInstructions: '',
-  });
-  const set = (key: string) => (value: string) =>
-    setForm((old) => ({ ...old, [key]: value }));
-  const selectedCustomer = customers.data?.items?.find(
-    (customer) => String(customer.id) === form.customerId,
-  );
-  const billingKm = Number(form.billingKm) || 0;
-  const ratePerKm = Number(form.ratePerKm) || 0;
-  const toll = Number(form.toll) || 0;
-  const parking = Number(form.parking) || 0;
-  const otherCharges = Number(form.otherCharges) || 0;
-  const paid = Number(form.advance) || 0;
-  const baseFare = Math.round(billingKm * ratePerKm * 100) / 100;
-  const customerTotal =
-    Math.round((baseFare + toll + parking + otherCharges) * 100) / 100;
-  const balance = Math.max(
-    0,
-    Math.round((customerTotal - paid) * 100) / 100,
-  );
-  const credit = Math.max(0, Math.round((paid - customerTotal) * 100) / 100);
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedCustomer || billingKm <= 0 || ratePerKm <= 0) return;
-    const payload: TripInput = {
-      customerId: selectedCustomer.id,
-      customerName: selectedCustomer.name,
-      customerMobile: selectedCustomer.mobile,
-      tripType: form.tripType,
-      pickup: { name: form.pickup, address: form.pickup },
-      destination: { name: form.destination, address: form.destination },
-      startDate: form.startDate,
-      startTime: form.startTime,
-      returnDate: form.returnDate || undefined,
-      returnTime: form.returnTime || undefined,
-      passengerCount: Number(form.passengerCount),
-      billingKm,
-      ratePerKm,
-      toll: form.toll === '' ? undefined : toll,
-      parking,
-      otherCharges,
-      advance: paid,
-      notes: form.notes || undefined,
-      specialInstructions: form.specialInstructions || undefined,
-    };
-    create.mutate(
-      { data: payload },
-      {
-        onSuccess: (trip) => {
-          queryClient.invalidateQueries({ queryKey: getListTripsQueryKey() });
-          setLocation(`/trips/${trip.id}`);
-        },
-      },
-    );
-  };
-  return (
-    <div className="mx-auto max-w-4xl">
-      <PageHeader
-        eyebrow="New booking"
-        title="Plan a trip"
-        copy="Capture the route first. Fare and payment stay transparent all the way through."
-        action={
-          <Link href="/trips">
-            <Button variant="outline">
-              <ArrowLeft size={15} />Back to trips
-            </Button>
-          </Link>
+    async function checkExistingSession() {
+      const token = localStorage.getItem("ng_auth_token");
+      if (!token) {
+        if (isMounted) {
+          setUser(null);
+          setIsSignedIn(false);
+          setIsLoaded(true);
         }
-      />
-      <form onSubmit={submit} className="space-y-5">
-        <section className="surface rounded-2xl p-5 md:p-7">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
-              01
-            </span>
-            <div>
-              <h2 className="font-extrabold">Passenger</h2>
-              <p className="text-xs text-muted-foreground">
-                Select an existing customer record.
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-xs font-bold text-foreground/80">
-              <span>
-                Customer<span className="ml-1 text-accent">*</span>
-              </span>
-              <select
-                required
-                data-testid="select-trip-customer"
-                value={form.customerId}
-                onChange={(event) => set('customerId')(event.target.value)}
-                className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
-              >
-                <option value="">Select customer</option>
-                {(customers.data?.items ?? []).map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} · {customer.mobile}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="rounded-lg border border-dashed bg-muted/35 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Selected contact
-              </p>
-              <p className="mt-1 text-sm font-bold">
-                {selectedCustomer?.name ?? 'Choose a customer'}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {selectedCustomer?.mobile ?? 'Customer details will be used on the booking'}
-              </p>
-            </div>
-          </div>
-        </section>
+        return;
+      }
 
-        <section className="surface rounded-2xl p-5 md:p-7">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
-              02
-            </span>
-            <div>
-              <h2 className="font-extrabold">Route & timing</h2>
-              <p className="text-xs text-muted-foreground">
-                Use clear locations now; live Google route data is unavailable.
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-xs font-bold text-foreground/80">
-              <span>Trip type</span>
-              <select
-                data-testid="select-trip-type"
-                value={form.tripType}
-                onChange={(event) => set('tripType')(event.target.value)}
-                className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
-              >
-                <option value="one_way">One way</option>
-                <option value="round_trip">Round trip</option>
-                <option value="local">Local</option>
-                <option value="airport">Airport transfer</option>
-              </select>
-            </label>
-            <Field
-              label="Passengers"
-              required
-              type="number"
-              min="1"
-              value={form.passengerCount}
-              onChange={set('passengerCount')}
-              testId="input-trip-passengers"
-            />
-            <Field
-              label="Pickup"
-              required
-              value={form.pickup}
-              onChange={set('pickup')}
-              placeholder="Pickup point"
-              testId="input-trip-pickup"
-            />
-            <Field
-              label="Destination"
-              required
-              value={form.destination}
-              onChange={set('destination')}
-              placeholder="Destination"
-              testId="input-trip-destination"
-            />
-            <Field
-              label="Start date"
-              required
-              type="date"
-              value={form.startDate}
-              onChange={set('startDate')}
-              testId="input-trip-start-date"
-            />
-            <Field
-              label="Start time"
-              required
-              type="time"
-              value={form.startTime}
-              onChange={set('startTime')}
-              testId="input-trip-start-time"
-            />
-            <Field
-              label="Return date"
-              type="date"
-              value={form.returnDate}
-              onChange={set('returnDate')}
-              testId="input-trip-return-date"
-            />
-            <Field
-              label="Return time"
-              type="time"
-              value={form.returnTime}
-              onChange={set('returnTime')}
-              testId="input-trip-return-time"
-            />
-          </div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-            <div className="flex min-h-44 flex-col justify-between rounded-xl border border-dashed border-accent/50 bg-accent/5 p-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-accent/15 p-2 text-accent-foreground">
-                  <MapPin size={18} />
-                </div>
-                <div>
-                  <p className="font-extrabold">Google Maps unavailable</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Connect Google Maps Platform to enable Places selection,
-                    route drawing, automatic distance, duration, traffic and toll estimates.
-                  </p>
-                </div>
-              </div>
-              <p className="mt-5 text-xs font-bold text-accent-foreground">
-                No route values are being invented.
-              </p>
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <p className="eyebrow">Route summary</p>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Distance
-                  </p>
-                  <p className="mt-1 text-sm font-extrabold">Unavailable</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    Google route required
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Duration
-                  </p>
-                  <p className="mt-1 text-sm font-extrabold">Unavailable</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    No fabricated estimate
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        <section className="surface rounded-2xl p-5 md:p-7">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
-              03
-            </span>
-            <div>
-              <h2 className="font-extrabold">Fare & collection</h2>
-              <p className="text-xs text-muted-foreground">
-                Billing KM is a manual fallback until a real Google route is available.
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field
-              label="Billing KM"
-              required
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={form.billingKm}
-              onChange={set('billingKm')}
-              placeholder="Enter fallback KM"
-              testId="input-trip-billing-km"
-            />
-            <Field
-              label="Rate per KM"
-              required
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={form.ratePerKm}
-              onChange={set('ratePerKm')}
-              testId="input-trip-rate"
-            />
-            <Field
-              label="Advance / paid"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.advance}
-              onChange={set('advance')}
-              testId="input-trip-advance"
-            />
-            <Field
-              label="Final toll override"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.toll}
-              onChange={set('toll')}
-              placeholder="Toll unavailable"
-              testId="input-trip-toll"
-            />
-            <Field
-              label="Parking"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.parking}
-              onChange={set('parking')}
-              testId="input-trip-parking"
-            />
-            <Field
-              label="Other charges"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.otherCharges}
-              onChange={set('otherCharges')}
-              testId="input-trip-other"
-            />
-          </div>
-          <div className="mt-5 rounded-xl bg-sidebar p-5 text-sidebar-foreground">
-            <div className="flex items-center justify-between">
-              <p className="eyebrow text-sidebar-foreground/55">Fare preview</p>
-              <span className="text-[10px] font-bold text-sidebar-foreground/50">
-                Server recalculates on save
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
-                  Base fare
-                </p>
-                <p className="mt-1 text-lg font-extrabold">{moneyExact(baseFare)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
-                  Customer total
-                </p>
-                <p className="mt-1 text-lg font-extrabold">{moneyExact(customerTotal)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
-                  Balance
-                </p>
-                <p className="mt-1 text-lg font-extrabold">{moneyExact(balance)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
-                  Credit
-                </p>
-                <p className="mt-1 text-lg font-extrabold">{moneyExact(credit)}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-sidebar-foreground/55">
-              Toll estimate unavailable until Google Maps is connected. Enter a final toll only when the business has a confirmed amount.
-            </p>
-          </div>
-        </section>
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user && isMounted) {
+            const role = data.user.role === "driver" ? "driver" : "owner";
+            const authUser: AuthUser = {
+              id: data.user.id,
+              fullName: data.user.fullName,
+              firstName: data.user.fullName?.split(" ")[0] || "User",
+              role,
+              driverId: data.user.driverId,
+              phone: data.user.phone,
+              email: data.user.email,
+              primaryEmailAddress: data.user.email ? { emailAddress: data.user.email } : undefined,
+            };
+            setUser(authUser);
+            setIsSignedIn(true);
+            localStorage.setItem("ng_user_role", role);
+          } else if (isMounted) {
+            localStorage.removeItem("ng_auth_token");
+            setUser(null);
+            setIsSignedIn(false);
+          }
+        } else {
+          localStorage.removeItem("ng_auth_token");
+          if (isMounted) {
+            setUser(null);
+            setIsSignedIn(false);
+          }
+        }
+      } catch (err) {
+        console.warn("[Auth] Session restore offline notice:", err);
+        // If offline and token exists, maintain optimistic auth to avoid screen flashing
+        if (isMounted && token) {
+          const savedRole = (localStorage.getItem("ng_user_role") as "driver" | "owner") || "owner";
+          setIsSignedIn(true);
+          setUser({
+            fullName: savedRole === "driver" ? "Driver Pilot" : "Operations Owner",
+            role: savedRole,
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoaded(true);
+        }
+      }
+    }
 
-        <section className="surface rounded-2xl p-5 md:p-7">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Internal notes"
-              multiline
-              value={form.notes}
-              onChange={set('notes')}
-              testId="input-trip-notes"
-            />
-            <Field
-              label="Special instructions"
-              multiline
-              value={form.specialInstructions}
-              onChange={set('specialInstructions')}
-              testId="input-trip-instructions"
+    checkExistingSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const signInWithCredentials = async (params: {
+    type: "admin" | "driver";
+    email?: string;
+    password?: string;
+    identifier?: string;
+    pin?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const endpoint = params.type === "admin" ? "/api/auth/login" : "/api/auth/driver-login";
+      const body = params.type === "admin"
+        ? { email: params.email?.trim(), password: params.password }
+        : { identifier: params.identifier?.trim(), pin: params.pin?.trim() };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.token) {
+        return {
+          success: false,
+          error: data.message || data.error?.message || "Invalid credentials. Please verify and try again.",
+        };
+      }
+
+      localStorage.setItem("ng_auth_token", data.token);
+      const role = data.user.role === "driver" ? "driver" : "owner";
+      const authUser: AuthUser = {
+        id: data.user.id,
+        fullName: data.user.fullName,
+        firstName: data.user.fullName?.split(" ")[0] || "User",
+        role,
+        driverId: data.user.driverId,
+        phone: data.user.phone,
+        email: data.user.email,
+        primaryEmailAddress: data.user.email ? { emailAddress: data.user.email } : undefined,
+      };
+
+      localStorage.setItem("ng_user_role", role);
+      setUser(authUser);
+      setIsSignedIn(true);
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: "Unable to connect to authentication server. Please check your network.",
+      };
+    }
+  };
+
+  const signOut = async () => {
+    const token = localStorage.getItem("ng_auth_token");
+    if (token) {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {}
+    }
+    localStorage.removeItem("ng_auth_token");
+    localStorage.removeItem("ng_user_role");
+    setUser(null);
+    setIsSignedIn(false);
+  };
+
+  const switchRole = (role: "admin" | "driver") => {
+    // In production, switching roles triggers dedicated sign-in or context shift
+    localStorage.setItem("ng_user_role", role);
+    if (user) {
+      setUser({ ...user, role: role === "driver" ? "driver" : "owner" });
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isSignedIn,
+        isLoaded,
+        signOut,
+        signInWithCredentials,
+        switchRole,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Backward-compatible alias
+export const LocalAuthProvider = ProductionAuthProvider;
+
+function useAppAuth(): AuthContextType {
+  return useContext(AuthContext);
+}
+
+// -------------------------------------------------------------
+// SIGN IN PAGE WITH AUTHENTIC DATABASE CREDENTIAL VALIDATION
+// -------------------------------------------------------------
+function SignInPage() {
+  const { signInWithCredentials } = useAppAuth();
+  const [, setLocation] = useLocation();
+
+  const [activeTab, setActiveTab] = useState<"admin" | "driver">(() => {
+    if (typeof window !== "undefined" && (window as any).NG_APP_ROLE === "driver") {
+      return "driver";
+    }
+    return "admin";
+  });
+
+  // Admin form state
+  const [adminEmail, setAdminEmail] = useState("admin@ngtravels.in");
+  const [adminPassword, setAdminPassword] = useState("NGTravels@2026");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+
+  // Driver form state
+  const [driverIdentifier, setDriverIdentifier] = useState("DRV-101");
+  const [driverPin, setDriverPin] = useState("123456");
+  const [showDriverPin, setShowDriverPin] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!adminEmail.trim()) {
+      setErrorMessage("Please enter your operations email address.");
+      return;
+    }
+    if (!adminPassword) {
+      setErrorMessage("Please enter your account password.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await signInWithCredentials({
+        type: "admin",
+        email: adminEmail,
+        password: adminPassword,
+      });
+
+      if (!res.success) {
+        setErrorMessage(res.error || "Authentication failed.");
+      } else {
+        setLocation("/dashboard");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDriverSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!driverIdentifier.trim()) {
+      setErrorMessage("Please enter your Driver Code (e.g. DRV-101) or registered mobile number.");
+      return;
+    }
+    if (!driverPin.trim()) {
+      setErrorMessage("Please enter your 6-digit Driver Security PIN.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await signInWithCredentials({
+        type: "driver",
+        identifier: driverIdentifier,
+        pin: driverPin,
+      });
+
+      if (!res.success) {
+        setErrorMessage(res.error || "Driver authentication failed.");
+      } else {
+        setLocation("/driver");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 text-zinc-100 selection:bg-amber-400 selection:text-zinc-950">
+      <div className="w-full max-w-md bg-zinc-900/95 border border-zinc-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
+        <div className="text-center space-y-2">
+          <div className="flex justify-center">
+            <img
+              src="/logo.png"
+              alt="NG Travels - Travel with Comfort & Safety"
+              className="w-24 h-24 rounded-2xl object-contain bg-black p-1.5 border border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
             />
           </div>
-        </section>
-        {create.isError && (
-          <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm font-bold text-destructive">
-            Couldn’t save this trip. Check the required fields and try again.
-          </p>
-        )}
-        <div className="flex justify-end gap-3 pb-5">
-          <Link href="/trips">
-            <Button variant="outline">Cancel</Button>
-          </Link>
-          <Button type="submit" disabled={create.isPending || !selectedCustomer}>
-            {create.isPending && <Loader2 className="animate-spin" size={14} />}
-            {create.isPending ? 'Saving trip…' : 'Save trip'}
-          </Button>
+          <div>
+            <h1 className="text-2xl font-black text-zinc-100 tracking-tight">NG TRAVELS</h1>
+            <p className="text-xs text-amber-400 font-semibold tracking-wide mt-0.5">Travel with Comfort & Safety</p>
+            <p className="text-[11px] text-zinc-400 mt-1 font-mono">Operations Command & Dispatch Platform</p>
+          </div>
         </div>
-      </form>
+
+        {/* Role Segmented Tabs */}
+        <div className="grid grid-cols-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("admin");
+              setErrorMessage(null);
+            }}
+            className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === "admin"
+                ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" /> Operations Admin
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("driver");
+              setErrorMessage(null);
+            }}
+            className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === "driver"
+                ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Car className="w-4 h-4" /> Driver Pilot
+          </button>
+        </div>
+
+        {/* Error Alert Message */}
+        {errorMessage && (
+          <div className="bg-rose-950/40 border border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div className="leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
+
+        {/* Tab 1: Operations Admin Login */}
+        {activeTab === "admin" ? (
+          <form onSubmit={handleAdminSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                <span>Operations Email</span>
+                <span className="text-[10px] text-zinc-500 font-mono">admin@ngtravels.in</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Input
+                  type="email"
+                  required
+                  placeholder="admin@ngtravels.in"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                <span>Password</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Secure Salted Scrypt</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Input
+                  type={showAdminPassword ? "text" : "password"}
+                  required
+                  placeholder="Enter your operations password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPassword(!showAdminPassword)}
+                  className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                >
+                  {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+            >
+              {submitting ? (
+                <ButtonLoader label="Authenticating Operations..." />
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" /> Sign In to Operations Desk
+                </>
+              )}
+            </Button>
+          </form>
+        ) : (
+          /* Tab 2: Driver Pilot Login */
+          <form onSubmit={handleDriverSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                <span>Driver Code or Mobile</span>
+                <span className="text-[10px] text-zinc-500 font-mono">DRV-101 / +91 98450 11223</span>
+              </label>
+              <div className="relative">
+                <Car className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Input
+                  type="text"
+                  required
+                  placeholder="e.g. DRV-101 or 9845011223"
+                  value={driverIdentifier}
+                  onChange={(e) => setDriverIdentifier(e.target.value)}
+                  className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                <span>Driver Security PIN</span>
+                <span className="text-[10px] text-zinc-500 font-mono">6 Digits</span>
+              </label>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Input
+                  type={showDriverPin ? "text" : "password"}
+                  maxLength={6}
+                  required
+                  placeholder="Enter 6-digit PIN"
+                  value={driverPin}
+                  onChange={(e) => setDriverPin(e.target.value)}
+                  className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono tracking-widest text-center text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowDriverPin(!showDriverPin)}
+                  className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                >
+                  {showDriverPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+            >
+              {submitting ? (
+                <ButtonLoader label="Verifying Duty PIN..." />
+              ) : (
+                <>
+                  <Car className="w-4 h-4" /> Sign In to Driver Duty Cockpit
+                </>
+              )}
+            </Button>
+          </form>
+        )}
+
+        <div className="text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/80 text-center font-mono">
+          Single Source of Truth: PostgreSQL Database Auth • Cryptographic Token Session
+        </div>
+      </div>
     </div>
   );
 }
 
-function TripDetailPage({ driverView = false }: { driverView?: boolean }) {
-  const params = useParams<{ id: string }>(); const id = Number(params.id); const query = useGetTrip(id, { query: { queryKey: getGetTripQueryKey(id), enabled: Number.isFinite(id) } }); const payments = useListTripPayments(id, { query: { queryKey: getListTripPaymentsQueryKey(id), enabled: Number.isFinite(id) } }); const expenses = useListTripExpenses(id, { query: { queryKey: getListTripExpensesQueryKey(id), enabled: Number.isFinite(id) } }); const updateStatus = useUpdateTripStatus(); const updateOps = useUpdateTripOperations(); const createPayment = useCreateTripPayment(); const createExpense = useCreateTripExpense(); const update = useUpdateTrip(); const [modal, setModal] = useState<'payment' | 'expense' | 'edit' | null>(null); const [km, setKm] = useState({ startingKm: '', endingKm: '' });
-  if (query.isLoading) return <LoadingState label="Opening trip record" />; if (query.isError || !query.data) return <ErrorState retry={() => query.refetch()} />; const trip = query.data;
-  const statusAction = (status: string) => updateStatus.mutate({ id, data: { status } }, { onSuccess: (next) => queryClient.setQueryData(getGetTripQueryKey(id), next) });
-  const saveOps = () => updateOps.mutate({ id, data: { startingKm: km.startingKm ? Number(km.startingKm) : undefined, endingKm: km.endingKm ? Number(km.endingKm) : undefined } }, { onSuccess: (next) => queryClient.setQueryData(getGetTripQueryKey(id), next) });
-  return <div><PageHeader eyebrow={driverView ? 'Driver execution' : `Booking ${trip.bookingId}`} title={trip.customerName} copy={`${trip.tripType.replaceAll('_', ' ')} · ${dateLabel(trip.startDate)} at ${trip.startTime}`} action={<div className="flex gap-2"><Link href={driverView ? '/driver/trips' : '/trips'}><Button variant="outline"><ArrowLeft size={15} />Back</Button></Link>{!driverView && <Button variant="outline" onClick={() => setModal('edit')}><Pencil size={14} />Edit trip</Button>}</div>} /><div className="mb-5 flex flex-wrap items-center gap-3"><StatusPill status={trip.status} /><span className="mono text-xs text-muted-foreground">{trip.bookingId}</span>{!driverView && <div className="ml-auto flex gap-2">{trip.status === 'pending' && <Button onClick={() => statusAction('started')}><Check size={14} />Start trip</Button>}{trip.status === 'started' && <Button onClick={() => statusAction('in_progress')}><Navigation size={14} />Mark in progress</Button>}{trip.status === 'in_progress' && <Button onClick={() => statusAction('completed')}><CheckCircle2 size={14} />Complete trip</Button>}</div>}</div><div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><div className="space-y-5"><section className="surface overflow-hidden rounded-2xl"><div className="border-b px-5 py-4"><p className="eyebrow mb-1">Route</p><h2 className="font-extrabold">{trip.pickup.name} <span className="mx-1 font-normal text-muted-foreground">to</span> {trip.destination.name}</h2></div><div className="relative p-5"><div className="absolute bottom-8 left-[31px] top-8 w-px bg-border" /><div className="relative flex gap-4"><span className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-primary bg-card" /><div><p className="eyebrow">Pickup</p><p className="mt-1 text-sm font-bold">{trip.pickup.address}</p></div></div><div className="relative mt-9 flex gap-4"><span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-accent" /><div><p className="eyebrow">Destination</p><p className="mt-1 text-sm font-bold">{trip.destination.address}</p></div></div>{trip.routeSummary && <p className="mt-6 rounded-lg bg-muted p-3 text-xs text-muted-foreground">{trip.routeSummary} · {trip.mapDistanceKm} km mapped</p>}</div></section>{driverView && <section className="surface rounded-2xl p-5"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow mb-1">Execution log</p><h2 className="font-extrabold">Odometer readings</h2></div><Navigation className="text-primary" size={18} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Starting km" type="number" value={km.startingKm || trip.startingKm || ''} onChange={(value) => setKm({ ...km, startingKm: value })} testId="input-starting-km" /><Field label="Ending km" type="number" value={km.endingKm || trip.endingKm || ''} onChange={(value) => setKm({ ...km, endingKm: value })} testId="input-ending-km" /></div><Button onClick={saveOps} className="mt-4" disabled={updateOps.isPending}><Check size={14} />Save readings</Button></section>}<section className="surface rounded-2xl p-5"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow mb-1">Trip notes</p><h2 className="font-extrabold">Details for the day</h2></div><FileText size={18} className="text-muted-foreground" /></div><div className="grid gap-4 sm:grid-cols-2"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Passenger count</p><p className="mt-1 text-sm font-bold">{trip.passengerCount} passengers</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Customer mobile</p><p className="mt-1 text-sm font-bold">{trip.customerMobile}</p></div><div className="sm:col-span-2"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</p><p className="mt-1 text-sm text-muted-foreground">{trip.notes || 'No notes added.'}</p></div></div></section></div><div className="space-y-5"><section className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground shadow-md"><p className="eyebrow text-sidebar-foreground/55">Customer total</p><p data-testid="text-trip-total" className="mt-3 text-4xl font-extrabold tracking-tight">{money(trip.customerTotal)}</p><div className="mt-5 grid grid-cols-2 gap-3 border-t border-sidebar-border pt-4 text-xs"><div><p className="text-sidebar-foreground/55">Collected</p><p className="mt-1 font-extrabold text-accent">{money(trip.totalPaid)}</p></div><div><p className="text-sidebar-foreground/55">Remaining</p><p className="mt-1 font-extrabold">{money(trip.remainingBalance)}</p></div></div>{!driverView && <Button onClick={() => setModal('payment')} className="mt-5 w-full bg-accent text-accent-foreground hover:brightness-105"><Plus size={14} />Record payment</Button>}</section><section className="surface rounded-2xl p-5"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow mb-1">Payments</p><h2 className="font-extrabold">Collection history</h2></div>{!driverView && <button data-testid="button-add-payment" onClick={() => setModal('payment')} className="rounded-lg p-2 text-primary hover:bg-muted"><Plus size={16} /></button>}</div>{(payments.data ?? []).length ? <div className="space-y-3">{payments.data?.map((payment) => <div data-testid={`payment-${payment.id}`} key={payment.id} className="flex items-center justify-between"><div><p className="text-xs font-bold">{payment.method} · {payment.paymentType}</p><p className="mono mt-1 text-[10px] text-muted-foreground">{dateLabel(payment.paymentDate)}</p></div><p className="text-sm font-extrabold text-primary">{money(payment.amount)}</p></div>)}</div> : <p className="text-sm text-muted-foreground">No payments recorded yet.</p>}</section><section className="surface rounded-2xl p-5"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow mb-1">Expenses</p><h2 className="font-extrabold">Trip costs</h2></div>{!driverView && <button data-testid="button-add-expense" onClick={() => setModal('expense')} className="rounded-lg p-2 text-primary hover:bg-muted"><Plus size={16} /></button>}</div>{(expenses.data ?? []).length ? <div className="space-y-3">{expenses.data?.map((expense) => <div data-testid={`expense-${expense.id}`} key={expense.id} className="flex items-center justify-between"><div><p className="text-xs font-bold capitalize">{expense.category}</p><p className="mono mt-1 text-[10px] text-muted-foreground">{dateLabel(expense.expenseDate)}</p></div><p className="text-sm font-extrabold">{money(expense.amount)}</p></div>)}</div> : <p className="text-sm text-muted-foreground">No expenses logged for this trip.</p>}</section></div></div>{modal === 'payment' && <PaymentModal tripId={id} onClose={() => setModal(null)} />}{modal === 'expense' && <ExpenseModal tripId={id} onClose={() => setModal(null)} />}{modal === 'edit' && <EditTripModal trip={trip} onClose={() => setModal(null)} onSaved={(next) => { queryClient.setQueryData(getGetTripQueryKey(id), next); setModal(null); }} update={update} />}</div>;
-}
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
-function PaymentModal({ tripId, onClose }: { tripId: number; onClose: () => void }) { const mutation = useCreateTripPayment(); const [form, setForm] = useState({ amount: '', method: 'cash', paymentType: 'advance', paymentDate: new Date().toISOString().slice(0, 10), reference: '', notes: '' }); const set = (key: string) => (value: string) => setForm({ ...form, [key]: value }); const submit = (event: React.FormEvent) => { event.preventDefault(); const data: PaymentInput = { ...form, amount: Number(form.amount), reference: form.reference || undefined, notes: form.notes || undefined }; mutation.mutate({ id: tripId, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTripPaymentsQueryKey(tripId) }); queryClient.invalidateQueries({ queryKey: getGetTripQueryKey(tripId) }); onClose(); } }); }; return <Modal title="Record payment" onClose={onClose}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Amount" required type="number" value={form.amount} onChange={set('amount')} testId="input-payment-amount" /><label className="block text-xs font-bold">Method<select data-testid="select-payment-method" value={form.method} onChange={(event) => set('method')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="cash">Cash</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option><option value="card">Card</option></select></label><label className="block text-xs font-bold">Payment type<select data-testid="select-payment-type" value={form.paymentType} onChange={(event) => set('paymentType')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="advance">Advance</option><option value="full">Full</option><option value="balance">Balance</option></select></label><Field label="Payment date" required type="date" value={form.paymentDate} onChange={set('paymentDate')} testId="input-payment-date" /></div><Field label="Reference" value={form.reference} onChange={set('reference')} testId="input-payment-reference" /><Field label="Notes" value={form.notes} onChange={set('notes')} testId="input-payment-notes" /><Button type="submit" disabled={mutation.isPending} className="w-full">{mutation.isPending && <Loader2 className="animate-spin" size={14} />}Save payment</Button></form></Modal>; }
-function ExpenseModal({ tripId, onClose }: { tripId: number; onClose: () => void }) { const mutation = useCreateTripExpense(); const [form, setForm] = useState({ category: 'fuel', amount: '', expenseDate: new Date().toISOString().slice(0, 10), notes: '' }); const set = (key: string) => (value: string) => setForm({ ...form, [key]: value }); const submit = (event: React.FormEvent) => { event.preventDefault(); const data: ExpenseInput = { ...form, amount: Number(form.amount), notes: form.notes || undefined }; mutation.mutate({ id: tripId, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTripExpensesQueryKey(tripId) }); queryClient.invalidateQueries({ queryKey: getGetTripQueryKey(tripId) }); onClose(); } }); }; return <Modal title="Add expense" onClose={onClose}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Category<select data-testid="select-expense-category" value={form.category} onChange={(event) => set('category')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="fuel">Fuel</option><option value="toll">Toll</option><option value="parking">Parking</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select></label><Field label="Amount" required type="number" value={form.amount} onChange={set('amount')} testId="input-expense-amount" /><Field label="Expense date" required type="date" value={form.expenseDate} onChange={set('expenseDate')} testId="input-expense-date" /></div><Field label="Notes" value={form.notes} onChange={set('notes')} testId="input-expense-notes" /><Button type="submit" disabled={mutation.isPending} className="w-full">{mutation.isPending && <Loader2 className="animate-spin" size={14} />}Save expense</Button></form></Modal>; }
-function EditTripModal({ trip, onClose, onSaved, update }: { trip: any; onClose: () => void; onSaved: (next: any) => void; update: ReturnType<typeof useUpdateTrip> }) { const [form, setForm] = useState({ billingKm: String(trip.billingKm), ratePerKm: String(trip.ratePerKm), toll: String(trip.toll), parking: String(trip.parking), otherCharges: String(trip.otherCharges), notes: trip.notes ?? '' }); const set = (key: string) => (value: string) => setForm({ ...form, [key]: value }); const submit = (event: React.FormEvent) => { event.preventDefault(); const data: TripUpdate = { billingKm: Number(form.billingKm), ratePerKm: Number(form.ratePerKm), toll: Number(form.toll), parking: Number(form.parking), otherCharges: Number(form.otherCharges), notes: form.notes }; update.mutate({ id: trip.id, data }, { onSuccess: onSaved }); }; return <Modal title="Edit fare controls" onClose={onClose}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Billing kilometres" type="number" value={form.billingKm} onChange={set('billingKm')} testId="input-edit-billing-km" /><Field label="Rate per kilometre" type="number" value={form.ratePerKm} onChange={set('ratePerKm')} testId="input-edit-rate" /><Field label="Toll" type="number" value={form.toll} onChange={set('toll')} testId="input-edit-toll" /><Field label="Parking" type="number" value={form.parking} onChange={set('parking')} testId="input-edit-parking" /><Field label="Other charges" type="number" value={form.otherCharges} onChange={set('otherCharges')} testId="input-edit-other" /></div><Field label="Notes" multiline value={form.notes} onChange={set('notes')} testId="input-edit-notes" /><Button type="submit" disabled={update.isPending} className="w-full">{update.isPending && <Loader2 className="animate-spin" size={14} />}Save trip</Button></form></Modal>; }
+function MainApp() {
+  const { user, isSignedIn, isLoaded, signOut, switchRole } = useAppAuth();
+  const [location, setLocation] = useLocation();
+  const qc = useQueryClient();
 
-function PaymentsPage() { const trips = useListTrips({ page: 1, limit: 100 }, { query: { queryKey: getListTripsQueryKey({ page: 1, limit: 100 }) } }); const [search, setSearch] = useState(''); const filtered = (trips.data?.items ?? []).filter((trip) => `${trip.bookingId} ${trip.customerName}`.toLowerCase().includes(search.toLowerCase())); const total = filtered.reduce((sum, trip) => sum + (trip.totalPaid ?? 0), 0); const pending = filtered.reduce((sum, trip) => sum + (trip.remainingBalance ?? 0), 0); return <div><PageHeader eyebrow="Money desk" title="Payments" copy="See collection health before it becomes a follow-up." /><div className="mb-5 grid gap-4 sm:grid-cols-3"><Metric icon={WalletCards} label="Collected on board" value={money(total)} note="Across visible trips" accent /><Metric icon={Clock3} label="Pending collection" value={money(pending)} note="Balance to follow up" /><Metric icon={TrendingUp} label="Collection rate" value={total + pending ? `${Math.round(total / (total + pending) * 100)}%` : '—'} note="Paid vs customer total" /></div><div className="surface overflow-hidden rounded-2xl"><div className="flex flex-col gap-3 border-b p-4 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><input data-testid="input-search-payments" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customer or booking" className="w-full rounded-lg bg-muted/70 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><span className="flex items-center gap-2 px-2 text-xs font-bold text-muted-foreground"><CircleDollarSign size={15} className="text-primary" />Live from trips</span></div>{trips.isLoading ? <div className="p-5"><LoadingState /></div> : filtered.length ? <div className="divide-y">{filtered.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-payment-${trip.id}`} key={trip.id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-muted/50"><div><p className="mono text-xs font-bold text-primary">{trip.bookingId}</p><p className="mt-1 text-sm font-bold">{trip.customerName}<span className="ml-2 text-xs font-normal text-muted-foreground">{shortDate(trip.startDate)}</span></p></div><div className="text-right"><p className="text-sm font-extrabold">{money(trip.totalPaid)} <span className="font-normal text-muted-foreground">/ {money(trip.customerTotal)}</span></p><p className={`mt-1 text-[10px] font-bold ${trip.remainingBalance > 0 ? 'text-accent-foreground' : 'text-primary'}`}>{trip.remainingBalance > 0 ? `${money(trip.remainingBalance)} pending` : 'Paid in full'}</p></div><ChevronRight size={16} className="text-muted-foreground" /></Link>)}</div> : <EmptyState icon={WalletCards} title="Nothing to collect yet" copy="Trips with a customer total will show up here." />}</div></div>; }
+  // Connect Real-Time Server-Sent Events Sync
+  const { status: realtimeStatus } = useRealtimeSync();
 
-function ExpensesPage() { const trips = useListTrips({ page: 1, limit: 100 }, { query: { queryKey: getListTripsQueryKey({ page: 1, limit: 100 }) } }); const expenses = (trips.data?.items ?? []).reduce((sum, trip) => sum + (trip.expenseTotal ?? 0), 0); return <div><PageHeader eyebrow="Money desk" title="Expenses" copy="Keep every operational cost attached to the work it belongs to." /><div className="mb-5 grid gap-4 sm:grid-cols-3"><Metric icon={Fuel} label="Recorded costs" value={money(expenses)} note="Across visible trips" /><Metric icon={Receipt} label="Trips with costs" value={String((trips.data?.items ?? []).filter((trip) => (trip.expenseTotal ?? 0) > 0).length)} note="Expense-bearing bookings" accent /><Metric icon={CircleDollarSign} label="Margin watch" value={money((trips.data?.items ?? []).reduce((sum, trip) => sum + (trip.customerTotal - (trip.expenseTotal ?? 0)), 0))} note="Customer totals less costs" /></div><div className="surface overflow-hidden rounded-2xl"><div className="border-b px-5 py-4"><p className="eyebrow mb-1">Trip costs</p><h2 className="font-extrabold">Expense ledger</h2></div>{trips.isLoading ? <div className="p-5"><LoadingState /></div> : (trips.data?.items ?? []).length ? <div className="divide-y">{trips.data?.items.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-expense-${trip.id}`} key={trip.id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-muted/50"><div className="flex items-center gap-3"><span className="rounded-lg bg-secondary p-2 text-primary"><Fuel size={16} /></span><div><p className="mono text-xs font-bold text-primary">{trip.bookingId}</p><p className="mt-1 text-sm font-bold">{trip.pickup.name} <span className="font-normal text-muted-foreground">to</span> {trip.destination.name}</p></div></div><div className="text-right"><p className="text-sm font-extrabold">{money(trip.expenseTotal)}</p><p className="mt-1 text-[10px] text-muted-foreground">Open trip to add cost</p></div></Link>)}</div> : <EmptyState icon={Fuel} title="No operational costs yet" copy="Record fuel, tolls and parking from a trip detail." />}</div></div>; }
+  // Modal States
+  const [createTripOpen, setCreateTripOpen] = useState(false);
+  const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
+  const [customerCopyTrip, setCustomerCopyTrip] = useState<any | null>(null);
+  const [paymentRecordTrip, setPaymentRecordTrip] = useState<any | null>(null);
+  const [cancelTrip, setCancelTrip] = useState<any | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<{ payment: any; trip: any } | null>(null);
+  const [driverKmTrip, setDriverKmTrip] = useState<{ trip: any; mode: "start" | "end" } | null>(null);
+  const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(null);
+  const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<any | null>(null);
 
-function ReportsPage() { const [filters, setFilters] = useState({ from: '', to: '', status: '', tripType: '' }); const params = useMemo(() => Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as typeof filters, [filters]); const query = useGetReportSummary(params, { query: { queryKey: getGetReportSummaryQueryKey(params) } }); const report = query.data; const exportReport = () => { if (!report) return; const rows = report.rows.map((row) => [row.bookingId, row.customerName, row.status, row.customerTotal, row.totalPaid].join(',')).join('\\n'); const blob = new Blob([`Booking,Customer,Status,Total,Paid\\n${rows}`], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'ng-travels-report.csv'; anchor.click(); URL.revokeObjectURL(url); }; return <div><PageHeader eyebrow="Business intelligence" title="Reports" copy="A practical read on routes, collection and operating margin." action={<Button variant="outline" onClick={exportReport} disabled={!report}><Download size={15} />Export CSV</Button>} /><div className="surface mb-5 grid gap-3 rounded-2xl p-4 sm:grid-cols-2 lg:grid-cols-4"><Field label="From" type="date" value={filters.from} onChange={(value) => setFilters({ ...filters, from: value })} testId="input-report-from" /><Field label="To" type="date" value={filters.to} onChange={(value) => setFilters({ ...filters, to: value })} testId="input-report-to" /><label className="block text-xs font-bold">Status<select data-testid="select-report-status" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="">All statuses</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="pending">Pending</option></select></label><label className="block text-xs font-bold">Trip type<select data-testid="select-report-type" value={filters.tripType} onChange={(event) => setFilters({ ...filters, tripType: event.target.value })} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="">All types</option><option value="one_way">One way</option><option value="round_trip">Round trip</option><option value="local">Local</option></select></label></div>{query.isLoading ? <LoadingState label="Building your report" /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : !report ? <EmptyState icon={BarChart3} title="No report data" copy="Choose a date range to build an operating view." /> : <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric icon={Navigation} label="Total trips" value={String(report.totalTrips)} note={`${report.completed} completed · ${report.cancelled} cancelled`} accent /><Metric icon={CircleDollarSign} label="Gross fare" value={money(report.grossFare)} note={`${report.billingKm} billing km`} /><Metric icon={WalletCards} label="Collection" value={money(report.collection)} note={`${money(report.pendingBalance)} pending`} /><Metric icon={TrendingUp} label="Profit" value={money(report.profit)} note={`${money(report.expenses)} expenses`} accent /></div><div className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><section className="surface rounded-2xl p-5"><p className="eyebrow">Readout</p><div className="mt-5 space-y-5"><div><p className="text-xs text-muted-foreground">Average fare</p><p className="mt-1 text-xl font-extrabold">{money(report.averageFare)}</p></div><div><p className="text-xs text-muted-foreground">Top customer</p><p className="mt-1 font-extrabold">{report.topCustomer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Top destination</p><p className="mt-1 font-extrabold">{report.topDestination || '—'}</p></div><div className="border-t pt-4"><p className="eyebrow mb-3">Payment mix</p>{report.paymentMethods.map((method) => <div key={method.method} className="mb-3 flex items-center justify-between text-xs"><span className="capitalize">{method.method}</span><span className="font-extrabold">{money(method.amount)}</span></div>)}</div></div></section><section className="surface overflow-hidden rounded-2xl"><div className="border-b px-5 py-4"><p className="eyebrow mb-1">Detailed rows</p><h2 className="font-extrabold">Trip performance</h2></div><div className="overflow-x-auto"><div className="min-w-[620px] divide-y">{report.rows.map((trip) => <Link href={`/trips/${trip.id}`} data-testid={`row-report-${trip.id}`} key={trip.id} className="grid grid-cols-[1fr_1.2fr_.8fr_.8fr] items-center gap-3 px-5 py-4 hover:bg-muted/50"><span className="mono text-xs font-bold text-primary">{trip.bookingId}</span><span className="text-xs font-bold">{trip.customerName}</span><StatusPill status={trip.status} /><span className="text-right text-sm font-extrabold">{money(trip.customerTotal)}</span></Link>)}</div></div></section></div></>}</div>; }
-
-function NotificationsPage() { const query = useListNotifications({ query: { queryKey: getListNotificationsQueryKey() } }); const mark = useMarkNotificationRead(); return <div><PageHeader eyebrow="Inbox" title="Notifications" copy="Small signals, caught before they become surprises." /><div className="surface overflow-hidden rounded-2xl">{query.isLoading ? <div className="p-5"><LoadingState /></div> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data ?? []).length ? <div className="divide-y">{query.data?.map((notification) => <div data-testid={`notification-${notification.id}`} key={notification.id} className={`flex gap-4 px-5 py-5 ${!notification.isRead ? 'bg-primary/[.035]' : ''}`}><div className={`mt-0.5 rounded-lg p-2 ${notification.kind === 'payment' ? 'bg-accent/20 text-accent-foreground' : 'bg-secondary text-primary'}`}>{notification.kind === 'payment' ? <CircleDollarSign size={17} /> : <Bell size={17} />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-extrabold">{notification.title}</p><span className="mono text-[10px] text-muted-foreground">{new Date(notification.createdAt).toLocaleDateString('en-IN')}</span></div><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{notification.message}</p>{notification.tripId && <Link href={`/trips/${notification.tripId}`} className="mt-2 inline-flex text-xs font-bold text-primary hover:underline">Open trip <ArrowUpRight size={13} /></Link>}</div>{!notification.isRead && <button data-testid={`button-mark-read-${notification.id}`} onClick={() => mark.mutate({ id: notification.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() }) })} className="self-start rounded-lg p-2 text-primary hover:bg-muted" title="Mark as read"><Check size={16} /></button>}</div>)}</div> : <EmptyState icon={Bell} title="Inbox is clear" copy="You’re caught up. New payment and trip signals will land here." />}</div></div>; }
-
-function AuditLogsPage() { const query = useListAuditLogs({ query: { queryKey: getListAuditLogsQueryKey() } }); return <div><PageHeader eyebrow="Accountability" title="Audit logs" copy="A quiet, complete history of important workspace changes." /><div className="surface overflow-hidden rounded-2xl">{query.isLoading ? <div className="p-5"><LoadingState /></div> : query.isError ? <ErrorState retry={() => query.refetch()} /> : (query.data ?? []).length ? <div className="divide-y">{query.data?.map((log) => <div data-testid={`row-audit-${log.id}`} key={log.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_1fr_.8fr_1.3fr] sm:items-center"><div><p className="text-sm font-extrabold capitalize">{log.action.replaceAll('_', ' ')}</p><p className="mono mt-1 text-[10px] text-muted-foreground">{log.entity} · {log.entityId}</p></div><p className="text-xs text-muted-foreground">{log.actorName || 'System'}</p><p className="mono text-[10px] text-muted-foreground">{new Date(log.createdAt).toLocaleString('en-IN')}</p><p className="truncate text-xs text-muted-foreground">{log.newValue || log.oldValue || 'Record updated'}</p></div>)}</div> : <EmptyState icon={ShieldCheck} title="No audit events yet" copy="Changes to trips, customers and payments will appear here." />}</div></div>; }
-
-function SettingsPage() {
-  const queryClient = useQueryClient();
-  const settings = useGetSettings({
-    query: { queryKey: getGetSettingsQueryKey() },
-  });
-  const update = useUpdateSettings();
-  const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({
-    company: "NG Travels",
-    mobile: "+91 98450 21867",
-    email: "hello@ngtravels.in",
-    currency: "INR",
-    timezone: "Asia/Kolkata",
-    defaultRate: "18",
+  // Queries
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+    queryKey: ["/api/dashboard"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+    refetchInterval: 15000,
   });
 
-  useEffect(() => {
-    if (!settings.data) return;
-    setForm({
-      company: settings.data.company,
-      mobile: settings.data.mobile,
-      email: settings.data.email,
-      currency: settings.data.currency,
-      timezone: settings.data.timezone,
-      defaultRate: String(settings.data.defaultRate),
-    });
-  }, [settings.data]);
+  const { data: tripsData = { items: [] } } = useQuery({
+    queryKey: ["/api/trips"],
+    queryFn: async () => {
+      const res = await fetch("/api/trips?limit=100", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
 
-  const set = (key: keyof typeof form) => (value: string) =>
-    setForm((old) => ({ ...old, [key]: value }));
-  const save = () => {
-    update.mutate(
-      {
-        data: {
-          company: form.company,
-          mobile: form.mobile,
-          email: form.email,
-          currency: form.currency,
-          timezone: form.timezone,
-          defaultRate: Number(form.defaultRate) || 0,
-        },
-      },
-      {
-        onSuccess: (next) => {
-          queryClient.setQueryData(getGetSettingsQueryKey(), next);
-          setSaved(true);
-          window.setTimeout(() => setSaved(false), 2400);
-        },
-      },
-    );
+  const { data: customersData = { items: [] } } = useQuery({
+    queryKey: ["/api/customers"],
+    queryFn: async () => {
+      const res = await fetch("/api/customers?limit=100", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: driversData = [] } = useQuery({
+    queryKey: ["/api/drivers"],
+    queryFn: async () => {
+      const res = await fetch("/api/drivers", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: enquiriesData = [] } = useQuery({
+    queryKey: ["/api/enquiries"],
+    queryFn: async () => {
+      const res = await fetch("/api/enquiries", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: paymentsData = [] } = useQuery({
+    queryKey: ["/api/payments"],
+    queryFn: async () => {
+      const res = await fetch("/api/payments", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: expensesData = [] } = useQuery({
+    queryKey: ["/api/expenses"],
+    queryFn: async () => {
+      const res = await fetch("/api/expenses", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: notificationsData = [] } = useQuery({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const { data: auditLogsData = [] } = useQuery({
+    queryKey: ["/api/audit-logs"],
+    queryFn: async () => {
+      const res = await fetch("/api/audit-logs", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  const { data: settingsData = {} } = useQuery({
+    queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings", {
+        headers: { "x-user-role": user?.role || "owner" },
+      });
+      return res.json();
+    },
+  });
+
+  // Dedicated Driver Queries
+  const { data: driverTodayTrips = [] } = useQuery({
+    queryKey: ["/api/driver/today"],
+    queryFn: async () => {
+      const res = await fetch("/api/driver/today", {
+        headers: { "x-user-role": "driver" },
+      });
+      return res.json();
+    },
+    refetchInterval: 6000,
+  });
+
+  const { data: driverCurrentTrip } = useQuery({
+    queryKey: ["/api/driver/current-trip"],
+    queryFn: async () => {
+      const res = await fetch("/api/driver/current-trip", {
+        headers: { "x-user-role": "driver" },
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: 6000,
+  });
+
+  // Normalized collections: guarantees an array whether data is { items: [] } or raw array []
+  const tripList: any[] = Array.isArray(tripsData) ? tripsData : (Array.isArray((tripsData as any)?.items) ? (tripsData as any).items : []);
+  const customerList: any[] = Array.isArray(customersData) ? customersData : (Array.isArray((customersData as any)?.items) ? (customersData as any).items : []);
+  const driverList: any[] = Array.isArray(driversData) ? driversData : (Array.isArray((driversData as any)?.items) ? (driversData as any).items : []);
+  const paymentList: any[] = Array.isArray(paymentsData) ? paymentsData : (Array.isArray((paymentsData as any)?.items) ? (paymentsData as any).items : []);
+  const expenseList: any[] = Array.isArray(expensesData) ? expensesData : (Array.isArray((expensesData as any)?.items) ? (expensesData as any).items : []);
+  const notificationList: any[] = Array.isArray(notificationsData) ? notificationsData : (Array.isArray((notificationsData as any)?.items) ? (notificationsData as any).items : []);
+  const enquiryList: any[] = Array.isArray(enquiriesData) ? enquiriesData : (Array.isArray((enquiriesData as any)?.items) ? (enquiriesData as any).items : []);
+  const auditLogList: any[] = Array.isArray(auditLogsData) ? auditLogsData : (Array.isArray((auditLogsData as any)?.items) ? (auditLogsData as any).items : []);
+
+  // Action Handlers
+  const handleTripCreated = () => {
+    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
   };
-  if (settings.isLoading) return <LoadingState label="Loading workspace settings" />;
-  if (settings.isError) return <ErrorState retry={() => settings.refetch()} />;
-  return <div className="mx-auto max-w-4xl"><PageHeader eyebrow="Workspace controls" title="Settings" copy="Keep the operating defaults close to the way your business actually runs." /><div className="grid gap-5 lg:grid-cols-[.75fr_1.25fr]"><div className="surface h-fit rounded-2xl p-2"><div className="rounded-xl bg-primary/10 px-4 py-3 text-sm font-extrabold text-primary">Company profile</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Operations defaults</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Notifications</div><div className="px-4 py-3 text-sm font-semibold text-muted-foreground">Security</div></div><div className="space-y-5"><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6 flex items-center justify-between"><div><p className="eyebrow mb-1">Company profile</p><h2 className="font-extrabold">The details customers see</h2></div><Settings2 className="text-primary" size={19} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Business name" value={form.company} onChange={set('company')} testId="input-setting-company" /><Field label="Phone" value={form.mobile} onChange={set('mobile')} testId="input-setting-mobile" /><Field label="Email" type="email" value={form.email} onChange={set('email')} testId="input-setting-email" /><label className="block text-xs font-bold">Currency<select data-testid="select-setting-currency" value={form.currency} onChange={(event) => set('currency')(event.target.value)} className="focus-ring mt-1.5 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"><option value="INR">INR · Indian Rupee</option><option value="USD">USD · US Dollar</option></select></label></div></section><section className="surface rounded-2xl p-5 md:p-7"><div className="mb-6"><p className="eyebrow mb-1">Operations defaults</p><h2 className="font-extrabold">Make new trips faster</h2></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Timezone" value={form.timezone} onChange={set('timezone')} testId="input-setting-timezone" /><Field label="Default rate per kilometre" type="number" min="0" step="0.01" value={form.defaultRate} onChange={set('defaultRate')} testId="input-setting-rate" /></div><div className="mt-5 flex items-center justify-between border-t pt-5"><span className={`text-xs font-bold ${saved ? 'text-primary' : 'text-muted-foreground'}`}>{saved ? 'Saved just now' : 'Changes are saved to the workspace'}</span><Button onClick={save} disabled={update.isPending} testId="button-save-settings">{update.isPending && <Loader2 className="animate-spin" size={14} />}{update.isPending ? 'Saving…' : <><Check size={14} />Save settings</>}</Button></div>{update.isError && <p className="mt-3 text-xs font-bold text-destructive">Couldn’t save settings. Try again.</p>}</section></div></div></div>;
-}
 
-function DriverHome() { const trips = useListTrips({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }, { query: { queryKey: getListTripsQueryKey({ date: new Date().toISOString().slice(0, 10), page: 1, limit: 20 }) } }); return <div className="mx-auto max-w-xl"><div className="mb-7 flex items-center justify-between"><Link href="/dashboard" data-testid="link-driver-brand" className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span className="text-sm font-extrabold">NG Travels</span></Link><span className="rounded-full bg-primary/10 px-3 py-1.5 text-[10px] font-extrabold text-primary">Driver view</span></div><div className="rounded-2xl bg-sidebar p-6 text-sidebar-foreground"><p className="eyebrow text-sidebar-foreground/55">Today · {dateLabel(new Date().toISOString().slice(0, 10))}</p><h1 className="mt-3 text-3xl font-extrabold">Your runs, at a glance.</h1><p className="mt-2 text-sm text-sidebar-foreground/65">Stay focused on the next pickup.</p><div className="mt-7 flex items-center gap-7"><div><p className="text-3xl font-extrabold text-accent">{trips.data?.items.length ?? 0}</p><p className="mt-1 text-xs text-sidebar-foreground/60">assigned today</p></div><div className="h-10 w-px bg-sidebar-border" /><div><p className="text-3xl font-extrabold">{(trips.data?.items ?? []).filter((trip) => trip.status === 'completed').length}</p><p className="mt-1 text-xs text-sidebar-foreground/60">completed</p></div></div></div><div className="mt-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-extrabold">Next on your route</h2><Link href="/driver/trips" className="text-xs font-bold text-primary">All trips</Link></div>{trips.isLoading ? <LoadingState /> : (trips.data?.items ?? []).length ? <div className="space-y-3">{trips.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`card-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex items-center justify-between"><span className="mono text-[10px] font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><div className="mt-4 flex gap-3"><div className="flex flex-col items-center pt-1"><span className="h-2.5 w-2.5 rounded-full border-2 border-primary" /><span className="my-1 h-7 w-px bg-border" /><span className="h-2.5 w-2.5 rounded-full bg-accent" /></div><div className="space-y-3 text-sm font-bold"><p>{trip.pickup.name}<span className="ml-2 text-xs font-normal text-muted-foreground">{trip.startTime}</span></p><p>{trip.destination.name}</p></div></div></Link>)}</div> : <EmptyState icon={Navigation} title="No trips assigned today" copy="Your next assignment will appear here." />}</div></div>; }
-function DriverTripsPage() { const query = useListTrips({ page: 1, limit: 50 }, { query: { queryKey: getListTripsQueryKey({ page: 1, limit: 50 }) } }); return <div className="mx-auto max-w-2xl"><div className="mb-6 flex items-center gap-3"><Link href="/driver" className="rounded-lg p-2 hover:bg-muted"><ArrowLeft size={18} /></Link><div><p className="eyebrow">Driver view</p><h1 className="text-xl font-extrabold">Your trips</h1></div></div>{query.isLoading ? <LoadingState /> : query.isError ? <ErrorState retry={() => query.refetch()} /> : <div className="space-y-3">{query.data?.items.map((trip) => <Link href={`/driver/trips/${trip.id}`} data-testid={`row-driver-trip-${trip.id}`} key={trip.id} className="surface block rounded-2xl p-4 hover:border-primary/40"><div className="flex justify-between"><span className="mono text-xs font-bold text-primary">{trip.bookingId}</span><StatusPill status={trip.status} /></div><p className="mt-3 text-sm font-extrabold">{trip.pickup.name} <span className="font-normal text-muted-foreground">to</span> {trip.destination.name}</p><div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>{shortDate(trip.startDate)} · {trip.startTime}</span><span>{trip.customerName}</span></div></Link>)}</div>}</div>; }
-
-function SignInPage() { return <div className="noise flex min-h-[100dvh] items-center justify-center bg-sidebar px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div>; }
-function SignUpPage() { return <div className="noise flex min-h-[100dvh] items-center justify-center bg-sidebar px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div>; }
-
-function LandingPage() {
-  return <div className="noise min-h-[100dvh] bg-sidebar text-sidebar-foreground">
-    <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6 md:px-8"><Link href="/" className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-sm font-black text-accent-foreground">NG</span><span><span className="block text-sm font-extrabold">NG Travels</span><span className="eyebrow mt-1 block text-sidebar-foreground/55">Operations desk</span></span></Link><div className="flex items-center gap-2"><Link href="/sign-in" className="rounded-lg px-3 py-2 text-xs font-bold text-sidebar-foreground/70 hover:bg-sidebar-accent">Sign in</Link><Link href="/sign-up"><Button>Open the desk <ArrowUpRight size={14} /></Button></Link></div></header>
-    <main className="mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-12 md:grid-cols-[1.1fr_.9fr] md:px-8 md:pb-24 md:pt-20">
-      <div className="self-center"><p className="eyebrow text-accent">Travel operations, made calm</p><h1 className="mt-5 max-w-2xl text-5xl font-extrabold leading-[.98] tracking-[-.06em] md:text-7xl">Keep the day moving.</h1><p className="mt-6 max-w-xl text-base leading-relaxed text-sidebar-foreground/65 md:text-lg">One focused workspace for bookings, customer details, driver execution, collection and the small signals that keep every journey on track.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/sign-up"><Button className="px-5 py-3">Start with NG Travels <ArrowUpRight size={15} /></Button></Link><Link href="/sign-in" className="inline-flex items-center rounded-lg border border-sidebar-border px-5 py-3 text-xs font-bold text-sidebar-foreground/80 hover:bg-sidebar-accent">I already have an account</Link></div><div className="mt-12 flex flex-wrap gap-x-8 gap-y-3 text-xs font-semibold text-sidebar-foreground/50"><span>Bookings & routes</span><span>Transparent fares</span><span>Driver-first execution</span></div></div>
-      <div className="relative"><div className="absolute -inset-8 rounded-full bg-accent/10 blur-3xl" /><div className="relative rounded-3xl border border-sidebar-border bg-sidebar-accent/45 p-4 shadow-2xl md:p-5"><div className="rounded-2xl bg-card p-5 text-card-foreground"><div className="flex items-start justify-between"><div><p className="eyebrow text-primary">Operations workspace</p><p className="mt-2 text-xl font-extrabold">One calm view.</p></div><span className="rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-extrabold text-primary">READY</span></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl bg-muted p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bookings</p><p className="mt-2 text-2xl font-extrabold">Live</p></div><div className="rounded-xl bg-primary p-3 text-primary-foreground"><p className="text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Fares</p><p className="mt-2 text-2xl font-extrabold">Clear</p></div></div><div className="mt-3 rounded-xl border p-4"><p className="eyebrow">Built for the next action</p><div className="mt-3 flex gap-3"><span className="mt-1 h-2.5 w-2.5 rounded-full border-2 border-primary" /><div><p className="text-sm font-extrabold">Plan, collect, execute.</p><p className="mono mt-1 text-[10px] text-muted-foreground">Customer records · route details · driver updates</p></div></div></div></div></div></div>
-    </main>
-  </div>;
-}
-
-function NotFound() { return <div className="grid min-h-[100dvh] place-items-center bg-background p-6"><div className="max-w-md text-center"><p className="eyebrow text-primary">404 · Off route</p><h1 className="mt-3 text-4xl font-extrabold">This road ends here.</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">The page you’re looking for doesn’t exist in this workspace.</p><Link href="/dashboard" data-testid="link-not-found-home"><Button className="mt-6">Back to dashboard</Button></Link></div></div>; }
-
-function HomeRedirect() { return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><LandingPage /></Show></>; }
-function ProtectedApp() { return <><Show when="signed-in"><Shell><RoutedErrorBoundary><Switch><Route path="/dashboard"><DashboardPage /></Route><Route path="/customers/:id"><CustomerDetailPage /></Route><Route path="/customers"><CustomersPage /></Route><Route path="/trips/new"><TripFormPage /></Route><Route path="/trips/:id"><TripDetailPage /></Route><Route path="/trips"><TripsPage /></Route><Route path="/payments"><PaymentsPage /></Route><Route path="/expenses"><ExpensesPage /></Route><Route path="/reports"><ReportsPage /></Route><Route path="/notifications"><NotificationsPage /></Route><Route path="/settings"><SettingsPage /></Route><Route path="/audit-logs"><AuditLogsPage /></Route><Route path="/driver/trips/:id"><TripDetailPage driverView /></Route><Route path="/driver/trips"><DriverTripsPage /></Route><Route path="/driver"><DriverHome /></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary></Shell></Show><Show when="signed-out"><Redirect to="/" /></Show></>; }
-function Router() { return <Switch><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/" component={HomeRedirect} /><Route component={ProtectedApp} /></Switch>; }
-
-function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
-  const [prevUserId, setPrevUserId] = useState<string | null | undefined>(undefined);
-  const query = useQueryClient();
-  useEffect(() => {
-    const unsubscribe = addListener(({ user }) => {
-      const nextUserId = user?.id ?? null;
-      if (prevUserId !== undefined && prevUserId !== nextUserId) query.clear();
-      setPrevUserId(nextUserId);
+  const handleApproveExpense = async (id: number) => {
+    await fetch(`/api/expenses/${id}/approve`, {
+      method: "PATCH",
+      headers: { "x-user-role": "owner" },
     });
-    return unsubscribe;
-  }, [addListener, prevUserId, query]);
-  return null;
+    qc.invalidateQueries({ queryKey: ["/api/expenses"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+  };
+
+  const handleRejectExpense = async (id: number) => {
+    await fetch(`/api/expenses/${id}/reject`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-user-role": "owner" },
+      body: JSON.stringify({ reason: "Expense rejected by operations" }),
+    });
+    qc.invalidateQueries({ queryKey: ["/api/expenses"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+  };
+
+  const handleUpdateAvailability = async (driverId: number, availability: string) => {
+    await fetch(`/api/drivers/${driverId}/availability`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-user-role": "owner" },
+      body: JSON.stringify({ availability }),
+    });
+    qc.invalidateQueries({ queryKey: ["/api/drivers"] });
+  };
+
+  const handleSaveSettings = async (updated: any) => {
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-user-role": "owner" },
+      body: JSON.stringify(updated),
+    });
+    qc.invalidateQueries({ queryKey: ["/api/settings"] });
+  };
+
+  const handleMarkNotificationRead = async (id: number) => {
+    await fetch(`/api/notifications/${id}/read`, {
+      method: "POST",
+      headers: { "x-user-role": user?.role || "owner" },
+    });
+    qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    await fetch("/api/notifications/read-all", {
+      method: "POST",
+      headers: { "x-user-role": user?.role || "owner" },
+    });
+    qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+  };
+
+  const handleDriverMilestone = async (tripId: number, status: string, note?: string) => {
+    await fetch(`/api/trips/${tripId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, note, changedBy: "Driver Suresh" }),
+    });
+    qc.invalidateQueries({ queryKey: ["trips"] });
+    qc.invalidateQueries({ queryKey: ["driver-today"] });
+    qc.invalidateQueries({ queryKey: ["driver-current"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  };
+
+  const nativeRole = (window as any).NG_APP_ROLE;
+  const isDriverWorkspace = nativeRole === "driver" ? true : nativeRole === "owner" ? false : (location.startsWith("/driver") || user?.role === "driver");
+
+  // Force route alignment if native APK
+  useEffect(() => {
+    if (!isSignedIn) return;
+    if (nativeRole === "driver" && !location.startsWith("/driver")) {
+      setLocation("/driver");
+    } else if (nativeRole === "owner" && location.startsWith("/driver")) {
+      setLocation("/dashboard");
+    }
+  }, [nativeRole, location, setLocation, isSignedIn]);
+
+  if (!isLoaded) {
+    return (
+      <AppSplashLoader
+        mode={isDriverWorkspace ? "driver" : "owner"}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  if (!isSignedIn) {
+    return <SignInPage />;
+  }
+
+  const currentDriver = driversData.find((d: any) => d.id === user?.driverId) || driversData[0] || null;
+
+  return (
+    <>
+      {isDriverWorkspace ? (
+        <DriverLayout
+          driver={currentDriver || { name: user?.fullName || "Driver Pilot", availability: "available" }}
+          onSignOut={signOut}
+          onSwitchRole={(role) => {
+            switchRole(role);
+            if (role === "admin") setLocation("/dashboard");
+          }}
+        >
+          <Switch>
+            <Route path="/driver">
+              <DriverDashboardPage
+                todayTrips={driverTodayTrips}
+                currentTrip={driverCurrentTrip}
+                driver={currentDriver}
+                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
+                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
+              />
+            </Route>
+            <Route path="/driver/dashboard">
+              <DriverDashboardPage
+                todayTrips={driverTodayTrips}
+                currentTrip={driverCurrentTrip}
+                driver={currentDriver}
+                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
+                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
+              />
+            </Route>
+            <Route path="/driver/today">
+              <DriverTodayPage
+                todayTrips={driverTodayTrips}
+                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
+                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+              />
+            </Route>
+            <Route path="/driver/current-trip">
+              <DriverCurrentTripPage
+                trip={driverCurrentTrip || driverTodayTrips[0]}
+                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
+                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
+                onUpdateMilestone={handleDriverMilestone}
+              />
+            </Route>
+            <Route path="/driver/expenses">
+              <DriverExpensesPage
+                expenses={expensesData.filter((e: any) => !user?.driverId || e.driverId === user.driverId)}
+                onOpenExpenseModal={() => setDriverExpenseTripId(driverCurrentTrip?.id || null)}
+              />
+            </Route>
+            <Route path="/driver/vehicle">
+              <DriverVehiclePage />
+            </Route>
+            <Route path="/driver/history">
+              <DriverHistoryPage />
+            </Route>
+            <Route path="/driver/profile">
+              <DriverProfilePage
+                driver={currentDriver}
+                onUpdateAvailability={(avail) => currentDriver?.id && handleUpdateAvailability(currentDriver.id, avail)}
+              />
+            </Route>
+            <Route>
+              <Redirect to="/driver" />
+            </Route>
+          </Switch>
+        </DriverLayout>
+      ) : (
+        <OwnerLayout
+          user={user}
+          onSignOut={signOut}
+          onSwitchRole={(role) => {
+            switchRole(role);
+            if (role === "driver") setLocation("/driver");
+          }}
+          unreadNotificationCount={notificationList.filter((n: any) => !n.isRead && n.audience === "owner").length}
+        >
+          <Switch>
+            <Route path="/">
+              <Redirect to="/dashboard" />
+            </Route>
+            <Route path="/dashboard">
+              <DashboardPage
+                isLoading={dashboardLoading && !dashboardData}
+                metrics={dashboardData?.metrics}
+                schedule={dashboardData?.schedule || []}
+                recentActivity={dashboardData?.recentActivity || []}
+                allTrips={tripList}
+                customers={customerList}
+                payments={paymentList}
+                onOpenCreateTrip={() => {
+                  setInitialEnquiryForTrip(null);
+                  setCreateTripOpen(true);
+                }}
+                onOpenCreateEnquiry={() => setLocation("/enquiries")}
+                onOpenCustomerCopy={(trip) => {
+                  setCustomerCopyTrip(trip);
+                }}
+              />
+            </Route>
+            <Route path="/live-trips">
+              <LiveTripsPage trips={tripList} />
+            </Route>
+            <Route path="/calendar">
+              <CalendarPage trips={tripList} />
+            </Route>
+            <Route path="/route-planner">
+              <RoutePlannerPage
+                onOpenTripWizardWithRoute={(routeData) => {
+                  if (routeData) {
+                    setInitialEnquiryForTrip({
+                      pickup: routeData.pickup?.address || routeData.pickup?.name || routeData.pickup,
+                      destination: routeData.destination?.address || routeData.destination?.name || routeData.destination,
+                      tripType: routeData.tripType || "round_trip",
+                    });
+                  } else {
+                    setInitialEnquiryForTrip(null);
+                  }
+                  setCreateTripOpen(true);
+                }}
+              />
+            </Route>
+            <Route path="/trips">
+              <TripsPage
+                trips={tripList}
+                onOpenCreateTrip={() => {
+                  setInitialEnquiryForTrip(null);
+                  setCreateTripOpen(true);
+                }}
+                onOpenCustomerCopy={(trip) => setCustomerCopyTrip(trip)}
+                onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
+                onOpenCancelModal={(trip) => setCancelTrip(trip)}
+              />
+            </Route>
+            <Route path="/trips/:id">
+              {(params) => {
+                const tripId = Number(params.id);
+                const currentTrip = tripList.find((t: any) => t.id === tripId);
+                const tripPayments = paymentList.filter((p: any) => p.tripId === tripId);
+                const tripExpenses = expenseList.filter((e: any) => e.tripId === tripId);
+                return (
+                  <TripDetailPage
+                    trip={currentTrip}
+                    payments={tripPayments}
+                    expenses={tripExpenses}
+                    onOpenCustomerCopy={(trip) => setCustomerCopyTrip(trip)}
+                    onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
+                    onOpenCancelModal={(trip) => setCancelTrip(trip)}
+                    onApproveExpense={handleApproveExpense}
+                    onRejectExpense={handleRejectExpense}
+                  />
+                );
+              }}
+            </Route>
+            <Route path="/vehicles">
+              <VehiclesPage />
+            </Route>
+            <Route path="/customers">
+              <CustomersPage customers={customerList} />
+            </Route>
+            <Route path="/enquiries">
+              <EnquiriesPage
+                enquiries={enquiryList}
+                onOpenCreateEnquiry={() => setCreateEnquiryOpen(true)}
+                onConvertToTrip={(enq) => {
+                  setInitialEnquiryForTrip(enq);
+                  setCreateTripOpen(true);
+                }}
+              />
+            </Route>
+            <Route path="/drivers">
+              <DriversPage
+                drivers={driverList}
+                onUpdateAvailability={handleUpdateAvailability}
+              />
+            </Route>
+            <Route path="/driver-availability">
+              <DriversPage
+                drivers={driverList}
+                onUpdateAvailability={handleUpdateAvailability}
+              />
+            </Route>
+            <Route path="/payments">
+              <PaymentsPage
+                payments={paymentList}
+                trips={tripList}
+                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+              />
+            </Route>
+            <Route path="/refunds">
+              <PaymentsPage
+                payments={paymentList}
+                trips={tripList}
+                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+              />
+            </Route>
+            <Route path="/expenses">
+              <ExpensesPage
+                expenses={expenseList}
+                trips={tripList}
+                onApprove={handleApproveExpense}
+                onReject={handleRejectExpense}
+              />
+            </Route>
+            <Route path="/reports">
+              <ReportsPage
+                trips={tripList}
+                expenses={expenseList}
+                payments={paymentList}
+              />
+            </Route>
+            <Route path="/analytics">
+              <AnalyticsPage
+                trips={tripList}
+                customers={customerList}
+                payments={paymentList}
+              />
+            </Route>
+            <Route path="/notifications">
+              <NotificationsPage
+                notifications={notificationList.filter((n: any) => n.audience === "owner")}
+                onMarkRead={handleMarkNotificationRead}
+                onMarkAllRead={handleMarkAllNotificationsRead}
+              />
+            </Route>
+            <Route path="/audit-logs">
+              <AuditLogsPage logs={auditLogList} />
+            </Route>
+            <Route path="/settings">
+              <SettingsPage
+                settings={settingsData}
+                onSaveSettings={handleSaveSettings}
+              />
+            </Route>
+            <Route>
+              <Redirect to="/dashboard" />
+            </Route>
+          </Switch>
+        </OwnerLayout>
+      )}
+
+      {/* Global Modals */}
+      <CreateTripModal
+        isOpen={createTripOpen}
+        onClose={() => setCreateTripOpen(false)}
+        onTripCreated={handleTripCreated}
+        customers={customerList}
+        drivers={driverList}
+        defaultRate={settingsData.defaultRate || 18}
+        defaultMinimumKm={settingsData.minimumKmPerDay || 250}
+        defaultDriverBata={settingsData.driverBataPerDay || 500}
+        defaultBillingDayPolicy={settingsData.billingDayPolicy || "CALENDAR_DAYS"}
+        initialEnquiry={initialEnquiryForTrip}
+      />
+
+      <CustomerCopyModal
+        isOpen={Boolean(customerCopyTrip)}
+        onClose={() => setCustomerCopyTrip(null)}
+        trip={customerCopyTrip}
+        companyInfo={settingsData}
+      />
+
+      <PaymentReceiptModal
+        isOpen={Boolean(receiptPayment)}
+        onClose={() => setReceiptPayment(null)}
+        payment={receiptPayment?.payment}
+        trip={receiptPayment?.trip}
+        companyInfo={settingsData}
+      />
+
+      <CancelTripModal
+        isOpen={Boolean(cancelTrip)}
+        onClose={() => setCancelTrip(null)}
+        trip={cancelTrip}
+        onTripCancelled={() => {
+          qc.invalidateQueries({ queryKey: ["trips"] });
+          qc.invalidateQueries({ queryKey: ["dashboard"] });
+        }}
+      />
+
+      <PaymentRecordModal
+        isOpen={Boolean(paymentRecordTrip)}
+        onClose={() => setPaymentRecordTrip(null)}
+        trip={paymentRecordTrip}
+        onPaymentRecorded={() => {
+          qc.invalidateQueries({ queryKey: ["trips"] });
+          qc.invalidateQueries({ queryKey: ["payments"] });
+          qc.invalidateQueries({ queryKey: ["dashboard"] });
+        }}
+      />
+
+      {driverKmTrip && (
+        <DriverKmModal
+          isOpen={Boolean(driverKmTrip)}
+          onClose={() => setDriverKmTrip(null)}
+          trip={driverKmTrip.trip}
+          mode={driverKmTrip.mode}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ["trips"] });
+            qc.invalidateQueries({ queryKey: ["driver-today"] });
+            qc.invalidateQueries({ queryKey: ["driver-current"] });
+            qc.invalidateQueries({ queryKey: ["dashboard"] });
+          }}
+        />
+      )}
+
+      {driverExpenseTripId && (
+        <DriverExpenseModal
+          isOpen={Boolean(driverExpenseTripId)}
+          onClose={() => setDriverExpenseTripId(null)}
+          tripId={driverExpenseTripId}
+          onExpenseAdded={() => {
+            qc.invalidateQueries({ queryKey: ["expenses"] });
+          }}
+        />
+      )}
+    </>
+  );
 }
-function ClerkProviderWithRoutes() {
-  const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryClientCacheInvalidator /><TooltipProvider><Router /><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <LocalAuthProvider>
+            <WouterRouter base={basePath}>
+              <MainApp />
+            </WouterRouter>
+          </LocalAuthProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
 }
-function App() { return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>; }
-export default App;

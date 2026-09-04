@@ -1,0 +1,9 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.gradle.wrapper.enabled": true,
+  "java.import.gradle.version": "8.13",
+  "java.import.gradle.home": "C:\\Users\\sures\\.gradle\\wrapper\\dists\\gradle-8.13-bin\\5xuhj0ry160q40clulazy9h7d\\gradle-8.13",
+  "gradle.wrapper.enabled": true,
+  "gradle.version": "8.13",
+  "gradle.home": "C:\\Users\\sures\\.gradle\\wrapper\\dists\\gradle-8.13-bin\\5xuhj0ry160q40clulazy9h7d\\gradle-8.13"
+}

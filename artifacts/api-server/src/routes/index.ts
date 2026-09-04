@@ -1,12 +1,10 @@
-import { Router, type IRouter } from "express";
-import healthRouter from "./health";
-import ngTravelsRouter from "./ng-travels";
-import { requireAuth } from "../middlewares/auth";
+import { Router } from "express";
+import healthRouter from "./health.js";
+import ngTravelsRouter from "./ng-travels.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 router.use(healthRouter);
-router.use(requireAuth);
 router.use(ngTravelsRouter);
 
 export default router;

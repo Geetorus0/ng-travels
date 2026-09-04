@@ -55,15 +55,15 @@ export function getClerkProxyHost(req: {
 export function clerkProxyMiddleware(): RequestHandler {
   // Only run proxy in production — Clerk proxying doesn't work for dev instances
   if (process.env.NODE_ENV !== 'production') {
-    return (_req, _res, next) => next();
+    return (_req: any, _res: any, next: any) => next();
   }
 
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
-    return (_req, _res, next) => next();
+    return (_req: any, _res: any, next: any) => next();
   }
 
-  return createProxyMiddleware({
+  return (createProxyMiddleware as any)({
     target: CLERK_FAPI,
     changeOrigin: true,
     // Take over the response so it can be re-sent with a Content-Length (see
@@ -72,7 +72,7 @@ export function clerkProxyMiddleware(): RequestHandler {
     pathRewrite: (path: string) =>
       path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ''),
     on: {
-      proxyReq: (proxyReq, req) => {
+      proxyReq: (proxyReq: any, req: any) => {
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = getClerkProxyHost(req) || '';
         const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
@@ -96,7 +96,7 @@ export function clerkProxyMiddleware(): RequestHandler {
       // be re-sent with a Content-Length; the body is forwarded untouched so
       // Content-Encoding is preserved. Length-known responses (e.g. /npm/*
       // assets) and body-less responses stream through without buffering.
-      proxyRes: (proxyRes, req, res) => {
+      proxyRes: (proxyRes: any, req: any, res: any) => {
         const headers = { ...proxyRes.headers };
         // Transfer-Encoding/Connection are hop-by-hop (RFC 7230 §6.1).
         delete headers['transfer-encoding'];
