@@ -50,7 +50,20 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ customers = [] }) 
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {customerList.length === 0 ? (
+        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
+          <Users className="w-12 h-12 text-zinc-600 mx-auto" />
+          <div className="text-sm font-semibold text-zinc-300">No customers registered yet</div>
+          <div className="text-xs text-zinc-500 max-w-sm mx-auto">
+            Customers will automatically appear here when booking trips, receiving quotes, or registering new journeys.
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 text-xs">
+          No customer accounts found matching "{search}".
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((c: any) => (
           <div
             key={c.id}
@@ -99,7 +112,8 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ customers = [] }) 
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

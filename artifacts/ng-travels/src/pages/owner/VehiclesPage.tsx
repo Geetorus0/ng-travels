@@ -284,6 +284,18 @@ export const VehiclesPage: React.FC = () => {
             subtext="Checking commercial vehicle status, permits and maintenance"
           />
         </div>
+      ) : vehicles.length === 0 ? (
+        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
+          <Car className="w-12 h-12 text-zinc-600 mx-auto" />
+          <div className="text-sm font-semibold text-zinc-300">No fleet vehicles registered yet</div>
+          <div className="text-xs text-zinc-500 max-w-sm mx-auto">
+            Get started by registering your first commercial taxi, sedan, Innova, or Tempo Traveller.
+          </div>
+          <Button onClick={handleOpenAdd} className="bg-amber-400 hover:bg-amber-500 text-zinc-950 font-bold text-xs mt-2">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Register First Vehicle
+          </Button>
+        </div>
       ) : filteredVehicles.length === 0 ? (
         <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 text-xs">
           No vehicles found matching your criteria.

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppSplashLoader, ButtonLoader } from "@/components/loading";
 import { syncEngine } from "@/lib/syncEngine";
+import { supabase } from "@/lib/supabase/client";
 
 // Initialize universal sync engine (standalone offline + remote sync)
 syncEngine.init();
@@ -121,11 +122,38 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Restore authenticated session from server on mount
+  // Restore authenticated session from Supabase or server on mount
   useEffect(() => {
     let isMounted = true;
 
-    async function checkExistingSession() {
+    async function checkAuthSession() {
+      // 1. Check native Supabase Auth session first
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && isMounted) {
+          const rawRole = (session.user.user_metadata?.role || "OWNER").toUpperCase();
+          const role = rawRole === "DRIVER" ? "driver" : "owner";
+          const authUser: AuthUser = {
+            id: session.user.id as any,
+            fullName: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Operations Owner",
+            firstName: (session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User").split(" ")[0],
+            role,
+            driverId: session.user.user_metadata?.driver_id || null,
+            phone: session.user.phone,
+            email: session.user.email,
+            primaryEmailAddress: session.user.email ? { emailAddress: session.user.email } : undefined,
+          };
+          setUser(authUser);
+          setIsSignedIn(true);
+          localStorage.setItem("ng_user_role", role);
+          setIsLoaded(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("[Auth] Supabase session check notice:", err);
+      }
+
+      // 2. Check token in localStorage
       const token = localStorage.getItem("ng_auth_token");
       if (!token) {
         if (isMounted) {
@@ -171,8 +199,7 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        console.warn("[Auth] Session restore offline notice:", err);
-        // If offline and token exists, maintain optimistic auth to avoid screen flashing
+        console.warn("[Auth] Session restore notice:", err);
         if (isMounted && token) {
           const savedRole = (localStorage.getItem("ng_user_role") as "driver" | "owner") || "owner";
           setIsSignedIn(true);
@@ -188,9 +215,31 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    checkExistingSession();
+    checkAuthSession();
+
+    // Subscribe to Supabase Auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        const rawRole = (session.user.user_metadata?.role || "OWNER").toUpperCase();
+        const role = rawRole === "DRIVER" ? "driver" : "owner";
+        setUser({
+          id: session.user.id as any,
+          fullName: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
+          firstName: (session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User").split(" ")[0],
+          role,
+          driverId: session.user.user_metadata?.driver_id || null,
+          phone: session.user.phone,
+          email: session.user.email,
+        });
+        setIsSignedIn(true);
+        localStorage.setItem("ng_user_role", role);
+      }
+    });
+
     return () => {
       isMounted = false;
+      subscription?.unsubscribe();
     };
   }, []);
 
@@ -202,6 +251,35 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
     pin?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     try {
+      // 1. Direct Supabase Auth attempt for admin
+      if (params.type === "admin" && params.email && params.password) {
+        try {
+          const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+            email: params.email.trim(),
+            password: params.password,
+          });
+
+          if (!sbError && sbData?.session?.user) {
+            const rawRole = (sbData.session.user.user_metadata?.role || "OWNER").toUpperCase();
+            const role = rawRole === "DRIVER" ? "driver" : "owner";
+            const authUser: AuthUser = {
+              id: sbData.session.user.id as any,
+              fullName: sbData.session.user.user_metadata?.full_name || "Operations Admin",
+              firstName: (sbData.session.user.user_metadata?.full_name || "Admin").split(" ")[0],
+              role,
+              email: sbData.session.user.email,
+            };
+            localStorage.setItem("ng_user_role", role);
+            setUser(authUser);
+            setIsSignedIn(true);
+            return { success: true };
+          }
+        } catch (e) {
+          console.warn("[Auth] Supabase direct auth notice:", e);
+        }
+      }
+
+      // 2. Primary API server authentication
       const endpoint = params.type === "admin" ? "/api/auth/login" : "/api/auth/driver-login";
       const body = params.type === "admin"
         ? { email: params.email?.trim(), password: params.password }
@@ -247,6 +325,9 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     const token = localStorage.getItem("ng_auth_token");
     if (token) {
       try {

@@ -405,35 +405,41 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
 
           <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl overflow-x-auto shadow-sm">
-            <table className="w-full text-left text-xs min-w-[500px]">
-              <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
-                <tr>
-                  <th className="py-2.5 sm:py-3 px-3 sm:px-4">Booking ID</th>
-                  <th className="py-2.5 sm:py-3 px-3 sm:px-4">Customer</th>
-                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Total</th>
-                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Paid</th>
-                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Balance Due</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {pendingPaymentTrips.slice(0, 5).map((trip) => (
-                  <tr key={trip.id} className="hover:bg-zinc-800/40 transition-colors">
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-mono font-bold text-amber-400">
-                      <Link href={`/trips/${trip.id}`} className="hover:underline">
-                        {trip.bookingId}
-                      </Link>
-                    </td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                      <div className="font-semibold text-zinc-200">{trip.customerName}</div>
-                      <div className="text-[10px] sm:text-[11px] text-zinc-500">{trip.customerMobile}</div>
-                    </td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-zinc-300">{formatINR(trip.customerTotal)}</td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-emerald-400">{formatINR(trip.totalPaid)}</td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono font-bold text-amber-300">{formatINR(trip.remainingBalance)}</td>
+            {pendingPaymentTrips.length === 0 ? (
+              <div className="p-6 text-center text-zinc-500 text-xs">
+                All trip balances are settled. No outstanding payments.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs min-w-[500px]">
+                <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                  <tr>
+                    <th className="py-2.5 sm:py-3 px-3 sm:px-4">Booking ID</th>
+                    <th className="py-2.5 sm:py-3 px-3 sm:px-4">Customer</th>
+                    <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Total</th>
+                    <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Paid</th>
+                    <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Balance Due</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {pendingPaymentTrips.slice(0, 5).map((trip) => (
+                    <tr key={trip.id} className="hover:bg-zinc-800/40 transition-colors">
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-mono font-bold text-amber-400">
+                        <Link href={`/trips/${trip.id}`} className="hover:underline">
+                          {trip.bookingId}
+                        </Link>
+                      </td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                        <div className="font-semibold text-zinc-200">{trip.customerName}</div>
+                        <div className="text-[10px] sm:text-[11px] text-zinc-500">{trip.customerMobile}</div>
+                      </td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-zinc-300">{formatINR(trip.customerTotal)}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-emerald-400">{formatINR(trip.totalPaid)}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono font-bold text-amber-300">{formatINR(trip.remainingBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -450,19 +456,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
 
           <div className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 space-y-2.5 shadow-sm">
-            {customerList.slice(0, 5).map((cust: any) => (
-              <div key={cust.id} className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800/60 last:border-0 last:pb-0">
-                <div>
-                  <div className="font-semibold text-zinc-200">{cust.name}</div>
-                  <div className="text-[10px] sm:text-[11px] text-zinc-500">{cust.mobile}</div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-mono font-semibold">
-                    {cust.totalTrips || 0} Runs
-                  </span>
-                </div>
+            {customerList.length === 0 ? (
+              <div className="py-4 text-center text-zinc-500 text-xs">
+                No customers recorded yet. Add your first customer to get started.
               </div>
-            ))}
+            ) : (
+              customerList.slice(0, 5).map((cust: any) => (
+                <div key={cust.id} className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800/60 last:border-0 last:pb-0">
+                  <div>
+                    <div className="font-semibold text-zinc-200">{cust.name}</div>
+                    <div className="text-[10px] sm:text-[11px] text-zinc-500">{cust.mobile}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-mono font-semibold">
+                      {cust.totalTrips || 0} Runs
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -48,11 +48,12 @@ Thumbs.db
 .cache/
 .local/
 
-# Netlify
-.netlify/
-
 # Binaries & APKs
 *.apk
 apks/
 dist-apk/
 
+# Local Environment & Secrets
+.env.local
+.env.*.local
+.netlify

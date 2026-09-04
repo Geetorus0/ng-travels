@@ -24,7 +24,16 @@ export const DriversPage: React.FC<DriversPageProps> = ({ drivers = [], onUpdate
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {driverList.length === 0 ? (
+        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
+          <Car className="w-12 h-12 text-zinc-600 mx-auto" />
+          <div className="text-sm font-semibold text-zinc-300">No driver partners registered yet</div>
+          <div className="text-xs text-zinc-500 max-w-sm mx-auto">
+            Once drivers join your fleet or are added, their roster, duty statuses, and vehicle assignments will appear here.
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {driverList.map((drv: any) => (
           <div
             key={drv.id}
@@ -98,7 +107,8 @@ export const DriversPage: React.FC<DriversPageProps> = ({ drivers = [], onUpdate
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
