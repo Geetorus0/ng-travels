@@ -496,7 +496,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   <div className="relative">
                     <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
                     <Input
-                      placeholder="Search customer by name or phone..."
+                      placeholder="Search customer by name, mobile, or corporate account (e.g. Rajesh, 98450)..."
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
                       className="pl-9 bg-zinc-900 border-zinc-800 text-xs h-10"
@@ -533,7 +533,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     <div>
                       <label className="text-[11px] text-zinc-400 block mb-1">Customer Full Name *</label>
                       <Input
-                        placeholder="e.g. Anand Kumar"
+                        placeholder="e.g. Rajesh Sharma / Infosys Corporate"
                         value={newCustomerName}
                         onChange={(e) => setNewCustomerName(e.target.value)}
                         className="bg-zinc-900 border-zinc-800 text-xs h-9"
@@ -542,10 +542,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     <div>
                       <label className="text-[11px] text-zinc-400 block mb-1">Mobile Number *</label>
                       <Input
-                        placeholder="e.g. +91 98450 12345"
+                        placeholder="e.g. +91 98450 12345 (10 digits)"
                         value={newCustomerMobile}
                         onChange={(e) => setNewCustomerMobile(e.target.value)}
-                        className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                        className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
                       />
                     </div>
                   </div>
@@ -553,16 +553,16 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     <div>
                       <label className="text-[11px] text-zinc-400 block mb-1">WhatsApp Number</label>
                       <Input
-                        placeholder="e.g. +91 98450 12345"
+                        placeholder="e.g. +91 98450 12345 (for booking updates)"
                         value={newCustomerWhatsapp}
                         onChange={(e) => setNewCustomerWhatsapp(e.target.value)}
-                        className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                        className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
                       />
                     </div>
                     <div>
                       <label className="text-[11px] text-zinc-400 block mb-1">Customer Address</label>
                       <Input
-                        placeholder="e.g. Indiranagar, Bengaluru"
+                        placeholder="e.g. #42, 100ft Road, Indiranagar, Bengaluru - 560038"
                         value={newCustomerAddress}
                         onChange={(e) => setNewCustomerAddress(e.target.value)}
                         className="bg-zinc-900 border-zinc-800 text-xs h-9"
@@ -675,7 +675,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 <div>
                   <label className="text-[11px] text-zinc-400 block mb-1">Special Driver Instructions</label>
                   <Input
-                    placeholder="e.g. Keep AC on, water bottles ready"
+                    placeholder="e.g. Keep AC turned on, 2 mineral water bottles, passenger luggage assistance"
                     value={specialInstructions}
                     onChange={(e) => setSpecialInstructions(e.target.value)}
                     className="bg-zinc-900 border-zinc-800 text-xs h-9"
@@ -699,7 +699,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   <MapPin className="w-3.5 h-3.5" /> Pickup Location *
                 </label>
                 <Input
-                  placeholder="Type pickup place, city, airport, landmark..."
+                  placeholder="Type pickup place (e.g. Kempegowda Airport, Indiranagar, MG Road, Whitefield)..."
                   value={pickupInput}
                   onChange={(e) => setPickupInput(e.target.value)}
                   className="bg-zinc-900 border-zinc-800 text-xs h-10 font-semibold text-zinc-100"
@@ -731,7 +731,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   <MapPin className="w-3.5 h-3.5" /> Destination *
                 </label>
                 <Input
-                  placeholder="Type destination city, landmark, hotel..."
+                  placeholder="Type destination (e.g. Mysore Palace, Ooty, Coorg, Chennai Central, Tirupati)..."
                   value={destInput}
                   onChange={(e) => setDestInput(e.target.value)}
                   className="bg-zinc-900 border-zinc-800 text-xs h-10 font-semibold text-zinc-100"
@@ -762,7 +762,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 <label className="text-xs font-bold text-zinc-400">Via Stops / Enroute Waypoints</label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add intermediate stop (e.g. Mandya, Tirupur Bypass)..."
+                    placeholder="Add intermediate stop (e.g. Mandya, Maddur Tiffany's, Channapatna Toys)..."
                     value={stopInput}
                     onChange={(e) => setStopInput(e.target.value)}
                     className="bg-zinc-900 border-zinc-800 text-xs h-9"
@@ -1217,10 +1217,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 <div>
                   <label className="text-[11px] text-zinc-400 block mb-1">Payment Reference</label>
                   <Input
-                    placeholder="e.g. UPI/260902/894102"
+                    placeholder="e.g. UPI Ref / UTR / Txn ID: 429188201992"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
-                    className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                    className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
                   />
                 </div>
               </div>

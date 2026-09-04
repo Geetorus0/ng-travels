@@ -140,8 +140,8 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
               <Input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                placeholder="e.g. UPI/260902/849102"
-                className="bg-zinc-900 border-zinc-800 text-xs"
+                placeholder="e.g. UPI Ref / UTR: 429188201992 or Cheque #104921"
+                className="bg-zinc-900 border-zinc-800 text-xs font-mono"
               />
             </div>
 

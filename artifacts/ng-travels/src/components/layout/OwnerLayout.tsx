@@ -126,7 +126,7 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({
             <form onSubmit={handleGlobalSearch} className="relative hidden lg:block w-36 xl:w-44">
               <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
               <Input
-                placeholder="Search Bookings..."
+                placeholder="Search bookings, ID, customer..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-8 bg-zinc-900/90 border-zinc-800 pl-8 text-xs placeholder:text-zinc-500 rounded-lg focus:border-amber-500/50"

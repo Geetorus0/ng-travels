@@ -303,7 +303,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                   setPickupInput(e.target.value);
                   setSelectedPickup(null);
                 }}
-                placeholder="Type real location (e.g. Coimbatore)..."
+                placeholder="Type pickup place, city, or airport (e.g. Bengaluru, Indiranagar)..."
                 className="bg-zinc-950 border-zinc-800 text-xs h-10 pr-8"
               />
               {searchingPickup && (
@@ -358,7 +358,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                     next[idx] = e.target.value;
                     setStops(next);
                   }}
-                  placeholder={`Waypoint ${idx + 1}...`}
+                  placeholder={`Waypoint ${idx + 1} (e.g. Mandya, Maddur, Mysore Road)...`}
                   className="bg-zinc-950 border-zinc-800 text-xs h-9 flex-1"
                 />
                 <Button size="sm" variant="ghost" onClick={() => setStops(stops.filter((_, i) => i !== idx))} className="text-rose-400 hover:bg-rose-950/20 h-8 w-8 p-0">
@@ -380,7 +380,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                   setDestInput(e.target.value);
                   setSelectedDest(null);
                 }}
-                placeholder="Type real destination (e.g. Chennai)..."
+                placeholder="Type destination city or landmark (e.g. Mysore Palace, Ooty, Chennai)..."
                 className="bg-zinc-950 border-zinc-800 text-xs h-10 pr-8"
               />
               {searchingDest && (
