@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { syncEngine } from "@/lib/syncEngine";
 import { supabase } from "@/lib/supabase/client";
 
@@ -8,7 +8,6 @@ export type ConnectionStatus = "connected" | "connecting" | "offline" | "standal
 
 export function useRealtimeSync() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [status, setStatus] = useState<ConnectionStatus>(() => syncEngine.getState().status);
 
   useEffect(() => {
@@ -130,7 +129,7 @@ export function useRealtimeSync() {
       }
       window.removeEventListener("ng_realtime_sync", handleRealtimeEvent as EventListener);
     };
-  }, [queryClient, toast]);
+  }, [queryClient]);
 
   return { status };
 }

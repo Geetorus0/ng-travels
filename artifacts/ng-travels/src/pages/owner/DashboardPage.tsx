@@ -1,6 +1,5 @@
 import React from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import {
   Navigation, Users, Car, CircleDollarSign, Receipt, BarChart3, CalendarDays,
   MapPin, Bell, Settings, Plus, TrendingUp, Radio, Clock3, ArrowUpRight,
@@ -18,6 +17,7 @@ interface DashboardPageProps {
   allTrips?: any[];
   customers?: any[];
   payments?: any[];
+  vehicles?: any[];
   isLoading?: boolean;
   onOpenCreateTrip: () => void;
   onOpenCreateEnquiry?: () => void;
@@ -30,39 +30,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   allTrips = [],
   customers = [],
   payments = [],
+  vehicles = [],
   isLoading = false,
   onOpenCreateTrip,
   onOpenCreateEnquiry,
   onOpenCustomerCopy,
 }) => {
-  const { data: rawVehicles = [] } = useQuery<any>({
-    queryKey: ["/api/vehicles"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/vehicles");
-        if (!res.ok) return [];
-        const json = await res.json();
-        return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
-      } catch {
-        return [];
-      }
-    },
-  });
-
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   const customerList = Array.isArray(customers) ? customers : ((customers as any)?.items || []);
+  const vehicleList = Array.isArray(vehicles) ? vehicles : ((vehicles as any)?.items || []);
 
-  const vehicles: any[] = Array.isArray(rawVehicles)
-    ? rawVehicles
-    : Array.isArray((rawVehicles as any)?.items)
-    ? (rawVehicles as any).items
-    : [];
-
-  const activeVehiclesCount = vehicles.filter((v: any) => v && v.status === "active").length;
-  const expiringDocCount = vehicles.filter((v: any) => v && v.hasExpiringDocuments).length;
+  const activeVehiclesCount = vehicleList.filter((v: any) => v && v.status === "active").length;
+  const expiringDocCount = vehicleList.filter((v: any) => v && v.hasExpiringDocuments).length;
 
   // 12 Balanced Quick Access Cards
   const quickAccessCards = [

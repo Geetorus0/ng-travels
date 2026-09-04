@@ -716,6 +716,22 @@ function MainApp() {
     },
   });
 
+  const { data: rawVehicles = [] } = useQuery({
+    queryKey: ["/api/vehicles"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/vehicles", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        if (!res.ok) return [];
+        const json = await res.json();
+        return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+      } catch {
+        return [];
+      }
+    },
+  });
+
   const { data: enquiriesData = [] } = useQuery({
     queryKey: ["/api/enquiries"],
     queryFn: async () => {
@@ -805,6 +821,7 @@ function MainApp() {
   const tripList: any[] = Array.isArray(tripsData) ? tripsData : (Array.isArray((tripsData as any)?.items) ? (tripsData as any).items : []);
   const customerList: any[] = Array.isArray(customersData) ? customersData : (Array.isArray((customersData as any)?.items) ? (customersData as any).items : []);
   const driverList: any[] = Array.isArray(driversData) ? driversData : (Array.isArray((driversData as any)?.items) ? (driversData as any).items : []);
+  const vehicleList: any[] = Array.isArray(rawVehicles) ? rawVehicles : (Array.isArray((rawVehicles as any)?.items) ? (rawVehicles as any).items : []);
   const paymentList: any[] = Array.isArray(paymentsData) ? paymentsData : (Array.isArray((paymentsData as any)?.items) ? (paymentsData as any).items : []);
   const expenseList: any[] = Array.isArray(expensesData) ? expensesData : (Array.isArray((expensesData as any)?.items) ? (expensesData as any).items : []);
   const notificationList: any[] = Array.isArray(notificationsData) ? notificationsData : (Array.isArray((notificationsData as any)?.items) ? (notificationsData as any).items : []);
@@ -1008,6 +1025,7 @@ function MainApp() {
                 allTrips={tripList}
                 customers={customerList}
                 payments={paymentList}
+                vehicles={vehicleList}
                 onOpenCreateTrip={() => {
                   setInitialEnquiryForTrip(null);
                   setCreateTripOpen(true);
