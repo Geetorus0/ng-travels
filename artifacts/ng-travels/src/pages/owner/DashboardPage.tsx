@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import {
   Navigation, Users, Car, CircleDollarSign, Receipt, BarChart3, CalendarDays,
@@ -63,18 +63,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     { title: "Settings", desc: "Rates & Profile", icon: Settings, href: "/settings", color: "text-zinc-400" },
   ];
 
+  const [perfViewMode, setPerfViewMode] = useState<"all_time" | "today">("all_time");
+
   const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
   const todayTrips = tripList.filter((t: any) => t?.startDate === todayStr);
+
+  // All-time aggregate calculations (100% Dynamic from trips & ledger)
+  const totalRevenue = tripList.reduce((sum: number, t: any) => sum + Number(t?.customerTotal || 0), 0);
+  const totalCollection = tripList.reduce((sum: number, t: any) => sum + Number(t?.totalPaid || 0), 0);
+  const totalPendingBalance = tripList.reduce((sum: number, t: any) => sum + Number(t?.remainingBalance || 0), 0);
+  const totalCompletedTrips = tripList.filter((t: any) => t?.status === "completed").length;
+  const totalBillingKm = tripList.reduce((sum: number, t: any) => sum + Number(t?.billingKm || 0), 0);
+  const totalExpenses = metrics?.weeklyExpenses || metrics?.monthlyExpenses || 0;
+  const totalProfit = Math.max(0, totalRevenue - totalExpenses);
+
+  // Today's dispatch calculations
   const todaysRevenueCalc = todayTrips.reduce((sum: number, t: any) => sum + Number(t?.customerTotal || 0), 0);
   const todaysCollectionCalc = todayTrips.reduce((sum: number, t: any) => sum + Number(t?.totalPaid || 0), 0);
   const completedTodayCalc = todayTrips.filter((t: any) => t?.status === "completed").length;
+  const todaysExpenses = metrics?.todaysExpenses ?? 0;
+  const todaysProfit = metrics?.todaysProfit ?? (todaysRevenueCalc - todaysExpenses);
 
-  const displayTodaysTrips = metrics?.todaysTrips ?? todayTrips.length;
-  const displayCompletedToday = metrics?.completedToday ?? completedTodayCalc;
-  const displayTodaysRevenue = metrics?.todaysRevenue ?? todaysRevenueCalc;
-  const displayTodaysCollection = metrics?.todaysCollection ?? todaysCollectionCalc;
-  const displayTodaysExpenses = metrics?.todaysExpenses ?? 0;
-  const displayTodaysProfit = metrics?.todaysProfit ?? (displayTodaysRevenue - displayTodaysExpenses);
+  // Dynamic selection based on view mode
+  const isAllTime = perfViewMode === "all_time";
+  const displayTrips = isAllTime ? tripList.length : (metrics?.todaysTrips ?? todayTrips.length);
+  const displayCompleted = isAllTime ? totalCompletedTrips : (metrics?.completedToday ?? completedTodayCalc);
+  const displayRevenue = isAllTime ? totalRevenue : (metrics?.todaysRevenue ?? todaysRevenueCalc);
+  const displayCollection = isAllTime ? totalCollection : (metrics?.todaysCollection ?? todaysCollectionCalc);
+  const displayExpenses = isAllTime ? totalExpenses : todaysExpenses;
+  const displayProfit = isAllTime ? totalProfit : todaysProfit;
 
   const getRouteText = (trip: any) => {
     if (!trip) return "Route";
@@ -102,9 +119,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   // Pending Payments Trips
   const pendingPaymentTrips = tripList.filter((t: any) => Number(t?.remainingBalance || 0) > 0);
-
-  // Total Billing KM across all trips
-  const totalBillingKm = tripList.reduce((sum: number, t: any) => sum + Number(t?.billingKm || 0), 0);
 
   // Status Badge Helper
   const renderStatusBadge = (status: string) => {
@@ -208,56 +222,101 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
       </div>
 
-      {/* TODAY'S OPERATIONS & FINANCIAL SUMMARY */}
+      {/* OPERATIONS & FINANCIAL PERFORMANCE SUMMARY */}
       <div className="space-y-2.5">
-        <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-          <CircleDollarSign className="w-4 h-4 text-emerald-400" />
-          Today's Performance Summary
-        </h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+            <CircleDollarSign className="w-4 h-4 text-emerald-400" />
+            {isAllTime ? "All-Time Financial & Operational Performance" : "Today's Dispatch & Revenue Performance"}
+          </h2>
+          <div className="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs">
+            <button
+              onClick={() => setPerfViewMode("all_time")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                isAllTime
+                  ? "bg-amber-400 text-zinc-950 font-bold shadow"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              All-Time Business
+            </button>
+            <button
+              onClick={() => setPerfViewMode("today")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                !isAllTime
+                  ? "bg-amber-400 text-zinc-950 font-bold shadow"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Today's Dispatch
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 sm:gap-3">
-          {/* Today's Trips */}
+          {/* Trips Count */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Today's Trips</span>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 mt-0.5">{displayTodaysTrips}</div>
-            <span className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 block font-medium">{displayCompletedToday} completed</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+              {isAllTime ? "Total Booked Trips" : "Today's Trips"}
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 mt-0.5">{displayTrips}</div>
+            <span className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 block font-medium">
+              {displayCompleted} completed
+            </span>
           </div>
 
-          {/* Today's Revenue */}
+          {/* Revenue */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Today's Revenue</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+              {isAllTime ? "Total Booked Revenue" : "Today's Revenue"}
+            </span>
             <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5">
-              {formatINR(displayTodaysRevenue)}
+              {formatINR(displayRevenue)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Gross Booked</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Gross Fare Volume</span>
           </div>
 
-          {/* Today's Collection */}
+          {/* Collection */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Today's Collection</span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-0.5">{formatINR(displayTodaysCollection)}</div>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+              {isAllTime ? "Total Cash Collected" : "Today's Collection"}
+            </span>
+            <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-0.5">
+              {formatINR(displayCollection)}
+            </div>
             <span className="text-[9px] sm:text-[10px] text-emerald-400/80 mt-0.5 block font-medium">Cash / Bank In</span>
           </div>
 
           {/* Outstanding Balance */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Outstanding Balance</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Outstanding Receivables</span>
             <div className="text-lg sm:text-xl font-bold font-mono text-amber-300 mt-0.5">
-              {formatINR(pendingPaymentTrips.reduce((sum, t) => sum + Number(t.remainingBalance || 0), 0))}
+              {formatINR(totalPendingBalance)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">{pendingPaymentTrips.length} pending runs</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">
+              {pendingPaymentTrips.length} pending runs
+            </span>
           </div>
 
-          {/* Today's Expenses */}
+          {/* Operating Expenses */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Today's Expenses</span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-rose-400 mt-0.5">{formatINR(displayTodaysExpenses)}</div>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+              {isAllTime ? "Operating Expenses" : "Today's Expenses"}
+            </span>
+            <div className="text-lg sm:text-xl font-bold font-mono text-rose-400 mt-0.5">
+              {formatINR(displayExpenses)}
+            </div>
             <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Approved Claims</span>
           </div>
 
-          {/* Today's Net Profit */}
+          {/* Net Profit */}
           <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 shadow-md">
-            <span className="text-[9px] sm:text-[10px] text-amber-300 uppercase font-bold block">Today's Net Profit</span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5">{formatINR(displayTodaysProfit)}</div>
+            <span className="text-[9px] sm:text-[10px] text-amber-300 uppercase font-bold block">
+              {isAllTime ? "Net Company Profit" : "Today's Profit"}
+            </span>
+            <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5">
+              {formatINR(displayProfit)}
+            </div>
             <span className="text-[9px] sm:text-[10px] text-amber-400/80 mt-0.5 block font-medium">Revenue - Expenses</span>
           </div>
 
@@ -276,13 +335,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </span>
             </div>
           </Link>
-
-          {/* Total Billing KM */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors col-span-2 sm:col-span-1">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Total Billing KM</span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-zinc-100 mt-0.5">{totalBillingKm} KM</div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Commercial Volume</span>
-          </div>
         </div>
       </div>
 

@@ -26,31 +26,13 @@ interface PlaceSuggestion {
 }
 
 export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWizardWithRoute }) => {
-  const [pickupInput, setPickupInput] = useState("Coimbatore, Tamil Nadu, India");
-  const [selectedPickup, setSelectedPickup] = useState<PlaceSuggestion | null>({
-    placeId: "coimbatore_default",
-    name: "Coimbatore",
-    formattedAddress: "Coimbatore, Tamil Nadu, India",
-    lat: 11.0168,
-    lng: 76.9558,
-    city: "Coimbatore",
-    state: "Tamil Nadu",
-    country: "India",
-  });
+  const [pickupInput, setPickupInput] = useState("");
+  const [selectedPickup, setSelectedPickup] = useState<PlaceSuggestion | null>(null);
   const [pickupSuggestions, setPickupSuggestions] = useState<PlaceSuggestion[]>([]);
   const [searchingPickup, setSearchingPickup] = useState(false);
 
-  const [destInput, setDestInput] = useState("Chennai, Tamil Nadu, India");
-  const [selectedDest, setSelectedDest] = useState<PlaceSuggestion | null>({
-    placeId: "chennai_default",
-    name: "Chennai",
-    formattedAddress: "Chennai, Tamil Nadu, India",
-    lat: 13.0827,
-    lng: 80.2707,
-    city: "Chennai",
-    state: "Tamil Nadu",
-    country: "India",
-  });
+  const [destInput, setDestInput] = useState("");
+  const [selectedDest, setSelectedDest] = useState<PlaceSuggestion | null>(null);
   const [destSuggestions, setDestSuggestions] = useState<PlaceSuggestion[]>([]);
   const [searchingDest, setSearchingDest] = useState(false);
 
