@@ -40,7 +40,7 @@ export function getDefaultServerUrl(): string {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
-  return "https://ng-travels-operations.vercel.app";
+  return "https://ng-travels-operations-black.vercel.app";
 }
 
 class SyncEngine {
