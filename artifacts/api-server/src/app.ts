@@ -51,5 +51,6 @@ if (process.env.CLERK_SECRET_KEY) {
 }
 
 app.use("/api", router);
+app.use(router);
 
 export default app;

@@ -21,27 +21,23 @@ export interface SyncState {
 const STORAGE_SERVER_URL = "ng_server_url";
 
 export function getDefaultServerUrl(): string {
-  // 1. Check configured environment variable
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && typeof envUrl === "string" && envUrl.trim() !== "") {
-    return envUrl.trim().replace(/\/+$/, "");
-  }
-
-  // 2. Check if running in browser window
+  // 1. In regular Web Browser: ALWAYS route relative to current origin (same-origin on Vercel)
   if (typeof window !== "undefined") {
-    // If running in Capacitor native APK (origin is localhost or capacitor://)
     const isCapacitor = Boolean(
       (window as any).Capacitor?.isNativePlatform?.() ||
       window.location.protocol === "capacitor:" ||
-      window.location.hostname === "localhost" && (window as any).NG_APP_ROLE
+      (window.location.hostname === "localhost" && (window as any).NG_APP_ROLE)
     );
 
-    if (isCapacitor) {
-      return "https://ng-travels-operations.vercel.app";
+    if (!isCapacitor) {
+      return window.location.origin.replace(/\/+$/, "");
     }
+  }
 
-    // Regular Web Browser: relative to current origin
-    return window.location.origin.replace(/\/+$/, "");
+  // 2. Mobile Native APK (Capacitor): Use configured remote server URL
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && typeof envUrl === "string" && envUrl.trim() !== "") {
+    return envUrl.trim().replace(/\/+$/, "");
   }
 
   return "https://ng-travels-operations.vercel.app";
