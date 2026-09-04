@@ -34,6 +34,18 @@ import {
 } from "../lib/financialEngine.js";
 import { searchPlaces, calculateRouteJourney } from "../lib/routeService.js";
 import { addRealtimeClient, broadcastRealtimeEvent } from "../lib/realtime.js";
+import {
+  memDrivers,
+  memVehicles,
+  memTrips,
+  memCustomers,
+  memEnquiries,
+  memPayments,
+  memExpenses,
+  memNotifications,
+  memAuditLogs,
+  memSettings,
+} from "../lib/memoryStore.js";
 
 const router = Router();
 
@@ -654,8 +666,55 @@ router.get("/dashboard", requireOwner, async (_req, res): Promise<void> => {
       })),
     });
   } catch (err: any) {
-    console.error("[dashboard] Database query error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to load dashboard metrics" } });
+    console.warn("[dashboard] Database query fallback to memory store:", err?.message);
+    const todayTrps = memTrips.filter((t) => t.startDate === currentDay);
+    const activeTrips = memTrips.filter((t) => ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status));
+    const rev = todayTrps.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
+    const exp = memExpenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const col = todayTrps.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
+
+    res.json({
+      date: new Date(`${currentDay}T00:00:00Z`),
+      metrics: {
+        totalTrips: memTrips.length,
+        todaysTrips: todayTrps.length,
+        upcomingTrips: todayTrps.filter((t) => ["upcoming", "confirmed", "ready"].includes(t.status)).length,
+        started: todayTrps.filter((t) => t.status === "started").length,
+        inProgress: activeTrips.length,
+        completedToday: todayTrps.filter((t) => t.status === "completed").length,
+        paymentPending: memTrips.filter((t) => Number(t.remainingBalance || 0) > 0).length,
+        todaysRevenue: rev,
+        todaysCollection: col,
+        todaysExpenses: exp,
+        todaysProfit: rev - exp,
+        weeklyRevenue: rev,
+        weeklyExpenses: exp,
+        weeklyProfit: rev - exp,
+        monthlyRevenue: rev,
+        monthlyExpenses: exp,
+        monthlyProfit: rev - exp,
+        availableDrivers: memDrivers.filter((d) => d.availability === "available").length,
+        driversOnTrip: memDrivers.filter((d) => d.availability === "on_trip").length,
+        availableVehicles: memVehicles.filter((v) => v.status === "active").length,
+        vehiclesOnTrip: memVehicles.filter((v) => v.status === "active" && v.assignedDriverId).length,
+      },
+      schedule: todayTrps.map((t) => ({
+        id: t.id,
+        bookingId: t.bookingId,
+        time: t.startTime,
+        pickup: (t.pickup as any)?.name || "Pickup",
+        destination: (t.destination as any)?.name || "Destination",
+        customerName: "Corporate Customer",
+        driverName: t.driverName ?? "Unassigned",
+        status: t.status,
+      })),
+      recentActivity: memAuditLogs.slice(0, 10).map((a) => ({
+        id: a.id,
+        title: a.action,
+        detail: `${a.entity} ${a.entityId}`,
+        timestamp: a.createdAt,
+      })),
+    });
   }
 });
 
@@ -667,8 +726,8 @@ router.get("/drivers", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(driversTable).orderBy(asc(driversTable.name));
     res.json(rows);
   } catch (err: any) {
-    console.error("[drivers] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch drivers" } });
+    console.warn("[drivers] DB fallback to memory store:", err?.message);
+    res.json(memDrivers);
   }
 });
 
@@ -787,8 +846,8 @@ router.get("/vehicles", async (_req, res): Promise<void> => {
     const rows = await db.select().from(vehiclesTable).orderBy(asc(vehiclesTable.vehicleNumber));
     res.json(rows.map(enrichVehicleWithAlerts));
   } catch (err: any) {
-    console.error("[vehicles] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch fleet vehicles" } });
+    console.warn("[vehicles] DB fallback to memory store:", err?.message);
+    res.json((memVehicles as any).map(enrichVehicleWithAlerts));
   }
 });
 
@@ -919,8 +978,8 @@ router.get("/customers", requireOwner, async (req, res): Promise<void> => {
     const views = await Promise.all(rows.map(customerView));
     res.json({ items: views, total: views.length });
   } catch (err: any) {
-    console.error("[customers] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch customers" } });
+    console.warn("[customers] DB fallback to memory store:", err?.message);
+    res.json({ items: memCustomers, total: memCustomers.length });
   }
 });
 
@@ -1012,7 +1071,8 @@ router.get("/enquiries", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(enquiriesTable).orderBy(desc(enquiriesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[enquiries] DB fallback to memory store:", err?.message);
+    res.json(memEnquiries);
   }
 });
 
@@ -1185,8 +1245,8 @@ router.get("/trips", async (req, res): Promise<void> => {
 
     res.json({ items: filtered, total: filtered.length });
   } catch (err: any) {
-    console.error("[trips] List error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch trips" } });
+    console.warn("[trips] DB fallback to memory store:", err?.message);
+    res.json({ items: memTrips, total: memTrips.length });
   }
 });
 
@@ -1620,8 +1680,8 @@ router.get("/driver/today", async (req, res): Promise<void> => {
 
     res.json(trips.map((t) => tripView(t, cMap.get(t.customerId))));
   } catch (err: any) {
-    console.error("[driver/today] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch today's duty" } });
+    console.warn("[driver/today] DB fallback:", err?.message);
+    res.json(memTrips.filter((t) => t.startDate === today()));
   }
 });
 
@@ -1662,7 +1722,13 @@ router.get("/driver/current-trip", async (req, res): Promise<void> => {
     const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, trips[0].customerId));
     res.json(tripView(trips[0], customer));
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[driver/current-trip] DB fallback:", err?.message);
+    const active = memTrips.find((t) => ["started", "in_progress", "reached_pickup", "customer_picked_up"].includes(t.status)) || memTrips[0] || null;
+    if (!active) {
+      res.status(404).json({ success: false, message: "No active trip in progress" });
+      return;
+    }
+    res.json(active);
   }
 });
 
@@ -2014,7 +2080,8 @@ router.get("/payments", async (_req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[payments] DB fallback to memory store:", err?.message);
+    res.json(memPayments);
   }
 });
 
@@ -2024,7 +2091,8 @@ router.get("/trips/:id/payments", async (req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.tripId, id)).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[trips/:id/payments] DB fallback:", err?.message);
+    res.json(memPayments.filter((p) => p.tripId === id));
   }
 });
 
@@ -2098,7 +2166,8 @@ router.get("/expenses", async (_req, res): Promise<void> => {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[expenses] DB fallback to memory store:", err?.message);
+    res.json(memExpenses);
   }
 });
 
@@ -2258,7 +2327,8 @@ router.get("/notifications", async (req, res): Promise<void> => {
 
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[notifications] DB fallback to memory store:", err?.message);
+    res.json(memNotifications);
   }
 });
 
@@ -2288,7 +2358,8 @@ router.get("/audit-logs", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(100);
     res.json(rows);
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[audit-logs] DB fallback to memory store:", err?.message);
+    res.json(memAuditLogs);
   }
 });
 

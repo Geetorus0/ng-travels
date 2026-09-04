@@ -42,6 +42,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   const customerList = Array.isArray(customers) ? customers : ((customers as any)?.items || []);
   const vehicleList = Array.isArray(vehicles) ? vehicles : ((vehicles as any)?.items || []);
+  const tripList = Array.isArray(allTrips) ? allTrips : ((allTrips as any)?.items || []);
 
   const activeVehiclesCount = vehicleList.filter((v: any) => v && v.status === "active").length;
   const expiringDocCount = vehicleList.filter((v: any) => v && v.hasExpiringDocuments).length;
@@ -49,8 +50,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   // 12 Balanced Quick Access Cards
   const quickAccessCards = [
     { title: "New Trip", desc: "Dispatch booking", icon: Plus, href: "#new-trip", onClick: onOpenCreateTrip, primary: true },
-    { title: "Trips", desc: `${allTrips.length} Bookings`, icon: Navigation, href: "/trips", color: "text-amber-400" },
-    { title: "Vehicles", desc: `${vehicles.length} Fleet Units`, icon: Car, href: "/vehicles", color: "text-amber-400" },
+    { title: "Trips", desc: `${tripList.length} Bookings`, icon: Navigation, href: "/trips", color: "text-amber-400" },
+    { title: "Vehicles", desc: `${vehicleList.length} Fleet Units`, icon: Car, href: "/vehicles", color: "text-amber-400" },
     { title: "Drivers", desc: "Duty Roster", icon: Users, href: "/drivers", color: "text-emerald-400" },
     { title: "Customers", desc: `${customerList.length} Profiles`, icon: Users, href: "/customers", color: "text-sky-400" },
     { title: "Payments", desc: "Ledger", icon: CircleDollarSign, href: "/payments", color: "text-emerald-400" },
@@ -63,10 +64,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   ];
 
   const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-  const todayTrips = allTrips.filter((t) => t.startDate === todayStr);
-  const todaysRevenueCalc = todayTrips.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
-  const todaysCollectionCalc = todayTrips.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
-  const completedTodayCalc = todayTrips.filter((t) => t.status === "completed").length;
+  const todayTrips = tripList.filter((t: any) => t?.startDate === todayStr);
+  const todaysRevenueCalc = todayTrips.reduce((sum: number, t: any) => sum + Number(t?.customerTotal || 0), 0);
+  const todaysCollectionCalc = todayTrips.reduce((sum: number, t: any) => sum + Number(t?.totalPaid || 0), 0);
+  const completedTodayCalc = todayTrips.filter((t: any) => t?.status === "completed").length;
 
   const displayTodaysTrips = metrics?.todaysTrips ?? todayTrips.length;
   const displayCompletedToday = metrics?.completedToday ?? completedTodayCalc;
@@ -76,32 +77,34 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const displayTodaysProfit = metrics?.todaysProfit ?? (displayTodaysRevenue - displayTodaysExpenses);
 
   const getRouteText = (trip: any) => {
+    if (!trip) return "Route";
     const p = trip.pickup?.name || trip.pickup?.address || (typeof trip.pickup === "string" ? trip.pickup : "Pickup");
     const d = trip.destination?.name || trip.destination?.address || (typeof trip.destination === "string" ? trip.destination : "Destination");
     return `${p} ➔ ${d}`;
   };
 
   const getPassengerName = (trip: any) => {
+    if (!trip) return "Customer";
     if (trip.customerName) return trip.customerName;
-    const found = customerList.find((c: any) => c.id === trip.customerId);
+    const found = customerList.find((c: any) => c?.id === trip.customerId);
     return found?.name || "Corporate Customer";
   };
 
   // Active / Ongoing Trips
-  const activeTrips = allTrips.filter((t) =>
-    ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status)
+  const activeTrips = tripList.filter((t: any) =>
+    ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t?.status)
   );
 
   // Upcoming Trips
-  const upcomingTrips = allTrips.filter((t) =>
-    ["upcoming", "ready", "confirmed"].includes(t.status)
+  const upcomingTrips = tripList.filter((t: any) =>
+    ["upcoming", "ready", "confirmed"].includes(t?.status)
   );
 
   // Pending Payments Trips
-  const pendingPaymentTrips = allTrips.filter((t) => Number(t.remainingBalance || 0) > 0);
+  const pendingPaymentTrips = tripList.filter((t: any) => Number(t?.remainingBalance || 0) > 0);
 
   // Total Billing KM across all trips
-  const totalBillingKm = allTrips.reduce((sum, t) => sum + Number(t.billingKm || 0), 0);
+  const totalBillingKm = tripList.reduce((sum: number, t: any) => sum + Number(t?.billingKm || 0), 0);
 
   // Status Badge Helper
   const renderStatusBadge = (status: string) => {

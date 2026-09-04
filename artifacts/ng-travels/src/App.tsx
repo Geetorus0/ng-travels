@@ -673,46 +673,75 @@ function MainApp() {
   const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(null);
   const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<any | null>(null);
 
+  // Helper for safe query responses
+  const safeJsonArray = async (res: Response) => {
+    if (!res.ok) return [];
+    try {
+      const json = await res.json();
+      return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+    } catch {
+      return [];
+    }
+  };
+
   // Queries
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+  const { data: dashboardData = {}, isLoading: dashboardLoading } = useQuery({
     queryKey: ["/api/dashboard"],
     queryFn: async () => {
-      const res = await fetch("/api/dashboard", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/dashboard", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        if (!res.ok) return {};
+        const json = await res.json();
+        return json && typeof json === "object" && !json.error ? json : {};
+      } catch {
+        return {};
+      }
     },
     refetchInterval: 15000,
   });
 
-  const { data: tripsData = { items: [] } } = useQuery({
+  const { data: tripsData = [] } = useQuery({
     queryKey: ["/api/trips"],
     queryFn: async () => {
-      const res = await fetch("/api/trips?limit=100", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/trips?limit=100", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
     refetchInterval: 15000,
   });
 
-  const { data: customersData = { items: [] } } = useQuery({
+  const { data: customersData = [] } = useQuery({
     queryKey: ["/api/customers"],
     queryFn: async () => {
-      const res = await fetch("/api/customers?limit=100", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/customers?limit=100", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
   const { data: driversData = [] } = useQuery({
     queryKey: ["/api/drivers"],
     queryFn: async () => {
-      const res = await fetch("/api/drivers", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/drivers", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -723,9 +752,7 @@ function MainApp() {
         const res = await fetch("/api/vehicles", {
           headers: { "x-user-role": user?.role || "owner" },
         });
-        if (!res.ok) return [];
-        const json = await res.json();
-        return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+        return await safeJsonArray(res);
       } catch {
         return [];
       }
@@ -735,40 +762,56 @@ function MainApp() {
   const { data: enquiriesData = [] } = useQuery({
     queryKey: ["/api/enquiries"],
     queryFn: async () => {
-      const res = await fetch("/api/enquiries", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/enquiries", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
   const { data: paymentsData = [] } = useQuery({
     queryKey: ["/api/payments"],
     queryFn: async () => {
-      const res = await fetch("/api/payments", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/payments", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
   const { data: expensesData = [] } = useQuery({
     queryKey: ["/api/expenses"],
     queryFn: async () => {
-      const res = await fetch("/api/expenses", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/expenses", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
   const { data: notificationsData = [] } = useQuery({
     queryKey: ["/api/notifications"],
     queryFn: async () => {
-      const res = await fetch("/api/notifications", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/notifications", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
     refetchInterval: 15000,
   });
@@ -776,20 +819,30 @@ function MainApp() {
   const { data: auditLogsData = [] } = useQuery({
     queryKey: ["/api/audit-logs"],
     queryFn: async () => {
-      const res = await fetch("/api/audit-logs", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/audit-logs", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
   });
 
   const { data: settingsData = {} } = useQuery({
     queryKey: ["/api/settings"],
     queryFn: async () => {
-      const res = await fetch("/api/settings", {
-        headers: { "x-user-role": user?.role || "owner" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/settings", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        if (!res.ok) return {};
+        const json = await res.json();
+        return json && typeof json === "object" ? json : {};
+      } catch {
+        return {};
+      }
     },
   });
 
@@ -797,10 +850,14 @@ function MainApp() {
   const { data: driverTodayTrips = [] } = useQuery({
     queryKey: ["/api/driver/today"],
     queryFn: async () => {
-      const res = await fetch("/api/driver/today", {
-        headers: { "x-user-role": "driver" },
-      });
-      return res.json();
+      try {
+        const res = await fetch("/api/driver/today", {
+          headers: { "x-user-role": "driver" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
     },
     refetchInterval: 6000,
   });
@@ -808,11 +865,16 @@ function MainApp() {
   const { data: driverCurrentTrip } = useQuery({
     queryKey: ["/api/driver/current-trip"],
     queryFn: async () => {
-      const res = await fetch("/api/driver/current-trip", {
-        headers: { "x-user-role": "driver" },
-      });
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        const res = await fetch("/api/driver/current-trip", {
+          headers: { "x-user-role": "driver" },
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return json && typeof json === "object" && !json.error ? json : null;
+      } catch {
+        return null;
+      }
     },
     refetchInterval: 6000,
   });
@@ -827,6 +889,7 @@ function MainApp() {
   const notificationList: any[] = Array.isArray(notificationsData) ? notificationsData : (Array.isArray((notificationsData as any)?.items) ? (notificationsData as any).items : []);
   const enquiryList: any[] = Array.isArray(enquiriesData) ? enquiriesData : (Array.isArray((enquiriesData as any)?.items) ? (enquiriesData as any).items : []);
   const auditLogList: any[] = Array.isArray(auditLogsData) ? auditLogsData : (Array.isArray((auditLogsData as any)?.items) ? (auditLogsData as any).items : []);
+  const driverTodayTripList: any[] = Array.isArray(driverTodayTrips) ? driverTodayTrips : (Array.isArray((driverTodayTrips as any)?.items) ? (driverTodayTrips as any).items : []);
 
   // Action Handlers
   const handleTripCreated = () => {
@@ -929,7 +992,9 @@ function MainApp() {
     return <SignInPage />;
   }
 
-  const currentDriver = driversData.find((d: any) => d.id === user?.driverId) || driversData[0] || null;
+  const currentDriver = Array.isArray(driverList)
+    ? (driverList.find((d: any) => d?.id === user?.driverId) || driverList[0] || null)
+    : null;
 
   return (
     <>
@@ -945,7 +1010,7 @@ function MainApp() {
           <Switch>
             <Route path="/driver">
               <DriverDashboardPage
-                todayTrips={driverTodayTrips}
+                todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
                 onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
@@ -955,7 +1020,7 @@ function MainApp() {
             </Route>
             <Route path="/driver/dashboard">
               <DriverDashboardPage
-                todayTrips={driverTodayTrips}
+                todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
                 onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
@@ -965,14 +1030,14 @@ function MainApp() {
             </Route>
             <Route path="/driver/today">
               <DriverTodayPage
-                todayTrips={driverTodayTrips}
+                todayTrips={driverTodayTripList}
                 onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
                 onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
               />
             </Route>
             <Route path="/driver/current-trip">
               <DriverCurrentTripPage
-                trip={driverCurrentTrip || driverTodayTrips[0]}
+                trip={driverCurrentTrip || driverTodayTripList[0] || null}
                 onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
                 onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
@@ -981,7 +1046,7 @@ function MainApp() {
             </Route>
             <Route path="/driver/expenses">
               <DriverExpensesPage
-                expenses={expensesData.filter((e: any) => !user?.driverId || e.driverId === user.driverId)}
+                expenses={Array.isArray(expenseList) ? expenseList.filter((e: any) => !user?.driverId || e?.driverId === user?.driverId) : []}
                 onOpenExpenseModal={() => setDriverExpenseTripId(driverCurrentTrip?.id || null)}
               />
             </Route>

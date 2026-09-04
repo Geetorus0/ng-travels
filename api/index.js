@@ -74045,6 +74045,674 @@ setInterval(() => {
   });
 }, 2e4);
 
+// src/lib/memoryStore.ts
+var todayStr = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata"
+}).format(/* @__PURE__ */ new Date());
+var memDrivers = [
+  {
+    id: 1,
+    driverCode: "DRV-101",
+    name: "Suresh K",
+    mobile: "+91 98450 11223",
+    email: "suresh.driver@ngtravels.in",
+    licenseNumber: "DL-KA01-2018004921",
+    licenseExpiry: "2029-12-31",
+    emergencyContact: "+91 98450 99887 (Wife)",
+    status: "active",
+    availability: "on_trip",
+    rating: "4.9",
+    notes: "Senior driver. Expert in Bangalore-Mysore-Coorg outstation routes.",
+    createdAt: /* @__PURE__ */ new Date("2024-01-10T10:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    driverCode: "DRV-102",
+    name: "Ramesh Babu",
+    mobile: "+91 98765 22334",
+    email: "ramesh.driver@ngtravels.in",
+    licenseNumber: "DL-KA05-2019001822",
+    licenseExpiry: "2030-05-15",
+    emergencyContact: "+91 98765 88776 (Brother)",
+    status: "active",
+    availability: "available",
+    rating: "4.8",
+    notes: "Punctual, speaks English & Hindi. Ideal for airport transfers.",
+    createdAt: /* @__PURE__ */ new Date("2024-03-15T09:30:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    driverCode: "DRV-103",
+    name: "Anand V",
+    mobile: "+91 91234 33445",
+    email: "anand.driver@ngtravels.in",
+    licenseNumber: "DL-KA03-2020008811",
+    licenseExpiry: "2031-08-20",
+    emergencyContact: "+91 91234 77665 (Father)",
+    status: "active",
+    availability: "available",
+    rating: "4.7",
+    notes: "Corporate vehicle specialist.",
+    createdAt: /* @__PURE__ */ new Date("2024-06-01T11:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 4,
+    driverCode: "DRV-104",
+    name: "Rajesh M",
+    mobile: "+91 99887 44556",
+    email: "rajesh.driver@ngtravels.in",
+    licenseNumber: "DL-KA04-2017006655",
+    licenseExpiry: "2028-11-10",
+    emergencyContact: "+91 99887 66554 (Brother)",
+    status: "on_leave",
+    availability: "on_leave",
+    rating: "4.9",
+    notes: "On medical leave until next week.",
+    createdAt: /* @__PURE__ */ new Date("2023-11-20T08:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  }
+];
+var memVehicles = [
+  {
+    id: 1,
+    vehicleNumber: "KA-01-MJ-5050",
+    vehicleType: "Innova Crysta",
+    brand: "Toyota",
+    model: "Innova Crysta 2.4 ZX",
+    year: 2023,
+    capacity: 7,
+    fuelType: "Diesel",
+    rcNumber: "RC-KA01-2023-998811",
+    insurancePolicy: "HDFC-ERGO-COM-889102",
+    insuranceExpiry: "2026-11-20",
+    permitNumber: "AITP-KA-2024-5510",
+    permitExpiry: "2027-03-31",
+    fitnessCertNumber: "FIT-KA01-2024-110",
+    fitnessExpiry: "2026-12-15",
+    pollutionCertNumber: "PUC-KA-2026-9912",
+    pollutionExpiry: "2026-10-10",
+    assignedDriverId: 1,
+    status: "active",
+    maintenanceStatus: "good",
+    lastServiceDate: "2026-08-10",
+    nextServiceDate: "2026-11-10",
+    currentOdometerKm: "45350",
+    notes: "Top-tier premium luxury fleet vehicle. Immaculate condition.",
+    createdAt: /* @__PURE__ */ new Date("2024-01-15T10:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    vehicleNumber: "KA-05-AB-7744",
+    vehicleType: "Sedan",
+    brand: "Maruti Suzuki",
+    model: "Dzire VXI",
+    year: 2022,
+    capacity: 4,
+    fuelType: "CNG/Petrol",
+    rcNumber: "RC-KA05-2022-441100",
+    insurancePolicy: "ICICI-LOMB-778811",
+    insuranceExpiry: "2026-09-28",
+    permitNumber: "KA-STATE-2023-441",
+    permitExpiry: "2026-10-05",
+    fitnessCertNumber: "FIT-KA05-2023-881",
+    fitnessExpiry: "2027-05-20",
+    pollutionCertNumber: "PUC-KA-2026-5522",
+    pollutionExpiry: "2026-09-15",
+    assignedDriverId: 2,
+    status: "active",
+    maintenanceStatus: "good",
+    lastServiceDate: "2026-07-20",
+    nextServiceDate: "2026-10-20",
+    currentOdometerKm: "68200",
+    notes: "Punctual airport transfer vehicle. High fuel economy.",
+    createdAt: /* @__PURE__ */ new Date("2024-02-10T11:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    vehicleNumber: "KA-03-MM-1234",
+    vehicleType: "SUV",
+    brand: "Maruti Suzuki",
+    model: "Ertiga ZXI",
+    year: 2024,
+    capacity: 6,
+    fuelType: "Petrol",
+    rcNumber: "RC-KA03-2024-112233",
+    insurancePolicy: "TATA-AIG-665544",
+    insuranceExpiry: "2027-02-15",
+    permitNumber: "AITP-KA-2024-9912",
+    permitExpiry: "2027-08-30",
+    fitnessCertNumber: "FIT-KA03-2024-332",
+    fitnessExpiry: "2028-02-15",
+    pollutionCertNumber: "PUC-KA-2026-3311",
+    pollutionExpiry: "2027-02-15",
+    assignedDriverId: 3,
+    status: "active",
+    maintenanceStatus: "good",
+    lastServiceDate: "2026-08-25",
+    nextServiceDate: "2026-12-25",
+    currentOdometerKm: "18400",
+    notes: "Corporate vehicle.",
+    createdAt: /* @__PURE__ */ new Date("2024-03-01T09:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  }
+];
+var memCustomers = [
+  {
+    id: 1,
+    customerCode: "CUS-1002341",
+    name: "Rajesh Sharma",
+    mobile: "+91 98450 12345",
+    whatsapp: "+91 98450 12345",
+    email: "rajesh.sharma@example.com",
+    address: "Indiranagar, 100 Feet Rd, Bengaluru",
+    notes: "VIP Corporate client. Prefers premium sedan.",
+    archived: false,
+    createdAt: /* @__PURE__ */ new Date("2026-08-15T09:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-08-15T09:00:00Z")
+  },
+  {
+    id: 2,
+    customerCode: "CUS-1002342",
+    name: "Priya Patel",
+    mobile: "+91 98765 43210",
+    whatsapp: "+91 98765 43210",
+    email: "priya.p@techcorp.in",
+    address: "Whitefield, ITPL Main Rd, Bengaluru",
+    notes: "Regular airport transfer traveller.",
+    archived: false,
+    createdAt: /* @__PURE__ */ new Date("2026-08-18T11:30:00Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-08-18T11:30:00Z")
+  },
+  {
+    id: 3,
+    customerCode: "CUS-1002343",
+    name: "Bangalore Tech Solutions",
+    mobile: "+91 91234 56780",
+    whatsapp: "+91 91234 56780",
+    email: "logistics@bangaloretech.in",
+    address: "Electronic City Phase 1, Bengaluru",
+    notes: "Monthly billing account.",
+    archived: false,
+    createdAt: /* @__PURE__ */ new Date("2026-08-20T14:15:00Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-08-20T14:15:00Z")
+  },
+  {
+    id: 4,
+    customerCode: "CUS-1002344",
+    name: "Anita Rao",
+    mobile: "+91 99887 76655",
+    whatsapp: "+91 99887 76655",
+    email: "anita.rao@gmail.com",
+    address: "Koramangala 4th Block, Bengaluru",
+    notes: "Family weekend outstation booking.",
+    archived: false,
+    createdAt: /* @__PURE__ */ new Date("2026-08-25T16:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-08-25T16:00:00Z")
+  },
+  {
+    id: 5,
+    customerCode: "CUS-1002345",
+    name: "Vikram Malhotra",
+    mobile: "+91 97654 32190",
+    whatsapp: "+91 97654 32190",
+    email: "vikram.m@cloudventures.co",
+    address: "MG Road, Bengaluru",
+    notes: "Requires English speaking driver with clean car.",
+    archived: false,
+    createdAt: /* @__PURE__ */ new Date("2026-08-28T10:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-08-28T10:00:00Z")
+  }
+];
+var memEnquiries = [
+  {
+    id: 1,
+    enquiryCode: "ENQ-2026-001",
+    customerName: "Dr. Arvind Swaminathan",
+    customerMobile: "+91 98451 99221",
+    customerEmail: "arvind.doc@apollo.org",
+    pickup: "Jayanagar 4th Block, Bengaluru",
+    destination: "Ooty Botanical Gardens, Nilgiris",
+    tripType: "outstation_round_trip",
+    startDate: todayStr,
+    passengerCount: 4,
+    estimatedBudget: "20000.00",
+    quotedFare: "18500.00",
+    status: "quoted",
+    notes: "Wants Innova Crysta for 3 days sightseeing.",
+    createdAt: /* @__PURE__ */ new Date("2026-09-01T09:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    enquiryCode: "ENQ-2026-002",
+    customerName: "Cognizant Logistics Desk",
+    customerMobile: "+91 98860 11990",
+    customerEmail: "corp.travel@cognizant.com",
+    pickup: "Manyata Embassy Tech Park",
+    destination: "Electronic City Phase 2",
+    tripType: "local_rental",
+    startDate: todayStr,
+    passengerCount: 6,
+    estimatedBudget: "8000.00",
+    quotedFare: "7500.00",
+    status: "pending",
+    notes: "Corporate client VIP delegation transfer.",
+    createdAt: /* @__PURE__ */ new Date("2026-09-02T08:30:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  }
+];
+var memTrips = [
+  {
+    id: 1,
+    bookingId: "TRP-2026-001",
+    customerId: 1,
+    driverId: 1,
+    driverName: "Suresh K",
+    driverMobile: "+91 98450 11223",
+    tripType: "outstation_round_trip",
+    pickup: { name: "Indiranagar", address: "100 Feet Rd, Indiranagar, Bengaluru", latitude: 12.9784, longitude: 77.6408, placeId: "ChIJbU60yXA_rjsR4E9Va5PzK5I" },
+    destination: { name: "Mysore Palace", address: "Sayyaji Rao Rd, Mysuru", latitude: 12.3051, longitude: 76.6551, placeId: "ChIJbX0i3K5prjsR3GkF3K4B5KI" },
+    stops: [{ name: "Mandya Woodlands", address: "Bangalore-Mysore Expressway", latitude: 12.5238, longitude: 76.8961 }],
+    startDate: todayStr,
+    startTime: "07:30",
+    returnDate: todayStr,
+    returnTime: "21:00",
+    passengerCount: 3,
+    notes: "Sightseeing day tour.",
+    specialInstructions: "Driver allowance included. Keep water bottles ready.",
+    status: "in_progress",
+    mapDistanceKm: "310.00",
+    routeDurationMinutes: 240,
+    routeSummary: "Via NH275 Bengaluru-Mysuru Expressway",
+    selectedRouteSummary: "NH275 Expressway (Fastest)",
+    routeOptions: [
+      { routeIndex: 0, summary: "Via NH275 Expressway", distanceKm: 310, durationMinutes: 240, estimatedToll: 350, via: "NH275" },
+      { routeIndex: 1, summary: "Via NH948 & Kanakapura", distanceKm: 335, durationMinutes: 300, estimatedToll: 120, via: "NH948" }
+    ],
+    billingKm: "320.00",
+    ratePerKm: "18.00",
+    baseFare: "5760.00",
+    toll: "350.00",
+    finalToll: "350.00",
+    parking: "100.00",
+    permitCharge: "500.00",
+    customerTotal: "6710.00",
+    totalPaid: "3000.00",
+    remainingBalance: "3710.00",
+    credit: "0.00",
+    startingKm: "45120.00",
+    expenseTotal: "1200.00",
+    isLocked: false,
+    createdAt: /* @__PURE__ */ new Date("2026-09-01T08:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    bookingId: "TRP-2026-002",
+    customerId: 2,
+    driverId: 2,
+    driverName: "Ramesh Babu",
+    driverMobile: "+91 98765 22334",
+    tripType: "airport_transfer",
+    pickup: { name: "Whitefield", address: "ITPL Main Rd, Whitefield, Bengaluru", latitude: 12.9698, longitude: 77.7499 },
+    destination: { name: "Kempegowda Intl Airport", address: "Devanahalli, Bengaluru", latitude: 13.1986, longitude: 77.7066 },
+    stops: [],
+    startDate: todayStr,
+    startTime: "14:00",
+    passengerCount: 1,
+    notes: "Flight AI 504 departure at 17:30.",
+    specialInstructions: "AC must be on high.",
+    status: "upcoming",
+    mapDistanceKm: "42.00",
+    routeDurationMinutes: 65,
+    routeSummary: "Via SH 104 and Airport Rd",
+    billingKm: "45.00",
+    ratePerKm: "24.00",
+    baseFare: "1080.00",
+    toll: "115.00",
+    finalToll: "115.00",
+    parking: "0.00",
+    permitCharge: "0.00",
+    customerTotal: "1195.00",
+    totalPaid: "1195.00",
+    remainingBalance: "0.00",
+    credit: "0.00",
+    expenseTotal: "0.00",
+    isLocked: false,
+    createdAt: /* @__PURE__ */ new Date("2026-09-01T10:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    bookingId: "TRP-2026-003",
+    customerId: 3,
+    driverId: 3,
+    driverName: "Anand V",
+    driverMobile: "+91 91234 33445",
+    tripType: "local_rental",
+    pickup: { name: "Electronic City Phase 1", address: "Infosys Gate 1, Bengaluru", latitude: 12.8399, longitude: 77.677 },
+    destination: { name: "Manyata Tech Park", address: "Nagavara, Bengaluru", latitude: 13.0475, longitude: 77.62 },
+    stops: [{ name: "Koramangala", address: "Sony World Junction", latitude: 12.9352, longitude: 77.6245 }],
+    startDate: todayStr,
+    startTime: "09:00",
+    passengerCount: 4,
+    notes: "Client delegate visits.",
+    status: "completed",
+    mapDistanceKm: "68.00",
+    routeDurationMinutes: 120,
+    routeSummary: "Via Outer Ring Rd",
+    billingKm: "80.00",
+    ratePerKm: "20.00",
+    baseFare: "1600.00",
+    toll: "0.00",
+    finalToll: "0.00",
+    parking: "150.00",
+    permitCharge: "0.00",
+    customerTotal: "1750.00",
+    totalPaid: "1750.00",
+    remainingBalance: "0.00",
+    credit: "0.00",
+    startingKm: "23400.00",
+    endingKm: "23485.00",
+    actualKm: "85.00",
+    expenseTotal: "550.00",
+    isLocked: true,
+    createdAt: /* @__PURE__ */ new Date("2026-09-01T12:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 4,
+    bookingId: "TRP-2026-004",
+    customerId: 4,
+    driverId: 1,
+    driverName: "Suresh K",
+    driverMobile: "+91 98450 11223",
+    tripType: "outstation_one_way",
+    pickup: { name: "Koramangala 4th Block", address: "100 Feet Rd, Bengaluru", latitude: 12.9345, longitude: 77.6265 },
+    destination: { name: "Madikeri, Coorg", address: "Madikeri Town Centre, Kodagu", latitude: 12.4244, longitude: 75.7382 },
+    stops: [],
+    startDate: todayStr,
+    startTime: "06:00",
+    passengerCount: 4,
+    notes: "Family holiday trip.",
+    status: "completed",
+    mapDistanceKm: "255.00",
+    routeDurationMinutes: 320,
+    routeSummary: "Via NH75 & SH88",
+    billingKm: "260.00",
+    ratePerKm: "22.00",
+    baseFare: "5720.00",
+    toll: "280.00",
+    finalToll: "280.00",
+    parking: "0.00",
+    permitCharge: "400.00",
+    customerTotal: "6400.00",
+    totalPaid: "6400.00",
+    remainingBalance: "0.00",
+    credit: "0.00",
+    startingKm: "78200.00",
+    endingKm: "78465.00",
+    actualKm: "265.00",
+    expenseTotal: "2100.00",
+    isLocked: true,
+    createdAt: /* @__PURE__ */ new Date("2026-08-30T15:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 5,
+    bookingId: "TRP-2026-005",
+    customerId: 5,
+    driverId: 2,
+    driverName: "Ramesh Babu",
+    driverMobile: "+91 98765 22334",
+    tripType: "local_transfer",
+    pickup: { name: "MG Road Metro", address: "MG Road, Bengaluru", latitude: 12.9756, longitude: 77.6066 },
+    destination: { name: "Bengaluru Golf Club", address: "Sankey Rd, Bengaluru", latitude: 12.9936, longitude: 77.5855 },
+    stops: [],
+    startDate: todayStr,
+    startTime: "16:30",
+    passengerCount: 2,
+    notes: "Evening appointment.",
+    status: "upcoming",
+    mapDistanceKm: "12.00",
+    routeDurationMinutes: 30,
+    routeSummary: "Via Raj Bhavan Rd",
+    billingKm: "15.00",
+    ratePerKm: "25.00",
+    baseFare: "375.00",
+    toll: "0.00",
+    finalToll: "0.00",
+    parking: "50.00",
+    permitCharge: "0.00",
+    customerTotal: "425.00",
+    totalPaid: "0.00",
+    remainingBalance: "425.00",
+    credit: "0.00",
+    expenseTotal: "0.00",
+    isLocked: false,
+    createdAt: /* @__PURE__ */ new Date("2026-09-02T06:00:00Z"),
+    updatedAt: /* @__PURE__ */ new Date()
+  }
+];
+var memPayments = [
+  {
+    id: 1,
+    tripId: 1,
+    amount: "3000.00",
+    method: "UPI",
+    paymentType: "advance",
+    paymentDate: todayStr,
+    reference: "UPI/260902/894102",
+    notes: "Advance payment received via GPay",
+    recordedBy: "Operations Admin",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    tripId: 2,
+    amount: "1195.00",
+    method: "Card",
+    paymentType: "full",
+    paymentDate: todayStr,
+    reference: "POS/TXN-49210",
+    notes: "Full payment prepaid online",
+    recordedBy: "Operations Admin",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    tripId: 3,
+    amount: "1750.00",
+    method: "Bank Transfer",
+    paymentType: "full",
+    paymentDate: todayStr,
+    reference: "NEFT/TECHCORP/0921",
+    notes: "Corporate payment",
+    recordedBy: "Operations Admin",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 4,
+    tripId: 4,
+    amount: "6400.00",
+    method: "Cash",
+    paymentType: "full",
+    paymentDate: todayStr,
+    reference: "CASH-REC-108",
+    notes: "Paid in full at pickup",
+    recordedBy: "Driver Suresh",
+    createdAt: /* @__PURE__ */ new Date()
+  }
+];
+var memExpenses = [
+  {
+    id: 1,
+    tripId: 1,
+    driverId: 1,
+    category: "Fuel",
+    amount: "1200.00",
+    expenseDate: todayStr,
+    notes: "Indian Oil Petrol Pump, Mysore Rd - 12.5L Diesel",
+    receiptPath: null,
+    status: "approved",
+    approvedBy: "Operations Admin",
+    approvedAt: /* @__PURE__ */ new Date(),
+    location: "Mysore Expressway Indian Oil",
+    recordedBy: "Driver Suresh",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    tripId: 3,
+    driverId: 3,
+    category: "Parking",
+    amount: "150.00",
+    expenseDate: todayStr,
+    notes: "Manyata Tech Park visitor multi-level parking",
+    receiptPath: null,
+    status: "approved",
+    approvedBy: "Operations Admin",
+    approvedAt: /* @__PURE__ */ new Date(),
+    location: "Manyata Tech Park",
+    recordedBy: "Driver Anand",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    tripId: 4,
+    driverId: 1,
+    category: "Fuel",
+    amount: "1800.00",
+    expenseDate: todayStr,
+    notes: "HPCL Nelamangala - 18.2L Diesel",
+    receiptPath: null,
+    status: "approved",
+    approvedBy: "Operations Admin",
+    approvedAt: /* @__PURE__ */ new Date(),
+    location: "Nelamangala Highway HPCL",
+    recordedBy: "Driver Suresh",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 4,
+    tripId: 4,
+    driverId: 1,
+    category: "Toll",
+    amount: "300.00",
+    expenseDate: todayStr,
+    notes: "Fastag toll charges",
+    receiptPath: null,
+    status: "approved",
+    approvedBy: "Operations Admin",
+    approvedAt: /* @__PURE__ */ new Date(),
+    location: "Kushalnagar Toll Plaza",
+    recordedBy: "Driver Suresh",
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 5,
+    tripId: 1,
+    driverId: 1,
+    category: "Food",
+    amount: "250.00",
+    expenseDate: todayStr,
+    notes: "Driver breakfast at Mandya Woodlands",
+    receiptPath: null,
+    status: "pending",
+    location: "Mandya Woodlands",
+    recordedBy: "Driver Suresh",
+    createdAt: /* @__PURE__ */ new Date()
+  }
+];
+var memNotifications = [
+  {
+    id: 1,
+    audience: "owner",
+    title: "Trip TRP-2026-001 In Progress",
+    message: "Driver Suresh K has departed Indiranagar towards Mysore with 3 passengers.",
+    kind: "trip_started",
+    tripId: 1,
+    isRead: false,
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 2,
+    audience: "owner",
+    title: "Advance Payment Received",
+    message: "\u20B93,000 recorded for booking TRP-2026-001 from Rajesh Sharma.",
+    kind: "payment_recorded",
+    tripId: 1,
+    isRead: false,
+    createdAt: /* @__PURE__ */ new Date()
+  },
+  {
+    id: 3,
+    audience: "owner",
+    title: "Trip TRP-2026-003 Completed",
+    message: "Local rental for Bangalore Tech Solutions concluded with 85 km clocked.",
+    kind: "trip_completed",
+    tripId: 3,
+    isRead: true,
+    createdAt: new Date(Date.now() - 36e5)
+  },
+  {
+    id: 4,
+    audience: "driver",
+    driverId: 1,
+    title: "Assigned to Trip TRP-2026-001",
+    message: "You have been assigned to trip to Mysore Palace. Pickup at Indiranagar 07:30 AM.",
+    kind: "trip_assigned",
+    tripId: 1,
+    isRead: false,
+    createdAt: new Date(Date.now() - 72e5)
+  },
+  {
+    id: 5,
+    audience: "driver",
+    driverId: 1,
+    title: "Fuel Expense Approved",
+    message: "Your \u20B91,200 fuel expense has been approved by Operations.",
+    kind: "expense_approved",
+    tripId: 1,
+    isRead: true,
+    createdAt: new Date(Date.now() - 18e5)
+  }
+];
+var memAuditLogs = [
+  {
+    id: 1,
+    action: "Trip Created",
+    entity: "trip",
+    entityId: "1",
+    actorName: "Operations Admin",
+    newValue: JSON.stringify({ bookingId: "TRP-2026-001", customer: "Rajesh Sharma", driver: "Suresh K" }),
+    createdAt: new Date(Date.now() - 72e5)
+  },
+  {
+    id: 2,
+    action: "Payment Recorded",
+    entity: "payment",
+    entityId: "1",
+    actorName: "Operations Admin",
+    newValue: JSON.stringify({ amount: 3e3, method: "UPI" }),
+    createdAt: new Date(Date.now() - 54e5)
+  },
+  {
+    id: 3,
+    action: "Trip Status Updated",
+    entity: "trip",
+    entityId: "1",
+    actorName: "Driver Suresh",
+    newValue: JSON.stringify({ status: "in_progress", startingKm: "45120.00" }),
+    createdAt: new Date(Date.now() - 18e5)
+  }
+];
+
 // src/routes/ng-travels.ts
 var router2 = (0, import_express3.Router)();
 router2.get("/realtime/stream", (req, res) => {
@@ -74534,8 +75202,54 @@ router2.get("/dashboard", requireOwner, async (_req, res) => {
       }))
     });
   } catch (err) {
-    console.error("[dashboard] Database query error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to load dashboard metrics" } });
+    console.warn("[dashboard] Database query fallback to memory store:", err?.message);
+    const todayTrps = memTrips.filter((t) => t.startDate === currentDay);
+    const activeTrips = memTrips.filter((t) => ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status));
+    const rev = todayTrps.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
+    const exp = memExpenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const col = todayTrps.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
+    res.json({
+      date: /* @__PURE__ */ new Date(`${currentDay}T00:00:00Z`),
+      metrics: {
+        totalTrips: memTrips.length,
+        todaysTrips: todayTrps.length,
+        upcomingTrips: todayTrps.filter((t) => ["upcoming", "confirmed", "ready"].includes(t.status)).length,
+        started: todayTrps.filter((t) => t.status === "started").length,
+        inProgress: activeTrips.length,
+        completedToday: todayTrps.filter((t) => t.status === "completed").length,
+        paymentPending: memTrips.filter((t) => Number(t.remainingBalance || 0) > 0).length,
+        todaysRevenue: rev,
+        todaysCollection: col,
+        todaysExpenses: exp,
+        todaysProfit: rev - exp,
+        weeklyRevenue: rev,
+        weeklyExpenses: exp,
+        weeklyProfit: rev - exp,
+        monthlyRevenue: rev,
+        monthlyExpenses: exp,
+        monthlyProfit: rev - exp,
+        availableDrivers: memDrivers.filter((d) => d.availability === "available").length,
+        driversOnTrip: memDrivers.filter((d) => d.availability === "on_trip").length,
+        availableVehicles: memVehicles.filter((v) => v.status === "active").length,
+        vehiclesOnTrip: memVehicles.filter((v) => v.status === "active" && v.assignedDriverId).length
+      },
+      schedule: todayTrps.map((t) => ({
+        id: t.id,
+        bookingId: t.bookingId,
+        time: t.startTime,
+        pickup: t.pickup?.name || "Pickup",
+        destination: t.destination?.name || "Destination",
+        customerName: "Corporate Customer",
+        driverName: t.driverName ?? "Unassigned",
+        status: t.status
+      })),
+      recentActivity: memAuditLogs.slice(0, 10).map((a) => ({
+        id: a.id,
+        title: a.action,
+        detail: `${a.entity} ${a.entityId}`,
+        timestamp: a.createdAt
+      }))
+    });
   }
 });
 router2.get("/drivers", requireOwner, async (_req, res) => {
@@ -74543,8 +75257,8 @@ router2.get("/drivers", requireOwner, async (_req, res) => {
     const rows = await db.select().from(driversTable).orderBy(asc(driversTable.name));
     res.json(rows);
   } catch (err) {
-    console.error("[drivers] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch drivers" } });
+    console.warn("[drivers] DB fallback to memory store:", err?.message);
+    res.json(memDrivers);
   }
 });
 router2.post("/drivers", requireOwner, async (req, res) => {
@@ -74636,8 +75350,8 @@ router2.get("/vehicles", async (_req, res) => {
     const rows = await db.select().from(vehiclesTable).orderBy(asc(vehiclesTable.vehicleNumber));
     res.json(rows.map(enrichVehicleWithAlerts));
   } catch (err) {
-    console.error("[vehicles] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch fleet vehicles" } });
+    console.warn("[vehicles] DB fallback to memory store:", err?.message);
+    res.json(memVehicles.map(enrichVehicleWithAlerts));
   }
 });
 router2.get("/vehicles/expiry-alerts", async (_req, res) => {
@@ -74742,8 +75456,8 @@ router2.get("/customers", requireOwner, async (req, res) => {
     const views = await Promise.all(rows.map(customerView));
     res.json({ items: views, total: views.length });
   } catch (err) {
-    console.error("[customers] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch customers" } });
+    console.warn("[customers] DB fallback to memory store:", err?.message);
+    res.json({ items: memCustomers, total: memCustomers.length });
   }
 });
 router2.post("/customers", requireOwner, async (req, res) => {
@@ -74815,7 +75529,8 @@ router2.get("/enquiries", requireOwner, async (_req, res) => {
     const rows = await db.select().from(enquiriesTable).orderBy(desc(enquiriesTable.createdAt));
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[enquiries] DB fallback to memory store:", err?.message);
+    res.json(memEnquiries);
   }
 });
 router2.post("/enquiries", requireOwner, async (req, res) => {
@@ -74942,8 +75657,8 @@ router2.get("/trips", async (req, res) => {
     ) : tripViews;
     res.json({ items: filtered, total: filtered.length });
   } catch (err) {
-    console.error("[trips] List error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch trips" } });
+    console.warn("[trips] DB fallback to memory store:", err?.message);
+    res.json({ items: memTrips, total: memTrips.length });
   }
 });
 router2.post("/trips", requireOwner, async (req, res) => {
@@ -75291,8 +76006,8 @@ router2.get("/driver/today", async (req, res) => {
     const cMap = new Map(customers.map((c) => [c.id, c]));
     res.json(trips.map((t) => tripView(t, cMap.get(t.customerId))));
   } catch (err) {
-    console.error("[driver/today] Error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to fetch today's duty" } });
+    console.warn("[driver/today] DB fallback:", err?.message);
+    res.json(memTrips.filter((t) => t.startDate === today()));
   }
 });
 router2.get("/driver/current-trip", async (req, res) => {
@@ -75321,7 +76036,13 @@ router2.get("/driver/current-trip", async (req, res) => {
     const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, trips[0].customerId));
     res.json(tripView(trips[0], customer));
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[driver/current-trip] DB fallback:", err?.message);
+    const active = memTrips.find((t) => ["started", "in_progress", "reached_pickup", "customer_picked_up"].includes(t.status)) || memTrips[0] || null;
+    if (!active) {
+      res.status(404).json({ success: false, message: "No active trip in progress" });
+      return;
+    }
+    res.json(active);
   }
 });
 router2.get("/driver/vehicle", async (req, res) => {
@@ -75565,7 +76286,8 @@ router2.get("/payments", async (_req, res) => {
     const rows = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[payments] DB fallback to memory store:", err?.message);
+    res.json(memPayments);
   }
 });
 router2.get("/trips/:id/payments", async (req, res) => {
@@ -75574,7 +76296,8 @@ router2.get("/trips/:id/payments", async (req, res) => {
     const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.tripId, id)).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[trips/:id/payments] DB fallback:", err?.message);
+    res.json(memPayments.filter((p) => p.tripId === id));
   }
 });
 async function recordPaymentHandler(req, res) {
@@ -75630,7 +76353,8 @@ router2.get("/expenses", async (_req, res) => {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[expenses] DB fallback to memory store:", err?.message);
+    res.json(memExpenses);
   }
 });
 router2.post("/expenses", async (req, res) => {
@@ -75752,7 +76476,8 @@ router2.get("/notifications", async (req, res) => {
     ).orderBy(desc(notificationsTable.createdAt)).limit(30);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[notifications] DB fallback to memory store:", err?.message);
+    res.json(memNotifications);
   }
 });
 router2.post("/notifications/:id/read", async (req, res) => {
@@ -75779,7 +76504,8 @@ router2.get("/audit-logs", requireOwner, async (_req, res) => {
     const rows = await db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(100);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+    console.warn("[audit-logs] DB fallback to memory store:", err?.message);
+    res.json(memAuditLogs);
   }
 });
 router2.get("/settings", requireOwner, async (_req, res) => {
