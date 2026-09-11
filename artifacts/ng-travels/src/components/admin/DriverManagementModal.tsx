@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import { X, Plus, Key, Mail, User, Phone, AlertCircle, CheckCircle2, Loader } from "lucide-react";
+import {
+  X,
+  Plus,
+  Key,
+  Mail,
+  User,
+  Phone,
+  AlertCircle,
+  CheckCircle2,
+  Loader,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -31,7 +41,10 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"create" | "reset">("create");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Create driver form state
   const [createForm, setCreateForm] = useState({
@@ -57,8 +70,17 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
     e.preventDefault();
     setMessage(null);
 
-    if (!createForm.name || !createForm.driverCode || !createForm.mobile || !createForm.email || !createForm.initialPassword) {
-      setMessage({ type: "error", text: "Name, driver code, mobile, email, and password are required." });
+    if (
+      !createForm.name ||
+      !createForm.driverCode ||
+      !createForm.mobile ||
+      !createForm.email ||
+      !createForm.initialPassword
+    ) {
+      setMessage({
+        type: "error",
+        text: "Name, driver code, mobile, email, and password are required.",
+      });
       return;
     }
 
@@ -68,7 +90,10 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
     }
 
     if (createForm.initialPassword.length < 6) {
-      setMessage({ type: "error", text: "Password must be at least 6 characters." });
+      setMessage({
+        type: "error",
+        text: "Password must be at least 6 characters.",
+      });
       return;
     }
 
@@ -84,7 +109,10 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
         emergencyContact: createForm.emergencyContact || undefined,
         initialPassword: createForm.initialPassword,
       });
-      setMessage({ type: "success", text: "Driver account created successfully!" });
+      setMessage({
+        type: "success",
+        text: "Driver account created successfully!",
+      });
       setCreateForm({
         name: "",
         driverCode: "",
@@ -98,7 +126,10 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
       });
       setTimeout(() => onClose(), 2000);
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Failed to create driver account." });
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to create driver account.",
+      });
     } finally {
       setLoading(false);
     }
@@ -119,18 +150,30 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
     }
 
     if (resetForm.newPassword.length < 6) {
-      setMessage({ type: "error", text: "Password must be at least 6 characters." });
+      setMessage({
+        type: "error",
+        text: "Password must be at least 6 characters.",
+      });
       return;
     }
 
     setLoading(true);
     try {
-      await onResetPassword(parseInt(resetForm.driverId), resetForm.newPassword);
-      setMessage({ type: "success", text: "Driver password reset successfully!" });
+      await onResetPassword(
+        parseInt(resetForm.driverId),
+        resetForm.newPassword,
+      );
+      setMessage({
+        type: "success",
+        text: "Driver password reset successfully!",
+      });
       setResetForm({ driverId: "", newPassword: "", confirmPassword: "" });
       setTimeout(() => onClose(), 2000);
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Failed to reset password." });
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to reset password.",
+      });
     } finally {
       setLoading(false);
     }
@@ -206,7 +249,9 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Driver Name *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Driver Name *
+                  </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
                     <Input
@@ -214,26 +259,37 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                       required
                       placeholder="e.g. Rajesh Kumar"
                       value={createForm.name}
-                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, name: e.target.value })
+                      }
                       className="pl-9"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Driver Code *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Driver Code *
+                  </label>
                   <Input
                     type="text"
                     required
                     placeholder="e.g. DRV-101"
                     value={createForm.driverCode}
-                    onChange={(e) => setCreateForm({ ...createForm, driverCode: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        driverCode: e.target.value,
+                      })
+                    }
                     className="font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Mobile Number *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Mobile Number *
+                  </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
                     <Input
@@ -241,14 +297,18 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                       required
                       placeholder="e.g. 9845011223"
                       value={createForm.mobile}
-                      onChange={(e) => setCreateForm({ ...createForm, mobile: e.target.value })}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, mobile: e.target.value })
+                      }
                       className="pl-9 font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Email Address *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Email Address *
+                  </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
                     <Input
@@ -256,60 +316,97 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                       required
                       placeholder="e.g. driver@example.com"
                       value={createForm.email}
-                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, email: e.target.value })
+                      }
                       className="pl-9"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">License Number</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    License Number
+                  </label>
                   <Input
                     type="text"
                     placeholder="Optional"
                     value={createForm.licenseNumber}
-                    onChange={(e) => setCreateForm({ ...createForm, licenseNumber: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        licenseNumber: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">License Expiry</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    License Expiry
+                  </label>
                   <Input
                     type="date"
                     value={createForm.licenseExpiry}
-                    onChange={(e) => setCreateForm({ ...createForm, licenseExpiry: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        licenseExpiry: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Emergency Contact</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Emergency Contact
+                  </label>
                   <Input
                     type="text"
                     placeholder="Optional - name and phone"
                     value={createForm.emergencyContact}
-                    onChange={(e) => setCreateForm({ ...createForm, emergencyContact: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        emergencyContact: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Initial Password *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Initial Password *
+                  </label>
                   <Input
                     type="password"
                     required
                     placeholder="Minimum 6 characters"
                     value={createForm.initialPassword}
-                    onChange={(e) => setCreateForm({ ...createForm, initialPassword: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        initialPassword: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">Confirm Password *</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                    Confirm Password *
+                  </label>
                   <Input
                     type="password"
                     required
                     placeholder="Repeat password"
                     value={createForm.confirmPassword}
-                    onChange={(e) => setCreateForm({ ...createForm, confirmPassword: e.target.value })}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        confirmPassword: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -319,7 +416,11 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 disabled={loading}
                 className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-6"
               >
-                {loading ? <Loader className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                {loading ? (
+                  <Loader className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
                 Create Driver Account
               </Button>
             </form>
@@ -329,11 +430,15 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
           {activeTab === "reset" && (
             <form onSubmit={handleResetSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">Select Driver *</label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  Select Driver *
+                </label>
                 <select
                   required
                   value={resetForm.driverId}
-                  onChange={(e) => setResetForm({ ...resetForm, driverId: e.target.value })}
+                  onChange={(e) =>
+                    setResetForm({ ...resetForm, driverId: e.target.value })
+                  }
                   className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
                 >
                   <option value="">-- Select a driver --</option>
@@ -346,24 +451,35 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">New Password *</label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  New Password *
+                </label>
                 <Input
                   type="password"
                   required
                   placeholder="Minimum 6 characters"
                   value={resetForm.newPassword}
-                  onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })}
+                  onChange={(e) =>
+                    setResetForm({ ...resetForm, newPassword: e.target.value })
+                  }
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">Confirm Password *</label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  Confirm Password *
+                </label>
                 <Input
                   type="password"
                   required
                   placeholder="Repeat password"
                   value={resetForm.confirmPassword}
-                  onChange={(e) => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
+                  onChange={(e) =>
+                    setResetForm({
+                      ...resetForm,
+                      confirmPassword: e.target.value,
+                    })
+                  }
                 />
               </div>
 
@@ -372,7 +488,11 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 disabled={loading}
                 className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-6"
               >
-                {loading ? <Loader className="w-4 h-4 animate-spin mr-2" /> : <Key className="w-4 h-4 mr-2" />}
+                {loading ? (
+                  <Loader className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Key className="w-4 h-4 mr-2" />
+                )}
                 Reset Driver Password
               </Button>
             </form>

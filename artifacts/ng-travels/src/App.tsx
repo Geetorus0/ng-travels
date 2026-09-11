@@ -1,15 +1,65 @@
-import React, { type ReactNode, createContext, useContext, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Router, Route, Switch, Redirect, useLocation } from "wouter";
 import type { Session } from "@supabase/supabase-js";
 import {
-  Archive, ArrowLeft, ArrowUpRight, BarChart3, Bell, CalendarDays,
-  Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, Clock3,
-  Download, FileText, Fuel, LayoutDashboard, LogOut, MapPin, Menu,
-  Navigation, Pencil, Plus, Receipt, RefreshCw, Search, Settings2, ShieldCheck,
-  SlidersHorizontal, Sparkles, TrendingUp, Users, WalletCards, X, XCircle,
-  Car, FileQuestion, Radio, Smartphone, AlertTriangle, AlertCircle, Eye, EyeOff,
-  Lock, Mail, KeyRound
+  Archive,
+  ArrowLeft,
+  ArrowUpRight,
+  BarChart3,
+  Bell,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  Download,
+  FileText,
+  Fuel,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Menu,
+  Navigation,
+  Pencil,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
+  Users,
+  WalletCards,
+  X,
+  XCircle,
+  Car,
+  FileQuestion,
+  Radio,
+  Smartphone,
+  AlertTriangle,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  KeyRound,
 } from "lucide-react";
 import { syncEngine } from "@/lib/syncEngine";
 import { supabase } from "@/lib/supabase/client";
@@ -99,9 +149,16 @@ export interface AuthContextType {
     password?: string;
     identifier?: string;
   }) => Promise<{ success: boolean; error?: string }>;
-  requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
-  completePasswordReset: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  requestDriverPasswordReset: (identifier: string, note?: string) => Promise<{ success: boolean; error?: string }>;
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  completePasswordReset: (
+    newPassword: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  requestDriverPasswordReset: (
+    identifier: string,
+    note?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   switchRole: (role: "admin" | "driver") => void;
 }
 
@@ -112,10 +169,22 @@ const AuthContext = createContext<AuthContextType>({
   isPasswordRecovery: false,
   accessToken: null,
   signOut: async () => {},
-  signInWithCredentials: async () => ({ success: false, error: "Uninitialized" }),
-  requestPasswordReset: async () => ({ success: false, error: "Uninitialized" }),
-  completePasswordReset: async () => ({ success: false, error: "Uninitialized" }),
-  requestDriverPasswordReset: async () => ({ success: false, error: "Uninitialized" }),
+  signInWithCredentials: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  requestPasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  completePasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  requestDriverPasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
   switchRole: () => {},
 });
 
@@ -123,7 +192,9 @@ function authUserFromSession(session: Session): AuthUser {
   const rawRole = (session.user.user_metadata?.role || "owner").toUpperCase();
   const role = rawRole === "DRIVER" ? "driver" : "owner";
   const fullName =
-    session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Operations User";
+    session.user.user_metadata?.full_name ||
+    session.user.email?.split("@")[0] ||
+    "Operations User";
   return {
     id: session.user.id as any,
     fullName,
@@ -132,7 +203,9 @@ function authUserFromSession(session: Session): AuthUser {
     driverId: session.user.user_metadata?.driver_id || null,
     phone: session.user.phone,
     email: session.user.email,
-    primaryEmailAddress: session.user.email ? { emailAddress: session.user.email } : undefined,
+    primaryEmailAddress: session.user.email
+      ? { emailAddress: session.user.email }
+      : undefined,
   };
 }
 
@@ -149,7 +222,9 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
 
     async function restoreSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (isMounted) {
           if (session?.user) {
             setUser(authUserFromSession(session));
@@ -175,7 +250,9 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
 
     restoreSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       if (_event === "PASSWORD_RECOVERY") {
         setIsPasswordRecovery(true);
@@ -215,7 +292,10 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
           password: params.password,
         });
         if (error || !data?.session?.user) {
-          return { success: false, error: error?.message || "Invalid email or password." };
+          return {
+            success: false,
+            error: error?.message || "Invalid email or password.",
+          };
         }
         setUser(authUserFromSession(data.session));
         setIsSignedIn(true);
@@ -226,22 +306,30 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch("/api/auth/driver-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: params.identifier?.trim(), password: params.password?.trim() }),
+        body: JSON.stringify({
+          identifier: params.identifier?.trim(),
+          password: params.password?.trim(),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.session?.accessToken) {
         return {
           success: false,
-          error: data?.error?.message || "Invalid driver credentials or password.",
+          error:
+            data?.error?.message || "Invalid driver credentials or password.",
         };
       }
 
-      const { data: sessionData, error: setErr } = await supabase.auth.setSession({
-        access_token: data.session.accessToken,
-        refresh_token: data.session.refreshToken,
-      });
+      const { data: sessionData, error: setErr } =
+        await supabase.auth.setSession({
+          access_token: data.session.accessToken,
+          refresh_token: data.session.refreshToken,
+        });
       if (setErr || !sessionData?.session) {
-        return { success: false, error: setErr?.message || "Unable to establish driver session." };
+        return {
+          success: false,
+          error: setErr?.message || "Unable to establish driver session.",
+        };
       }
 
       setUser(authUserFromSession(sessionData.session));
@@ -250,33 +338,49 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       return {
         success: false,
-        error: "Unable to connect to authentication server. Please check your network.",
+        error:
+          "Unable to connect to authentication server. Please check your network.",
       };
     }
   };
 
-  const requestPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
+  const requestPasswordReset = async (
+    email: string,
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
       const redirectTo = `${window.location.origin}${basePath}/reset-password`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo },
+      );
       if (error) return { success: false, error: error.message };
       return { success: true };
     } catch {
-      return { success: false, error: "Unable to reach the authentication server. Please check your network." };
+      return {
+        success: false,
+        error:
+          "Unable to reach the authentication server. Please check your network.",
+      };
     }
   };
 
-  const completePasswordReset = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+  const completePasswordReset = async (
+    newPassword: string,
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) return { success: false, error: error.message };
       setIsPasswordRecovery(false);
       return { success: true };
     } catch {
-      return { success: false, error: "Unable to update your password. Please check your network." };
+      return {
+        success: false,
+        error: "Unable to update your password. Please check your network.",
+      };
     }
   };
-
 
   const requestDriverPasswordReset = async (
     identifier: string,
@@ -286,15 +390,25 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch("/api/auth/driver-password-reset-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: identifier.trim(), note: note?.trim() }),
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          note: note?.trim(),
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        return { success: false, error: data?.error?.message || "Unable to submit the request." };
+        return {
+          success: false,
+          error: data?.error?.message || "Unable to submit the request.",
+        };
       }
       return { success: true };
     } catch {
-      return { success: false, error: "Unable to reach the operations desk. Please check your network." };
+      return {
+        success: false,
+        error:
+          "Unable to reach the operations desk. Please check your network.",
+      };
     }
   };
 
@@ -348,11 +462,18 @@ type AdminView = "password" | "forgot";
 type DriverView = "password" | "forgot";
 
 function SignInPage() {
-  const { signInWithCredentials, requestPasswordReset, requestDriverPasswordReset } = useAppAuth();
+  const {
+    signInWithCredentials,
+    requestPasswordReset,
+    requestDriverPasswordReset,
+  } = useAppAuth();
   const [, setLocation] = useLocation();
 
   const [activeTab, setActiveTab] = useState<"admin" | "driver">(() => {
-    if (typeof window !== "undefined" && (window as any).NG_APP_ROLE === "driver") {
+    if (
+      typeof window !== "undefined" &&
+      (window as any).NG_APP_ROLE === "driver"
+    ) {
       return "driver";
     }
     return "admin";
@@ -445,7 +566,9 @@ function SignInPage() {
     setErrorMessage(null);
 
     if (!driverIdentifier.trim()) {
-      setErrorMessage("Please enter your Driver Code (e.g. DRV-101) or registered mobile number.");
+      setErrorMessage(
+        "Please enter your Driver Code (e.g. DRV-101) or registered mobile number.",
+      );
       return;
     }
     if (!driverPassword.trim()) {
@@ -475,12 +598,17 @@ function SignInPage() {
     e.preventDefault();
     setErrorMessage(null);
     if (!passwordResetIdentifier.trim()) {
-      setErrorMessage("Please enter your Driver Code or registered mobile number.");
+      setErrorMessage(
+        "Please enter your Driver Code or registered mobile number.",
+      );
       return;
     }
     setSubmitting(true);
     try {
-      const res = await requestDriverPasswordReset(passwordResetIdentifier, passwordResetNote);
+      const res = await requestDriverPasswordReset(
+        passwordResetIdentifier,
+        passwordResetNote,
+      );
       if (!res.success) {
         setErrorMessage(res.error || "Unable to submit the request.");
       } else {
@@ -503,9 +631,15 @@ function SignInPage() {
             />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-zinc-100 tracking-tight">NG TRAVELS</h1>
-            <p className="text-xs text-amber-400 font-semibold tracking-wide mt-0.5">Travel with Comfort & Safety</p>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">Operations Command & Dispatch Platform</p>
+            <h1 className="text-2xl font-black text-zinc-100 tracking-tight">
+              NG TRAVELS
+            </h1>
+            <p className="text-xs text-amber-400 font-semibold tracking-wide mt-0.5">
+              Travel with Comfort & Safety
+            </p>
+            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+              Operations Command & Dispatch Platform
+            </p>
           </div>
         </div>
 
@@ -608,7 +742,11 @@ function SignInPage() {
                       onClick={() => setShowAdminPassword(!showAdminPassword)}
                       className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
                     >
-                      {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showAdminPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -622,7 +760,8 @@ function SignInPage() {
                     <ButtonLoader label="Authenticating Operations..." />
                   ) : (
                     <>
-                      <ShieldCheck className="w-4 h-4" /> Sign In to Operations Desk
+                      <ShieldCheck className="w-4 h-4" /> Sign In to Operations
+                      Desk
                     </>
                   )}
                 </Button>
@@ -642,16 +781,24 @@ function SignInPage() {
                   <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
-                      If an account exists for <span className="font-semibold">{adminEmail}</span>, a password reset link has been sent. Check your inbox.
+                      If an account exists for{" "}
+                      <span className="font-semibold">{adminEmail}</span>, a
+                      password reset link has been sent. Check your inbox.
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                  <form
+                    onSubmit={handleForgotPasswordSubmit}
+                    className="space-y-4"
+                  >
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Enter your operations email and we'll send a link to reset your password.
+                      Enter your operations email and we'll send a link to reset
+                      your password.
                     </p>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">Operations Email</label>
+                      <label className="text-xs font-semibold text-zinc-300">
+                        Operations Email
+                      </label>
                       <div className="relative">
                         <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
                         <Input
@@ -669,7 +816,11 @@ function SignInPage() {
                       disabled={submitting}
                       className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
                     >
-                      {submitting ? <ButtonLoader label="Sending Link..." /> : <>Send Reset Link</>}
+                      {submitting ? (
+                        <ButtonLoader label="Sending Link..." />
+                      ) : (
+                        <>Send Reset Link</>
+                      )}
                     </Button>
                   </form>
                 )}
@@ -729,7 +880,11 @@ function SignInPage() {
                       onClick={() => setShowDriverPassword(!showDriverPassword)}
                       className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
                     >
-                      {showDriverPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showDriverPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -763,16 +918,27 @@ function SignInPage() {
                   <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
-                      If a driver account exists for <span className="font-semibold">{passwordResetIdentifier}</span>, the operations desk has been notified and will assist with password reset.
+                      If a driver account exists for{" "}
+                      <span className="font-semibold">
+                        {passwordResetIdentifier}
+                      </span>
+                      , the operations desk has been notified and will assist
+                      with password reset.
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleDriverPasswordResetSubmit} className="space-y-4">
+                  <form
+                    onSubmit={handleDriverPasswordResetSubmit}
+                    className="space-y-4"
+                  >
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Enter your driver code or registered mobile number. The operations desk will assist you with password reset.
+                      Enter your driver code or registered mobile number. The
+                      operations desk will assist you with password reset.
                     </p>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">Driver Code or Mobile</label>
+                      <label className="text-xs font-semibold text-zinc-300">
+                        Driver Code or Mobile
+                      </label>
                       <div className="relative">
                         <Car className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
                         <Input
@@ -780,13 +946,17 @@ function SignInPage() {
                           required
                           placeholder="e.g. DRV-101 or 9845011223"
                           value={passwordResetIdentifier}
-                          onChange={(e) => setPasswordResetIdentifier(e.target.value)}
+                          onChange={(e) =>
+                            setPasswordResetIdentifier(e.target.value)
+                          }
                           className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono"
                         />
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">Note (Optional)</label>
+                      <label className="text-xs font-semibold text-zinc-300">
+                        Note (Optional)
+                      </label>
                       <div className="relative">
                         <FileText className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
                         <Input
@@ -803,7 +973,11 @@ function SignInPage() {
                       disabled={submitting}
                       className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
                     >
-                      {submitting ? <ButtonLoader label="Submitting Request..." /> : <>Request Password Reset</>}
+                      {submitting ? (
+                        <ButtonLoader label="Submitting Request..." />
+                      ) : (
+                        <>Request Password Reset</>
+                      )}
                     </Button>
                   </form>
                 )}
@@ -869,8 +1043,12 @@ function ResetPasswordPage() {
             />
           </div>
           <div>
-            <h1 className="text-xl font-black text-zinc-100 tracking-tight">Reset Your Password</h1>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">Operations Command & Dispatch Platform</p>
+            <h1 className="text-xl font-black text-zinc-100 tracking-tight">
+              Reset Your Password
+            </h1>
+            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+              Operations Command & Dispatch Platform
+            </p>
           </div>
         </div>
 
@@ -885,7 +1063,9 @@ function ResetPasswordPage() {
           <div className="space-y-4">
             <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">Your password has been updated.</div>
+              <div className="leading-relaxed">
+                Your password has been updated.
+              </div>
             </div>
             <Button
               type="button"
@@ -898,7 +1078,9 @@ function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">New Password</label>
+              <label className="text-xs font-semibold text-zinc-300">
+                New Password
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
                 <Input
@@ -915,12 +1097,18 @@ function ResetPasswordPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">Confirm Password</label>
+              <label className="text-xs font-semibold text-zinc-300">
+                Confirm Password
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
                 <Input
@@ -939,7 +1127,11 @@ function ResetPasswordPage() {
               disabled={submitting}
               className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
             >
-              {submitting ? <ButtonLoader label="Updating Password..." /> : <>Update Password</>}
+              {submitting ? (
+                <ButtonLoader label="Updating Password..." />
+              ) : (
+                <>Update Password</>
+              )}
             </Button>
             <button
               type="button"
@@ -961,7 +1153,15 @@ function ResetPasswordPage() {
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 function MainApp() {
-  const { user, isSignedIn, isLoaded, isPasswordRecovery, accessToken, signOut, switchRole } = useAppAuth();
+  const {
+    user,
+    isSignedIn,
+    isLoaded,
+    isPasswordRecovery,
+    accessToken,
+    signOut,
+    switchRole,
+  } = useAppAuth();
   const [location, setLocation] = useLocation();
   const qc = useQueryClient();
 
@@ -974,17 +1174,31 @@ function MainApp() {
   const [customerCopyTrip, setCustomerCopyTrip] = useState<any | null>(null);
   const [paymentRecordTrip, setPaymentRecordTrip] = useState<any | null>(null);
   const [cancelTrip, setCancelTrip] = useState<any | null>(null);
-  const [receiptPayment, setReceiptPayment] = useState<{ payment: any; trip: any } | null>(null);
-  const [driverKmTrip, setDriverKmTrip] = useState<{ trip: any; mode: "start" | "end" } | null>(null);
-  const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(null);
-  const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<any | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<{
+    payment: any;
+    trip: any;
+  } | null>(null);
+  const [driverKmTrip, setDriverKmTrip] = useState<{
+    trip: any;
+    mode: "start" | "end";
+  } | null>(null);
+  const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(
+    null,
+  );
+  const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<
+    any | null
+  >(null);
 
   // Helper for safe query responses
   const safeJsonArray = async (res: Response) => {
     if (!res.ok) return [];
     try {
       const json = await res.json();
-      return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+      return Array.isArray(json)
+        ? json
+        : Array.isArray(json?.items)
+          ? json.items
+          : [];
     } catch {
       return [];
     }
@@ -1205,16 +1419,56 @@ function MainApp() {
   });
 
   // Normalized collections: guarantees an array whether data is { items: [] } or raw array []
-  const tripList: any[] = Array.isArray(tripsData) ? tripsData : (Array.isArray((tripsData as any)?.items) ? (tripsData as any).items : []);
-  const customerList: any[] = Array.isArray(customersData) ? customersData : (Array.isArray((customersData as any)?.items) ? (customersData as any).items : []);
-  const driverList: any[] = Array.isArray(driversData) ? driversData : (Array.isArray((driversData as any)?.items) ? (driversData as any).items : []);
-  const vehicleList: any[] = Array.isArray(rawVehicles) ? rawVehicles : (Array.isArray((rawVehicles as any)?.items) ? (rawVehicles as any).items : []);
-  const paymentList: any[] = Array.isArray(paymentsData) ? paymentsData : (Array.isArray((paymentsData as any)?.items) ? (paymentsData as any).items : []);
-  const expenseList: any[] = Array.isArray(expensesData) ? expensesData : (Array.isArray((expensesData as any)?.items) ? (expensesData as any).items : []);
-  const notificationList: any[] = Array.isArray(notificationsData) ? notificationsData : (Array.isArray((notificationsData as any)?.items) ? (notificationsData as any).items : []);
-  const enquiryList: any[] = Array.isArray(enquiriesData) ? enquiriesData : (Array.isArray((enquiriesData as any)?.items) ? (enquiriesData as any).items : []);
-  const auditLogList: any[] = Array.isArray(auditLogsData) ? auditLogsData : (Array.isArray((auditLogsData as any)?.items) ? (auditLogsData as any).items : []);
-  const driverTodayTripList: any[] = Array.isArray(driverTodayTrips) ? driverTodayTrips : (Array.isArray((driverTodayTrips as any)?.items) ? (driverTodayTrips as any).items : []);
+  const tripList: any[] = Array.isArray(tripsData)
+    ? tripsData
+    : Array.isArray((tripsData as any)?.items)
+      ? (tripsData as any).items
+      : [];
+  const customerList: any[] = Array.isArray(customersData)
+    ? customersData
+    : Array.isArray((customersData as any)?.items)
+      ? (customersData as any).items
+      : [];
+  const driverList: any[] = Array.isArray(driversData)
+    ? driversData
+    : Array.isArray((driversData as any)?.items)
+      ? (driversData as any).items
+      : [];
+  const vehicleList: any[] = Array.isArray(rawVehicles)
+    ? rawVehicles
+    : Array.isArray((rawVehicles as any)?.items)
+      ? (rawVehicles as any).items
+      : [];
+  const paymentList: any[] = Array.isArray(paymentsData)
+    ? paymentsData
+    : Array.isArray((paymentsData as any)?.items)
+      ? (paymentsData as any).items
+      : [];
+  const expenseList: any[] = Array.isArray(expensesData)
+    ? expensesData
+    : Array.isArray((expensesData as any)?.items)
+      ? (expensesData as any).items
+      : [];
+  const notificationList: any[] = Array.isArray(notificationsData)
+    ? notificationsData
+    : Array.isArray((notificationsData as any)?.items)
+      ? (notificationsData as any).items
+      : [];
+  const enquiryList: any[] = Array.isArray(enquiriesData)
+    ? enquiriesData
+    : Array.isArray((enquiriesData as any)?.items)
+      ? (enquiriesData as any).items
+      : [];
+  const auditLogList: any[] = Array.isArray(auditLogsData)
+    ? auditLogsData
+    : Array.isArray((auditLogsData as any)?.items)
+      ? (auditLogsData as any).items
+      : [];
+  const driverTodayTripList: any[] = Array.isArray(driverTodayTrips)
+    ? driverTodayTrips
+    : Array.isArray((driverTodayTrips as any)?.items)
+      ? (driverTodayTrips as any).items
+      : [];
 
   // Action Handlers
   const handleTripCreated = () => {
@@ -1245,7 +1499,10 @@ function MainApp() {
     qc.invalidateQueries({ queryKey: ["/api/trips"] });
   };
 
-  const handleUpdateAvailability = async (driverId: number, availability: string) => {
+  const handleUpdateAvailability = async (
+    driverId: number,
+    availability: string,
+  ) => {
     await apiFetch(`/api/drivers/${driverId}/availability`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
@@ -1279,7 +1536,11 @@ function MainApp() {
     qc.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
-  const handleDriverMilestone = async (tripId: number, status: string, note?: string) => {
+  const handleDriverMilestone = async (
+    tripId: number,
+    status: string,
+    note?: string,
+  ) => {
     await apiFetch(`/api/trips/${tripId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1292,8 +1553,14 @@ function MainApp() {
   };
 
   const nativeRole = (window as any).NG_APP_ROLE;
-  const isDriverPath = location === "/driver" || location.startsWith("/driver/");
-  const isDriverWorkspace = nativeRole === "driver" ? true : nativeRole === "owner" ? false : (isDriverPath || user?.role === "driver");
+  const isDriverPath =
+    location === "/driver" || location.startsWith("/driver/");
+  const isDriverWorkspace =
+    nativeRole === "driver"
+      ? true
+      : nativeRole === "owner"
+        ? false
+        : isDriverPath || user?.role === "driver";
 
   // Force route alignment if native APK
   useEffect(() => {
@@ -1325,14 +1592,21 @@ function MainApp() {
   const currentDriver =
     driverMe ||
     (Array.isArray(driverList)
-      ? (driverList.find((d: any) => d?.id === user?.driverId) || driverList[0] || null)
+      ? driverList.find((d: any) => d?.id === user?.driverId) ||
+        driverList[0] ||
+        null
       : null);
 
   return (
     <>
       {isDriverWorkspace ? (
         <DriverLayout
-          driver={currentDriver || { name: user?.fullName || "Driver Pilot", availability: "available" }}
+          driver={
+            currentDriver || {
+              name: user?.fullName || "Driver Pilot",
+              availability: "available",
+            }
+          }
           onSignOut={signOut}
           onSwitchRole={(role) => {
             switchRole(role);
@@ -1345,8 +1619,12 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
               />
             </Route>
@@ -1355,31 +1633,52 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
               />
             </Route>
             <Route path="/driver/today">
               <DriverTodayPage
                 todayTrips={driverTodayTripList}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
               />
             </Route>
             <Route path="/driver/current-trip">
               <DriverCurrentTripPage
                 trip={driverCurrentTrip || driverTodayTripList[0] || null}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
                 onUpdateMilestone={handleDriverMilestone}
               />
             </Route>
             <Route path="/driver/expenses">
               <DriverExpensesPage
-                expenses={Array.isArray(expenseList) ? expenseList.filter((e: any) => !user?.driverId || e?.driverId === user?.driverId) : []}
-                onOpenExpenseModal={() => setDriverExpenseTripId(driverCurrentTrip?.id || null)}
+                expenses={
+                  Array.isArray(expenseList)
+                    ? expenseList.filter(
+                        (e: any) =>
+                          !user?.driverId || e?.driverId === user?.driverId,
+                      )
+                    : []
+                }
+                onOpenExpenseModal={() =>
+                  setDriverExpenseTripId(driverCurrentTrip?.id || null)
+                }
               />
             </Route>
             <Route path="/driver/vehicle">
@@ -1391,7 +1690,10 @@ function MainApp() {
             <Route path="/driver/profile">
               <DriverProfilePage
                 driver={currentDriver}
-                onUpdateAvailability={(avail) => currentDriver?.id && handleUpdateAvailability(currentDriver.id, avail)}
+                onUpdateAvailability={(avail) =>
+                  currentDriver?.id &&
+                  handleUpdateAvailability(currentDriver.id, avail)
+                }
               />
             </Route>
             <Route>
@@ -1407,7 +1709,11 @@ function MainApp() {
             switchRole(role);
             if (role === "driver") setLocation("/driver");
           }}
-          unreadNotificationCount={notificationList.filter((n: any) => !n.isRead && n.audience === "owner").length}
+          unreadNotificationCount={
+            notificationList.filter(
+              (n: any) => !n.isRead && n.audience === "owner",
+            ).length
+          }
         >
           <Switch>
             <Route path="/">
@@ -1444,8 +1750,14 @@ function MainApp() {
                 onOpenTripWizardWithRoute={(routeData) => {
                   if (routeData) {
                     setInitialEnquiryForTrip({
-                      pickup: routeData.pickup?.address || routeData.pickup?.name || routeData.pickup,
-                      destination: routeData.destination?.address || routeData.destination?.name || routeData.destination,
+                      pickup:
+                        routeData.pickup?.address ||
+                        routeData.pickup?.name ||
+                        routeData.pickup,
+                      destination:
+                        routeData.destination?.address ||
+                        routeData.destination?.name ||
+                        routeData.destination,
                       tripType: routeData.tripType || "round_trip",
                     });
                   } else {
@@ -1471,8 +1783,12 @@ function MainApp() {
               {(params) => {
                 const tripId = Number(params.id);
                 const currentTrip = tripList.find((t: any) => t.id === tripId);
-                const tripPayments = paymentList.filter((p: any) => p.tripId === tripId);
-                const tripExpenses = expenseList.filter((e: any) => e.tripId === tripId);
+                const tripPayments = paymentList.filter(
+                  (p: any) => p.tripId === tripId,
+                );
+                const tripExpenses = expenseList.filter(
+                  (e: any) => e.tripId === tripId,
+                );
                 return (
                   <TripDetailPage
                     trip={currentTrip}
@@ -1521,14 +1837,18 @@ function MainApp() {
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
-                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+                onOpenReceipt={(payment, trip) =>
+                  setReceiptPayment({ payment, trip })
+                }
               />
             </Route>
             <Route path="/refunds">
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
-                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+                onOpenReceipt={(payment, trip) =>
+                  setReceiptPayment({ payment, trip })
+                }
               />
             </Route>
             <Route path="/expenses">
@@ -1555,7 +1875,9 @@ function MainApp() {
             </Route>
             <Route path="/notifications">
               <NotificationsPage
-                notifications={notificationList.filter((n: any) => n.audience === "owner")}
+                notifications={notificationList.filter(
+                  (n: any) => n.audience === "owner",
+                )}
                 onMarkRead={handleMarkNotificationRead}
                 onMarkAllRead={handleMarkAllNotificationsRead}
               />
@@ -1586,7 +1908,9 @@ function MainApp() {
         defaultRate={settingsData.defaultRate || 18}
         defaultMinimumKm={settingsData.minimumKmPerDay || 250}
         defaultDriverBata={settingsData.driverBataPerDay || 500}
-        defaultBillingDayPolicy={settingsData.billingDayPolicy || "CALENDAR_DAYS"}
+        defaultBillingDayPolicy={
+          settingsData.billingDayPolicy || "CALENDAR_DAYS"
+        }
         initialEnquiry={initialEnquiryForTrip}
       />
 
