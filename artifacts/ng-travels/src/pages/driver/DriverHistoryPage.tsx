@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,7 +12,7 @@ export const DriverHistoryPage: React.FC = () => {
   const { data: trips = [], isLoading } = useQuery({
     queryKey: ["/api/driver/trips", "completed"],
     queryFn: async () => {
-      const res = await fetch("/api/driver/trips");
+      const res = await apiFetch("/api/driver/trips");
       if (!res.ok) return [];
       const data = await res.json();
       const list = Array.isArray(data) ? data : (Array.isArray((data as any)?.items) ? (data as any).items : []);

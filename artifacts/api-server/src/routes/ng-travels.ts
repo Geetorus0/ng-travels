@@ -16,15 +16,14 @@ import {
   vehiclesTable,
   driverLocationsTable,
   usersTable,
-  sessionsTable,
   type TripLocation,
   type RouteAlternative,
   type Vehicle,
   type Customer,
   type Trip,
 } from "@workspace/db";
-import { requireAuth, requireOwner, requireDriver, viewerFor, extractAuthToken } from "../middlewares/auth.js";
-import { hashPassword, verifyPassword, generateSessionToken } from "../lib/authCrypto.js";
+import { requireAuth, requireOwner, requireDriver, viewerFor } from "../middlewares/auth.js";
+import { supabaseServer } from "../lib/supabase.js";
 import {
   calculateFare,
   calculateCommercialFare,
@@ -318,107 +317,48 @@ function enrichVehicleWithAlerts(v: typeof vehiclesTable.$inferSelect) {
 }
 
 // =============================================================
-// AUTHENTICATION ROUTES (PRODUCTION READY WITH DATABASE VERIFICATION)
+// AUTHENTICATION ROUTES (SUPABASE AUTH)
 // =============================================================
 
+const DRIVER_AUTH_EMAIL_DOMAIN = "auth.ngtravels.internal";
+function driverAuthEmail(driverCode: string): string {
+  return `driver.${driverCode.toLowerCase()}@${DRIVER_AUTH_EMAIL_DOMAIN}`;
+}
+
 /**
- * Operations / Owner login with Email and Password
+ * Normalizes a mobile number to E.164 for the driver's Supabase Auth phone
+ * field (stored for reference only — driver sign-in is by password, not
+ * phone/SMS OTP). Assumes India (+91) when no country code is given,
+ * matching how driver mobiles are entered/stored elsewhere in this app.
  */
-router.post("/auth/login", async (req, res): Promise<void> => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    res.status(400).json({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message: "Email and password are required." },
-    });
-    return;
-  }
-
-  const cleanEmail = String(email).trim().toLowerCase();
-
-  try {
-    const users = await db
-      .select()
-      .from(usersTable)
-      .where(and(eq(usersTable.email, cleanEmail), eq(usersTable.status, "active")))
-      .limit(1);
-
-    if (users.length > 0) {
-      const user = users[0];
-
-      // Verify Password
-      if (user.passwordHash && verifyPassword(password, user.passwordHash)) {
-        // Generate Session Token
-        const token = generateSessionToken();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days validity
-
-        try {
-          await db.insert(sessionsTable).values({
-            token,
-            userId: user.id,
-            expiresAt,
-          });
-          await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
-        } catch {}
-
-        res.json({
-          success: true,
-          token,
-          user: {
-            id: user.id,
-            name: user.name,
-            fullName: user.name,
-            email: user.email,
-            phone: user.phone,
-            role: user.role,
-            driverId: user.driverId,
-          },
-        });
-        return;
-      }
-    }
-  } catch (err: any) {
-    console.warn("[auth] Database check error during login, verifying default credentials:", err?.message);
-  }
-
-  // Built-in operations admin credentials check (guarantees zero-lockout deployment on Vercel / Cloud)
-  if (cleanEmail === "admin@ngtravels.in" && password === "NGTravels@2026") {
-    const token = generateSessionToken();
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: 1,
-        name: "Operations Admin",
-        fullName: "Operations Admin",
-        email: "admin@ngtravels.in",
-        phone: "+91 98427 12345",
-        role: "owner",
-        driverId: null,
-      },
-    });
-    return;
-  }
-
-  res.status(401).json({
-    success: false,
-    error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password." },
-  });
-});
+function toE164(raw: string): string {
+  const trimmed = String(raw || "").trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (trimmed.startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return `+91${digits}`;
+  return `+${digits}`;
+}
 
 /**
- * Driver Partner login with Mobile / Driver Code and Password / PIN
+ * Owner/admin/manager authentication happens client-side via Supabase Auth
+ * directly (supabase.auth.signInWithPassword). This endpoint is intentionally
+ * not provided by the API server.
+ */
+
+/**
+ * Driver Partner login with Mobile / Driver Code and Password.
+ * Resolves the identifier to the driver's synthetic Supabase Auth email and
+ * exchanges the password for a real Supabase session via GoTrue.
  */
 router.post("/auth/driver-login", async (req, res): Promise<void> => {
-  const { identifier, mobile, driverCode, password, pin } = req.body;
-  const credential = String(password || pin || "").trim();
+  const { identifier, mobile, driverCode, password } = req.body;
+  const credential = String(password || "").trim();
   const rawId = String(identifier || driverCode || mobile || "").trim();
 
   if (!rawId || !credential) {
     res.status(400).json({
       success: false,
-      error: { code: "VALIDATION_ERROR", message: "Mobile/Driver Code and Password/PIN are required." },
+      error: { code: "VALIDATION_ERROR", message: "Mobile/Driver Code and password are required." },
     });
     return;
   }
@@ -426,9 +366,7 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
   const cleanMobile = rawId.replace(/\D/g, "");
   const cleanCode = rawId.toUpperCase();
 
-
   try {
-    // 1. Locate driver record
     const allDrivers = await db.select().from(driversTable);
     const driver = allDrivers.find(
       (d) =>
@@ -444,57 +382,29 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
       return;
     }
 
-    // 2. Locate driver user account
-    let users = await db
-      .select()
-      .from(usersTable)
-      .where(and(eq(usersTable.driverId, driver.id), eq(usersTable.status, "active")))
-      .limit(1);
-
-    if (users.length === 0) {
-      // Auto-provision driver user account if driver exists in fleet
-      const [newUser] = await db
-        .insert(usersTable)
-        .values({
-          name: driver.name,
-          email: driver.email,
-          phone: driver.mobile,
-          passwordHash: hashPassword(credential),
-          role: "driver",
-          driverId: driver.id,
-          status: "active",
-        })
-        .returning();
-      users = [newUser];
-    } else {
-      const user = users[0];
-      if (user.passwordHash && !verifyPassword(credential, user.passwordHash)) {
-        res.status(401).json({
-          success: false,
-          error: { code: "INVALID_CREDENTIALS", message: "Invalid driver PIN or password." },
-        });
-        return;
-      }
-    }
-
-    const user = users[0];
-    const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await db.insert(sessionsTable).values({
-      token,
-      userId: user.id,
-      expiresAt,
+    const { data, error } = await supabaseServer.auth.signInWithPassword({
+      email: driverAuthEmail(driver.driverCode),
+      password: credential,
     });
 
-    await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
+    if (error || !data?.session) {
+      res.status(401).json({
+        success: false,
+        error: { code: "INVALID_CREDENTIALS", message: "Invalid driver password." },
+      });
+      return;
+    }
+
+    await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.driverId, driver.id));
 
     res.json({
       success: true,
-      token,
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
       user: {
-        id: user.id,
-        name: driver.name,
         fullName: driver.name,
         mobile: driver.mobile,
         driverCode: driver.driverCode,
@@ -502,34 +412,231 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
         driverId: driver.id,
       },
     });
-    return;
   } catch (err: any) {
-    console.warn("[auth] Driver login DB check notice, verifying default credentials:", err?.message);
+    console.error("[auth] Driver login error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to process driver login right now." },
+    });
   }
+});
 
-  // Built-in default driver PIN check (guarantees zero-lockout deployment on Vercel / Cloud)
-  if ((cleanCode === "DRV-101" || cleanMobile.includes("9845011223")) && credential === "123456") {
-    const token = generateSessionToken();
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: 2,
-        name: "Suresh K (Pilot)",
-        fullName: "Suresh K",
-        mobile: "+91 98450 11223",
-        driverCode: "DRV-101",
-        role: "driver",
-        driverId: 1,
-      },
+/**
+ * Driver password reset request. Passwords are admin-managed (not self-service), so this
+ * just raises an owner-audience notification for the operations desk to act
+ * on; it always returns success to avoid leaking whether an identifier matched.
+ */
+router.post("/auth/driver-password-reset-request", async (req, res): Promise<void> => {
+  const { identifier, note } = req.body;
+  const rawId = String(identifier || "").trim();
+
+  if (!rawId) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Driver Code or Mobile number is required." },
     });
     return;
   }
 
-  res.status(401).json({
-    success: false,
-    error: { code: "INVALID_CREDENTIALS", message: "Invalid driver credentials or PIN." },
-  });
+  try {
+    const cleanMobile = rawId.replace(/\D/g, "");
+    const cleanCode = rawId.toUpperCase();
+    const allDrivers = await db.select().from(driversTable);
+    const driver = allDrivers.find(
+      (d) =>
+        (cleanMobile.length >= 7 && d.mobile.replace(/\D/g, "").includes(cleanMobile)) ||
+        (cleanCode && d.driverCode.toUpperCase() === cleanCode)
+    );
+
+    if (driver) {
+      const trimmedNote = String(note || "").trim();
+      await notify(
+        "Driver Password Reset Requested",
+        `${driver.name} (${driver.driverCode}) requested a password reset.${trimmedNote ? ` Note: ${trimmedNote}` : ""}`,
+        "password_reset_request",
+        undefined,
+        "owner",
+        driver.id,
+      );
+    }
+
+    // Always respond success — don't reveal whether the identifier matched a driver.
+    res.json({ success: true, message: "If a matching driver account was found, operations has been notified." });
+  } catch (err: any) {
+    console.error("[auth] Driver password reset request error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to submit the request right now." },
+    });
+  }
+});
+
+/**
+ * ADMIN DRIVER MANAGEMENT ROUTES
+ * =============================================================
+ */
+
+/**
+ * Create a new driver account with email and initial password
+ * Admin-only endpoint
+ */
+router.post("/admin/drivers", requireOwner, async (req, res): Promise<void> => {
+  const { name, driverCode, mobile, email, licenseNumber, licenseExpiry, emergencyContact, initialPassword } = req.body;
+
+  if (!name || !driverCode || !mobile || !email || !initialPassword) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Name, driver code, mobile, email, and initial password are required." },
+    });
+    return;
+  }
+
+  try {
+    // Driver sign-in (see /auth/driver-login) always looks the account up by
+    // the synthetic driver.<code>@auth.ngtravels.internal address, not the
+    // driver's real contact email — the real email is stored on the driver
+    // record for reference/notifications, not used as the auth identity.
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+      email: driverAuthEmail(driverCode.toUpperCase()),
+      phone: toE164(mobile),
+      password: initialPassword,
+      email_confirm: true,
+      phone_confirm: true,
+      user_metadata: {
+        full_name: name,
+        role: "driver",
+      },
+    });
+
+    if (authError || !authData?.user) {
+      res.status(400).json({
+        success: false,
+        error: { code: "AUTH_ERROR", message: authError?.message || "Failed to create auth account." },
+      });
+      return;
+    }
+
+    // Create driver record in database
+    const [driver] = await db
+      .insert(driversTable)
+      .values({
+        name,
+        driverCode: driverCode.toUpperCase(),
+        mobile,
+        email: email.toLowerCase().trim(),
+        licenseNumber: licenseNumber || null,
+        licenseExpiry: licenseExpiry || null,
+        emergencyContact: emergencyContact || null,
+        status: "active",
+      })
+      .returning();
+
+    // The handle_new_user() trigger already inserted a bare public.users row
+    // for this auth identity; link it to the driver record just created.
+    await db
+      .update(usersTable)
+      .set({
+        name,
+        email: email.toLowerCase().trim(),
+        phone: mobile,
+        role: "driver",
+        driverId: driver.id,
+        status: "active",
+      })
+      .where(eq(usersTable.authUserId, authData.user.id));
+
+    res.json({
+      success: true,
+      message: "Driver account created successfully.",
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        driverCode: driver.driverCode,
+        mobile: driver.mobile,
+        email: driver.email,
+      },
+    });
+  } catch (err: any) {
+    console.error("[admin] Create driver error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to create driver account." },
+    });
+  }
+});
+
+/**
+ * Reset a driver's password
+ * Admin-only endpoint
+ */
+router.post("/admin/drivers/:driverId/reset-password", requireOwner, async (req, res): Promise<void> => {
+  const { driverId } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "New password must be at least 6 characters." },
+    });
+    return;
+  }
+
+  try {
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, parseInt(driverId)));
+
+    if (!driver) {
+      res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Driver not found." },
+      });
+      return;
+    }
+
+    // Get the user record to find the auth user ID
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.driverId, parseInt(driverId)));
+
+    if (!user?.authUserId) {
+      res.status(400).json({
+        success: false,
+        error: { code: "NO_AUTH_USER", message: "Driver does not have an auth account." },
+      });
+      return;
+    }
+
+    // Update password in Supabase Auth
+    const { error: updateError } = await supabaseServer.auth.admin.updateUserById(user.authUserId, {
+      password: newPassword,
+    });
+
+    if (updateError) {
+      res.status(400).json({
+        success: false,
+        error: { code: "AUTH_ERROR", message: updateError.message || "Failed to reset password." },
+      });
+      return;
+    }
+
+    // Notify driver about password reset
+    await notify(
+      "Password Reset by Admin",
+      `Your driver password has been reset by the operations team. Please use your new password to login.`,
+      "password_reset",
+      user.id,
+      "driver",
+      driver.id,
+    );
+
+    res.json({
+      success: true,
+      message: `Password reset for driver ${driver.name} (${driver.driverCode})`,
+    });
+  } catch (err: any) {
+    console.error("[admin] Reset driver password error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to reset driver password." },
+    });
+  }
 });
 
 /**
@@ -550,15 +657,8 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     try {
       const [d] = await db.select().from(driversTable).where(eq(driversTable.id, viewer.driverId));
       driverDetails = d || null;
-    } catch {
-      driverDetails = {
-        id: 1,
-        driverCode: "DRV-101",
-        name: "Suresh K",
-        mobile: "+91 98450 11223",
-        status: "active",
-        availability: "available",
-      };
+    } catch (err) {
+      console.error("[auth] Failed to load driver details:", err);
     }
   }
 
@@ -572,17 +672,11 @@ router.get("/auth/me", async (req, res): Promise<void> => {
 });
 
 /**
- * Sign out and invalidate session token
+ * Sign out. Supabase Auth sessions are invalidated client-side via
+ * supabase.auth.signOut(); this endpoint is kept as a no-op for API
+ * compatibility.
  */
-router.post("/auth/logout", async (req, res): Promise<void> => {
-  const token = extractAuthToken(req);
-  if (token) {
-    try {
-      await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
-    } catch (err) {
-      console.error("[auth] Logout error:", err);
-    }
-  }
+router.post("/auth/logout", async (_req, res): Promise<void> => {
   res.json({ success: true, message: "Logged out successfully" });
 });
 
@@ -754,17 +848,31 @@ router.post("/drivers", requireOwner, async (req, res): Promise<void> => {
       })
       .returning();
 
-    // Auto-create user login for driver
+    // Provision a Supabase Auth identity for the driver (mobile/code + PIN login)
     const defaultPin = body.pin || "123456";
-    await db.insert(usersTable).values({
-      name: row.name,
-      email: row.email,
-      phone: row.mobile,
-      passwordHash: hashPassword(defaultPin),
-      role: "driver",
-      driverId: row.id,
-      status: "active",
-    });
+    try {
+      const { data: authUser, error: authError } = await supabaseServer.auth.admin.createUser({
+        email: driverAuthEmail(row.driverCode),
+        phone: toE164(row.mobile),
+        password: defaultPin,
+        email_confirm: true,
+        phone_confirm: true,
+        user_metadata: { role: "driver", full_name: row.name, driver_id: row.id },
+      });
+
+      if (authError || !authUser?.user) {
+        throw authError || new Error("Supabase did not return a user");
+      }
+
+      // The handle_new_user() trigger already inserted a bare public.users row
+      // for this auth identity; link it to the driver record just created.
+      await db
+        .update(usersTable)
+        .set({ driverId: row.id, name: row.name, phone: row.mobile, role: "driver", status: "active" })
+        .where(eq(usersTable.authUserId, authUser.user.id));
+    } catch (authErr: any) {
+      console.error("[drivers] Failed to provision Supabase Auth login for driver:", authErr);
+    }
 
     await writeAudit(req, "Created driver", "driver", row.id, null, row);
     broadcastRealtimeEvent("DRIVER_STATUS_CHANGED", row);

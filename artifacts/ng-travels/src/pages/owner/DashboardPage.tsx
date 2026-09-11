@@ -358,7 +358,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {activeTrips.map((trip) => (
+              {activeTrips.map((trip: any) => (
                 <div key={trip.id} className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -401,7 +401,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {upcomingTrips.slice(0, 4).map((trip) => (
+              {upcomingTrips.slice(0, 4).map((trip: any) => (
                 <div key={trip.id} className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -458,7 +458,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
-                  {pendingPaymentTrips.slice(0, 5).map((trip) => (
+                  {pendingPaymentTrips.slice(0, 5).map((trip: any) => (
                     <tr key={trip.id} className="hover:bg-zinc-800/40 transition-colors">
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-mono font-bold text-amber-400">
                         <Link href={`/trips/${trip.id}`} className="hover:underline">

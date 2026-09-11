@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,7 +12,7 @@ export const DriverVehiclePage: React.FC = () => {
   const { data: vehicle, isLoading } = useQuery({
     queryKey: ["/api/driver/vehicle"],
     queryFn: async () => {
-      const res = await fetch("/api/driver/vehicle");
+      const res = await apiFetch("/api/driver/vehicle");
       if (!res.ok) return null;
       return res.json();
     },

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
     if (!amount || Number(amount) <= 0) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/trips/${tripId}/expenses`, {
+      const res = await apiFetch(`/api/trips/${tripId}/expenses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

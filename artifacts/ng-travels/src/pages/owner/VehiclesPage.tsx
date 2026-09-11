@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -47,7 +48,7 @@ export const VehiclesPage: React.FC = () => {
     queryKey: ["/api/vehicles"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/vehicles");
+        const res = await apiFetch("/api/vehicles");
         if (!res.ok) return [];
         const json = await res.json();
         return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
@@ -66,7 +67,7 @@ export const VehiclesPage: React.FC = () => {
   const { data: drivers = [] } = useQuery({
     queryKey: ["/api/drivers"],
     queryFn: async () => {
-      const res = await fetch("/api/drivers");
+      const res = await apiFetch("/api/drivers");
       if (!res.ok) return [];
       return res.json();
     },
@@ -75,7 +76,7 @@ export const VehiclesPage: React.FC = () => {
   // Create Mutation
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const res = await fetch("/api/vehicles", {
+      const res = await apiFetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -96,7 +97,7 @@ export const VehiclesPage: React.FC = () => {
   // Update Mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: any }) => {
-      const res = await fetch(`/api/vehicles/${id}`, {
+      const res = await apiFetch(`/api/vehicles/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -137,6 +138,12 @@ export const VehiclesPage: React.FC = () => {
       maintenanceStatus: "good",
       notes: "",
     });
+  };
+
+  const handleOpenAdd = () => {
+    setEditingVehicle(null);
+    resetForm();
+    setAddModalOpen(true);
   };
 
   const handleOpenEdit = (v: any) => {

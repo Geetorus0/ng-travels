@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect, useRef } from "react";
 import {
   MapPin, Navigation, Plus, Trash2, IndianRupee, Clock, ArrowRight,
@@ -67,7 +68,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
     const timer = setTimeout(async () => {
       setSearchingPickup(true);
       try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
           signal: controller.signal,
         });
         const data = await res.json();
@@ -96,7 +97,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
     const timer = setTimeout(async () => {
       setSearchingDest(true);
       try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
           signal: controller.signal,
         });
         const data = await res.json();
@@ -147,7 +148,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
         tripType: tripType === "round" ? "round_trip" : "single_trip",
       };
 
-      const res = await fetch("/api/maps/routes", {
+      const res = await apiFetch("/api/maps/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

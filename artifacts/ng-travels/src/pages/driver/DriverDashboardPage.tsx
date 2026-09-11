@@ -19,11 +19,14 @@ interface DriverDashboardPageProps {
 export const DriverDashboardPage: React.FC<DriverDashboardPageProps> = ({
   todayTrips = [],
   currentTrip,
-  driver = { name: "Suresh K" },
+  driver: driverProp,
   onOpenStartKmModal,
   onOpenEndKmModal,
   onOpenExpenseModal,
 }) => {
+  // A plain default param doesn't cover an explicit `null` prop (only
+  // `undefined`), and the driver profile query can briefly resolve to null.
+  const driver = driverProp || { name: "Driver Pilot" };
   const activeTrip = currentTrip || todayTrips[0];
   const completedToday = todayTrips.filter((t) => t.status === "completed").length;
 

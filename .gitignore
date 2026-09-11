@@ -54,6 +54,7 @@ apks/
 dist-apk/
 
 # Local Environment & Secrets
+.env
 .env.local
 .env.*.local
 .netlify

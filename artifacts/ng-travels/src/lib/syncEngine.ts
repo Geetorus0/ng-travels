@@ -3,9 +3,11 @@
 // Supports:
 // 1. Real-Time Remote Cloud/LAN Cross-Device Sync (Owner & Driver APKs)
 // 2. Real-Time Server-Sent Events (SSE) Stream
-// 3. Automatic JWT / Session Token Injection
+// 3. Automatic Supabase Auth Token Injection
 // 4. Mobile / Web Unified Fetch Routing
 // =============================================================
+
+import { supabase } from "@/lib/supabase/client";
 
 export type SyncMode = "remote";
 export type ConnectionStatus = "connected" | "connecting" | "offline";
@@ -269,16 +271,17 @@ class SyncEngine {
         targetUrl = `${this.serverUrl}${urlStr}`;
       }
 
-      // Attach Authentication Token from localStorage
-      const token = localStorage.getItem("ng_auth_token");
-      const userRole = localStorage.getItem("ng_user_role") || "owner";
-
+      // Attach the current Supabase Auth access token, if signed in
       const existingHeaders = new Headers(init?.headers);
-      if (token && !existingHeaders.has("Authorization")) {
-        existingHeaders.set("Authorization", `Bearer ${token}`);
-      }
-      if (!existingHeaders.has("x-user-role")) {
-        existingHeaders.set("x-user-role", userRole);
+      if (!existingHeaders.has("Authorization")) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            existingHeaders.set("Authorization", `Bearer ${session.access_token}`);
+          }
+        } catch (err) {
+          console.warn("[SyncEngine] Unable to read Supabase session for request auth:", err);
+        }
       }
 
       const controller = new AbortController();

@@ -21,12 +21,6 @@ export function useRealtimeSync() {
     try {
       supabaseChannel = supabase
         .channel("ng_travels_realtime_changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-          queryClient.invalidateQueries({ queryKey: ["trips"] });
-          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-        })
         .on("postgres_changes", { event: "*", schema: "public", table: "trips" }, () => {
           queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
           queryClient.invalidateQueries({ queryKey: ["/api/driver/today"] });
@@ -49,7 +43,7 @@ export function useRealtimeSync() {
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
           queryClient.invalidateQueries({ queryKey: ["payments"] });
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => {
+        .on("postgres_changes", { event: "*", schema: "public", table: "trip_expenses" }, () => {
           queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
           queryClient.invalidateQueries({ queryKey: ["expenses"] });
         })

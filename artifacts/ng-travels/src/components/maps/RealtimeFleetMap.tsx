@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -377,7 +378,7 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
     const pollLiveGps = async () => {
       if (activeTrip?.id) {
         try {
-          const res = await fetch(`/api/trips/${activeTrip.id}/live-location`);
+          const res = await apiFetch(`/api/trips/${activeTrip.id}/live-location`);
           if (res.ok) {
             const data = await res.json();
             setTelemetry({

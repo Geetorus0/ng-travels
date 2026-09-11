@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -118,7 +119,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     queryKey: ["/api/vehicles"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/vehicles");
+        const res = await apiFetch("/api/vehicles");
         if (!res.ok) return [];
         const json = await res.json();
         return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
@@ -144,7 +145,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     const timer = setTimeout(async () => {
       setSearchingPickup(true);
       try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
           signal: controller.signal,
         });
         const data = await res.json();
@@ -171,7 +172,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     const timer = setTimeout(async () => {
       setSearchingDest(true);
       try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
           signal: controller.signal,
         });
         const data = await res.json();
@@ -198,7 +199,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     try {
       const pLoc = pickupLocation || { name: pickupInput, address: pickupInput };
       const dLoc = destLocation || { name: destInput, address: destInput };
-      const res = await fetch("/api/maps/routes", {
+      const res = await apiFetch("/api/maps/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -339,7 +340,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       let customerId = selectedCustomerId;
 
       if (isCreatingNewCustomer) {
-        const custRes = await fetch("/api/customers", {
+        const custRes = await apiFetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -402,7 +403,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         paymentReference,
       };
 
-      const res = await fetch("/api/trips", {
+      const res = await apiFetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

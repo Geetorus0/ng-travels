@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Navigation, Phone, MapPin, Gauge, CheckCircle2, Clock, Map,
@@ -57,7 +58,7 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
       });
 
       try {
-        await fetch(`/api/driver/trips/${trip.id}/location`, {
+        await apiFetch(`/api/driver/trips/${trip.id}/location`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/trips/${trip.id}/payments`, {
+      const res = await apiFetch(`/api/trips/${trip.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

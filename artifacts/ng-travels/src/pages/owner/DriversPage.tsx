@@ -1,14 +1,70 @@
-import React from "react";
-import { Car, Phone, Mail, Award, CheckCircle2, AlertCircle, Clock, ShieldCheck, Plus } from "lucide-react";
+import React, { useState } from "react";
+import { Car, Phone, Mail, Award, CheckCircle2, AlertCircle, Clock, ShieldCheck, Plus, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DriverManagementModal, CreateDriverData } from "@/components/admin/DriverManagementModal";
 
 interface DriversPageProps {
   drivers: any[];
   onUpdateAvailability?: (driverId: number, availability: string) => void;
+  authToken?: string;
 }
 
-export const DriversPage: React.FC<DriversPageProps> = ({ drivers = [], onUpdateAvailability }) => {
+export const DriversPage: React.FC<DriversPageProps> = ({ drivers = [], onUpdateAvailability, authToken }) => {
+  const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const driverList = Array.isArray(drivers) ? drivers : (Array.isArray((drivers as any)?.items) ? (drivers as any).items : []);
+
+  const handleCreateDriver = async (data: CreateDriverData) => {
+    setModalLoading(true);
+    try {
+      const response = await fetch("/api/admin/drivers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to create driver (${response.status})`);
+      }
+
+      // Trigger a refresh of the drivers list if needed
+      window.location.reload();
+    } catch (err: any) {
+      throw err;
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (driverId: number, newPassword: string) => {
+    setModalLoading(true);
+    try {
+      const response = await fetch(`/api/admin/drivers/${driverId}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to reset password (${response.status})`);
+      }
+
+      // Trigger a refresh of the drivers list if needed
+      window.location.reload();
+    } catch (err: any) {
+      throw err;
+    } finally {
+      setModalLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -22,7 +78,22 @@ export const DriversPage: React.FC<DriversPageProps> = ({ drivers = [], onUpdate
             Fleet operators, commercial license credentials, active duty statuses, and performance ratings.
           </p>
         </div>
+        <Button
+          onClick={() => setIsManagementModalOpen(true)}
+          className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold shrink-0"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Manage Drivers
+        </Button>
       </div>
+
+      <DriverManagementModal
+        isOpen={isManagementModalOpen}
+        onClose={() => setIsManagementModalOpen(false)}
+        onCreateDriver={handleCreateDriver}
+        onResetPassword={handleResetPassword}
+        drivers={driverList}
+      />
 
       {driverList.length === 0 ? (
         <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
