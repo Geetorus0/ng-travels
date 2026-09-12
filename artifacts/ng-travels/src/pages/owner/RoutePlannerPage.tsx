@@ -2,13 +2,14 @@ import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect, useRef } from "react";
 import {
   MapPin, Navigation, Plus, Trash2, IndianRupee, Clock, ArrowRight,
-  Sparkles, Compass, ShieldCheck, Car, Search, AlertCircle, CheckCircle2, RotateCcw
+  Sparkles, Compass, ShieldCheck, Car, AlertCircle, CheckCircle2, RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/fareEngine";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 import { ButtonLoader } from "@/components/loading";
+import { LocationPicker } from "@/components/trips/LocationPicker";
 
 interface RoutePlannerPageProps {
   onOpenTripWizardWithRoute?: (routeData: any) => void;
@@ -29,13 +30,9 @@ interface PlaceSuggestion {
 export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWizardWithRoute }) => {
   const [pickupInput, setPickupInput] = useState("");
   const [selectedPickup, setSelectedPickup] = useState<PlaceSuggestion | null>(null);
-  const [pickupSuggestions, setPickupSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [searchingPickup, setSearchingPickup] = useState(false);
 
   const [destInput, setDestInput] = useState("");
   const [selectedDest, setSelectedDest] = useState<PlaceSuggestion | null>(null);
-  const [destSuggestions, setDestSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [searchingDest, setSearchingDest] = useState(false);
 
   const [stops, setStops] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,64 +54,6 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
   const [estimatedToll, setEstimatedToll] = useState<number>(0);
 
   const reqIdRef = useRef(0);
-
-  // Debounced autocomplete for Pickup
-  useEffect(() => {
-    if (!pickupInput || pickupInput.length < 2) {
-      setPickupSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingPickup(true);
-      try {
-        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setPickupSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          setPickupSuggestions([]);
-        }
-      } finally {
-        setSearchingPickup(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [pickupInput]);
-
-  // Debounced autocomplete for Destination
-  useEffect(() => {
-    if (!destInput || destInput.length < 2) {
-      setDestSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingDest(true);
-      try {
-        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setDestSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          setDestSuggestions([]);
-        }
-      } finally {
-        setSearchingDest(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [destInput]);
 
   // Calculate Real Driving Route
   const handleCalculate = async () => {
@@ -193,16 +132,12 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
 
   const selected = routes[selectedRouteIdx] || routes[0];
 
-  const handleSelectPickup = (p: PlaceSuggestion) => {
+  const handleSelectPickup = (p: any) => {
     setSelectedPickup(p);
-    setPickupInput(p.formattedAddress || p.name);
-    setPickupSuggestions([]);
   };
 
-  const handleSelectDest = (p: PlaceSuggestion) => {
+  const handleSelectDest = (p: any) => {
     setSelectedDest(p);
-    setDestInput(p.formattedAddress || p.name);
-    setDestSuggestions([]);
   };
 
   return (
@@ -274,53 +209,24 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
             </div>
           </div>
 
-          {/* Pickup Autocomplete */}
-          <div className="relative">
-            <label className="text-[11px] text-emerald-400 font-bold uppercase block mb-1 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" /> Origin / Pickup Location
-            </label>
-            <div className="relative">
-              <Input
-                value={pickupInput}
-                onChange={(e) => {
-                  setPickupInput(e.target.value);
-                  setSelectedPickup(null);
-                }}
-                placeholder="Type pickup place, city, or airport (e.g. Bengaluru, Indiranagar)..."
-                className="bg-zinc-950 border-zinc-800 text-xs h-10 pr-8"
-              />
-              {searchingPickup && (
-                <div className="absolute right-2.5 top-2.5">
-                  <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+          {/* Pickup Location */}
+          <LocationPicker
+            label="Origin / Pickup Location"
+            accent="emerald"
+            searchPlaceholder="Type pickup place, city, or airport (e.g. Bengaluru, Indiranagar)..."
+            value={pickupInput}
+            onInputChange={(text) => {
+              setPickupInput(text);
+              setSelectedPickup(null);
+            }}
+            onSelect={handleSelectPickup}
+          />
+          {selectedPickup && (
+            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Verified: {selectedPickup.lat.toFixed(4)}, {selectedPickup.lng.toFixed(4)}</span>
             </div>
-
-            {selectedPickup && (
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Verified: {selectedPickup.lat.toFixed(4)}, {selectedPickup.lng.toFixed(4)}</span>
-              </div>
-            )}
-
-            {pickupSuggestions.length > 0 && (
-              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-zinc-800">
-                {pickupSuggestions.map((s, idx) => (
-                  <div
-                    key={s.placeId || idx}
-                    onClick={() => handleSelectPickup(s)}
-                    className="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs transition-colors"
-                  >
-                    <div className="font-bold text-zinc-200 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                      <span>{s.name}</span>
-                    </div>
-                    <div className="text-[10px] text-zinc-400 truncate pl-5">{s.formattedAddress}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Intermediate Stops */}
           <div className="space-y-2">
@@ -351,53 +257,24 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
             ))}
           </div>
 
-          {/* Destination Autocomplete */}
-          <div className="relative">
-            <label className="text-[11px] text-amber-400 font-bold uppercase block mb-1 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Destination Dropoff Point
-            </label>
-            <div className="relative">
-              <Input
-                value={destInput}
-                onChange={(e) => {
-                  setDestInput(e.target.value);
-                  setSelectedDest(null);
-                }}
-                placeholder="Type destination city or landmark (e.g. Mysore Palace, Ooty, Chennai)..."
-                className="bg-zinc-950 border-zinc-800 text-xs h-10 pr-8"
-              />
-              {searchingDest && (
-                <div className="absolute right-2.5 top-2.5">
-                  <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+          {/* Destination */}
+          <LocationPicker
+            label="Destination Dropoff Point"
+            accent="amber"
+            searchPlaceholder="Type destination city or landmark (e.g. Mysore Palace, Ooty, Chennai)..."
+            value={destInput}
+            onInputChange={(text) => {
+              setDestInput(text);
+              setSelectedDest(null);
+            }}
+            onSelect={handleSelectDest}
+          />
+          {selectedDest && (
+            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-amber-400 font-mono">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Verified: {selectedDest.lat.toFixed(4)}, {selectedDest.lng.toFixed(4)}</span>
             </div>
-
-            {selectedDest && (
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-amber-400 font-mono">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Verified: {selectedDest.lat.toFixed(4)}, {selectedDest.lng.toFixed(4)}</span>
-              </div>
-            )}
-
-            {destSuggestions.length > 0 && (
-              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-zinc-800">
-                {destSuggestions.map((s, idx) => (
-                  <div
-                    key={s.placeId || idx}
-                    onClick={() => handleSelectDest(s)}
-                    className="p-2.5 hover:bg-zinc-900 cursor-pointer text-xs transition-colors"
-                  >
-                    <div className="font-bold text-zinc-200 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      <span>{s.name}</span>
-                    </div>
-                    <div className="text-[10px] text-zinc-400 truncate pl-5">{s.formattedAddress}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Calculate CTA */}
           <Button

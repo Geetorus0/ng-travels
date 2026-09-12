@@ -31,7 +31,7 @@ import {
   calculateCompanyProfit,
   validateOdometer,
 } from "../lib/financialEngine.js";
-import { searchPlaces, calculateRouteJourney } from "../lib/routeService.js";
+import { searchPlaces, calculateRouteJourney, reverseGeocode, resolveLocationInput } from "../lib/routeService.js";
 import { addRealtimeClient, broadcastRealtimeEvent } from "../lib/realtime.js";
 import {
   memDrivers,
@@ -582,7 +582,7 @@ router.post("/admin/drivers/:driverId/reset-password", requireOwner, async (req,
   }
 
   try {
-    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, parseInt(driverId)));
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, parseInt(String(driverId))));
 
     if (!driver) {
       res.status(404).json({
@@ -593,7 +593,7 @@ router.post("/admin/drivers/:driverId/reset-password", requireOwner, async (req,
     }
 
     // Get the user record to find the auth user ID
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.driverId, parseInt(driverId)));
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.driverId, parseInt(String(driverId))));
 
     if (!user?.authUserId) {
       res.status(400).json({
@@ -1256,6 +1256,75 @@ router.get("/maps/places/autocomplete", async (req, res): Promise<void> => {
   }
 });
 
+/**
+ * Reverse geocode a map pin (or any lat/lng) into a human-readable place.
+ */
+router.get("/maps/reverse-geocode", async (req, res): Promise<void> => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    res.status(400).json({ error: "Valid lat and lng query parameters are required" });
+    return;
+  }
+
+  try {
+    const place = await reverseGeocode(lat, lng);
+    res.json(
+      place || {
+        placeId: `geo_${lat}_${lng}`,
+        name: "Pinned Location",
+        formattedAddress: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        latitude: lat,
+        longitude: lng,
+        lat,
+        lng,
+      },
+    );
+  } catch (err: any) {
+    console.error("[maps/reverse-geocode] Error:", err);
+    res.status(500).json({ error: "Unable to reverse geocode this location." });
+  }
+});
+
+/**
+ * Resolve a pasted Google Maps URL (including shortened links) or a plain
+ * "latitude, longitude" string into a usable place — for the pickup/drop
+ * "Map / URL / Coordinates" location entry option.
+ */
+router.post("/maps/resolve-location", async (req, res): Promise<void> => {
+  const input = String(req.body?.input || "").trim();
+  if (!input) {
+    res.status(400).json({ error: "input (a Google Maps URL or 'latitude, longitude') is required" });
+    return;
+  }
+
+  try {
+    const coords = await resolveLocationInput(input);
+    if (!coords) {
+      res.status(400).json({
+        error: "Could not find coordinates in that text. Paste a Google Maps link or 'latitude, longitude'.",
+      });
+      return;
+    }
+
+    const place = await reverseGeocode(coords.lat, coords.lng);
+    res.json(
+      place || {
+        placeId: `geo_${coords.lat}_${coords.lng}`,
+        name: "Pinned Location",
+        formattedAddress: `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        lat: coords.lat,
+        lng: coords.lng,
+      },
+    );
+  } catch (err: any) {
+    console.error("[maps/resolve-location] Error:", err);
+    res.status(500).json({ error: "Unable to resolve that location." });
+  }
+});
+
 router.post("/maps/routes", async (req, res): Promise<void> => {
   try {
     const { pickup, destination, stops = [], tripType = "single_trip", options = {} } = req.body;
@@ -1266,9 +1335,12 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
 
     const journey = await calculateRouteJourney(pickup, destination, stops, tripType, options);
 
-    const tollStatus = journey.tollAvailable && journey.estimatedToll != null
-      ? "Estimated from Routes API"
-      : "Unavailable / At Actuals";
+    const tollStatus =
+      journey.tollSource === "google_routes"
+        ? "Estimated from Routes API"
+        : journey.tollSource === "nhai_open_dataset"
+          ? "Estimated from NHAI toll-plaza open data"
+          : "Unavailable / At Actuals";
 
     res.json({
       provider: journey.provider,
@@ -1288,6 +1360,8 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
       apiEstimatedToll: journey.estimatedToll || 0,
       tollAvailable: journey.tollAvailable,
       tollStatus,
+      tollSource: journey.tollSource,
+      tollPlazas: journey.tollPlazas,
       routes: journey.alternatives,
       outbound: journey.outbound,
       return: journey.return,

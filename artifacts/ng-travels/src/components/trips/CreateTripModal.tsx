@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LocationPicker } from "@/components/trips/LocationPicker";
 import {
   calculateCommercialFare,
   calculateBillableDays,
@@ -13,7 +14,7 @@ import {
   formatKM,
 } from "@/lib/fareEngine";
 import {
-  User, Calendar, MapPin, Navigation, IndianRupee, ShieldCheck, CheckCircle2,
+  User, Calendar, Navigation, IndianRupee, ShieldCheck, CheckCircle2,
   Plus, Trash2, ArrowRight, ArrowLeft, Sparkles, AlertTriangle,
   Clock, Car, Search, Calculator, Receipt, CreditCard
 } from "lucide-react";
@@ -77,13 +78,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   // Step 3: Route & Direct Distance (Zero autofill)
   const [pickupInput, setPickupInput] = useState("");
   const [pickupLocation, setPickupLocation] = useState<any>(null);
-  const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
-  const [searchingPickup, setSearchingPickup] = useState(false);
-
   const [destInput, setDestInput] = useState("");
   const [destLocation, setDestLocation] = useState<any>(null);
-  const [destSuggestions, setDestSuggestions] = useState<any[]>([]);
-  const [searchingDest, setSearchingDest] = useState(false);
 
   const [stops, setStops] = useState<{ name: string; address: string }[]>([]);
   const [stopInput, setStopInput] = useState("");
@@ -134,60 +130,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     : Array.isArray((rawVehicles as any)?.items)
     ? (rawVehicles as any).items
     : [];
-
-  // Autocomplete for Pickup (debounced)
-  useEffect(() => {
-    if (!pickupInput || pickupInput.length < 2) {
-      setPickupSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingPickup(true);
-      try {
-        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setPickupSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") setPickupSuggestions([]);
-      } finally {
-        setSearchingPickup(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [pickupInput]);
-
-  // Autocomplete for Destination (debounced)
-  useEffect(() => {
-    if (!destInput || destInput.length < 2) {
-      setDestSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingDest(true);
-      try {
-        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setDestSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") setDestSuggestions([]);
-      } finally {
-        setSearchingDest(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [destInput]);
 
   // Optional: Auto-Estimate Distance from Driving Network in background
   const handleAutoEstimateDistance = async () => {
@@ -725,73 +667,33 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
 
                 {/* Pickup & Destination Inputs (Zero autofill) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" /> Pickup Location *
-                    </label>
-                    <Input
-                      placeholder="Type pickup place (e.g. Kempegowda Airport, Indiranagar, MG Road)..."
-                      value={pickupInput}
-                      onChange={(e) => {
-                        setPickupInput(e.target.value);
-                        setPickupLocation(null);
-                      }}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500"
-                    />
-                    {searchingPickup && <span className="text-[10px] text-zinc-500 absolute right-3 top-9">Searching...</span>}
-                    {pickupSuggestions.length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 top-16 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
-                        {pickupSuggestions.map((place, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setPickupInput(place.formattedAddress || place.name);
-                              setPickupLocation(place);
-                              setPickupSuggestions([]);
-                            }}
-                            className="p-2.5 hover:bg-zinc-800 text-xs text-zinc-200 cursor-pointer border-b border-zinc-800/60 last:border-0"
-                          >
-                            <div className="font-semibold">{place.name}</div>
-                            <div className="text-[10px] text-zinc-400 truncate">{place.formattedAddress}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <LocationPicker
+                    label="Pickup Location *"
+                    accent="emerald"
+                    searchPlaceholder="Type pickup place (e.g. Kempegowda Airport, Indiranagar, MG Road)..."
+                    value={pickupInput}
+                    onInputChange={(text) => {
+                      setPickupInput(text);
+                      setPickupLocation(null);
+                    }}
+                    onSelect={(place) => {
+                      setPickupLocation(place);
+                    }}
+                  />
 
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" /> Destination *
-                    </label>
-                    <Input
-                      placeholder="Type destination (e.g. Mysore Palace, Ooty, Coorg, Chennai Central)..."
-                      value={destInput}
-                      onChange={(e) => {
-                        setDestInput(e.target.value);
-                        setDestLocation(null);
-                      }}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500"
-                    />
-                    {searchingDest && <span className="text-[10px] text-zinc-500 absolute right-3 top-9">Searching...</span>}
-                    {destSuggestions.length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 top-16 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
-                        {destSuggestions.map((place, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setDestInput(place.formattedAddress || place.name);
-                              setDestLocation(place);
-                              setDestSuggestions([]);
-                            }}
-                            className="p-2.5 hover:bg-zinc-800 text-xs text-zinc-200 cursor-pointer border-b border-zinc-800/60 last:border-0"
-                          >
-                            <div className="font-semibold">{place.name}</div>
-                            <div className="text-[10px] text-zinc-400 truncate">{place.formattedAddress}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <LocationPicker
+                    label="Destination *"
+                    accent="amber"
+                    searchPlaceholder="Type destination (e.g. Mysore Palace, Ooty, Coorg, Chennai Central)..."
+                    value={destInput}
+                    onInputChange={(text) => {
+                      setDestInput(text);
+                      setDestLocation(null);
+                    }}
+                    onSelect={(place) => {
+                      setDestLocation(place);
+                    }}
+                  />
                 </div>
 
                 {/* Intermediate Stops */}
