@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LocationPicker } from "@/components/trips/LocationPicker";
+import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 import {
   calculateCommercialFare,
   calculateBillableDays,
@@ -27,8 +28,6 @@ export interface CreateTripModalProps {
   customers: any[];
   drivers: any[];
   defaultRate?: number;
-  defaultMinimumKm?: number;
-  defaultDriverBata?: number;
   defaultBillingDayPolicy?: "CALENDAR_DAYS" | "24_HOUR_PERIODS";
   initialEnquiry?: any;
 }
@@ -48,8 +47,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   customers,
   drivers,
   defaultRate = 18,
-  defaultMinimumKm = 250,
-  defaultDriverBata = 500,
   defaultBillingDayPolicy = "CALENDAR_DAYS",
   initialEnquiry,
 }) => {
@@ -90,10 +87,17 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const [returnKm, setReturnKm] = useState<number>(0);
   const [calculatingDistance, setCalculatingDistance] = useState(false);
 
+  // Route preview: driving polyline, duration & toll status returned by /api/maps/routes
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [outboundCoordinates, setOutboundCoordinates] = useState<[number, number][]>([]);
+  const [returnCoordinates, setReturnCoordinates] = useState<[number, number][]>([]);
+  const [outboundDurationMinutes, setOutboundDurationMinutes] = useState(0);
+  const [returnDurationMinutes, setReturnDurationMinutes] = useState(0);
+  const [estimatedToll, setEstimatedToll] = useState(0);
+  const [tollStatus, setTollStatus] = useState("");
+
   // Step 4: Commercial Pricing Parameters
   const [ratePerKm, setRatePerKm] = useState(defaultRate);
-  const [minimumKmPerDay, setMinimumKmPerDay] = useState(defaultMinimumKm);
-  const [driverBataPerDay, setDriverBataPerDay] = useState(defaultDriverBata);
   const [nightBata, setNightBata] = useState(0);
   const [finalToll, setFinalToll] = useState(0);
   const [parking, setParking] = useState(0);
@@ -164,6 +168,13 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             setFinalToll(data.estimatedToll);
           }
         }
+        setRouteCoordinates(data.routeCoordinates || []);
+        setOutboundCoordinates(data.outboundCoordinates || []);
+        setReturnCoordinates(data.returnCoordinates || []);
+        setOutboundDurationMinutes(Number(data.outboundDurationMinutes || 0));
+        setReturnDurationMinutes(Number(data.returnDurationMinutes || 0));
+        setEstimatedToll(Number(data.estimatedToll || 0));
+        setTollStatus(data.tollStatus || "");
       }
     } catch (err) {
       console.warn("Background distance calculation unavailable, enter KM manually:", err);
@@ -196,11 +207,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setRatePerKm(defaultRate);
-      setMinimumKmPerDay(defaultMinimumKm);
-      setDriverBataPerDay(defaultDriverBata);
       setBillingDayPolicy(defaultBillingDayPolicy);
     }
-  }, [isOpen, defaultRate, defaultMinimumKm, defaultDriverBata, defaultBillingDayPolicy]);
+  }, [isOpen, defaultRate, defaultBillingDayPolicy]);
 
   // 100% Dynamic, Authoritative Commercial Fare Calculation
   const isRound = tripType.toLowerCase().includes("round");
@@ -218,8 +227,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     startTime,
     returnTime,
     billingDayPolicy,
-    minimumKmPerDay: isRound ? minimumKmPerDay : 0,
-    driverBataPerDay: isRound ? driverBataPerDay : 0,
+    minimumKmPerDay: 0,
+    driverBataPerDay: 0,
     nightBata,
     permitCharge,
     toll: finalToll,
@@ -327,8 +336,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         estimatedToll: finalToll,
         billingKm: commercialFare.totalBillableDistance,
         ratePerKm,
-        minimumKmPerDay: isRound ? minimumKmPerDay : 0,
-        driverBataPerDay: isRound ? driverBataPerDay : 0,
+        minimumKmPerDay: 0,
+        driverBataPerDay: 0,
         nightBata,
         billingDayPolicy,
         finalToll,
@@ -640,7 +649,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               </div>
             )}
 
-            {/* STEP 3: ROUTE & DIRECT DISTANCE (No Map - 100% Dynamic & Editable) */}
+            {/* STEP 3: ROUTE & DIRECT DISTANCE (Map preview + 100% Dynamic & Editable) */}
             {step === 3 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -736,6 +745,30 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   )}
                 </div>
 
+                {/* Route & Toll Map Preview (Google Maps-style, driving polyline + live toll estimate) */}
+                {pickupInput.trim() && destInput.trim() && (
+                  <RealtimeFleetMap
+                    pickup={pickupLocation || { name: pickupInput }}
+                    destination={destLocation || { name: destInput }}
+                    stops={stops}
+                    tripType={tripType}
+                    height="300px"
+                    showLiveTelemetry
+                    showRoutePolyline
+                    interactive
+                    billingKm={distanceKm}
+                    totalMapKm={distanceKm}
+                    outboundDistanceKm={outboundKm}
+                    returnDistanceKm={returnKm}
+                    outboundDurationMinutes={outboundDurationMinutes}
+                    returnDurationMinutes={returnDurationMinutes}
+                    routeCoordinates={routeCoordinates}
+                    outboundCoordinates={outboundCoordinates}
+                    returnCoordinates={returnCoordinates}
+                    estimatedToll={estimatedToll || finalToll}
+                  />
+                )}
+
                 {/* Direct Editable Road Distance & Billing KM */}
                 <div className="bg-card/60 p-4 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-950/10 space-y-3">
                   <div className="flex items-center justify-between">
@@ -797,7 +830,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                       Commercial Pricing Engine & Transparent Calculation
                     </h3>
                     <p className="text-[11px] text-muted-foreground">
-                      100% dynamic distance-rate calculation with minimum KM policy, driver bata, state permits, and real tolls.
+                      100% dynamic distance-rate calculation with state permits and real tolls.
                     </p>
                   </div>
                 </div>
@@ -821,29 +854,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                       </div>
                       {isRound && (
                         <div>
-                          <label className="text-[11px] text-foreground block mb-1">Min KM / Day *</label>
-                          <Input
-                            type="number"
-                            value={minimumKmPerDay}
-                            onChange={(e) => setMinimumKmPerDay(Number(e.target.value))}
-                            className="bg-card border-border text-xs h-9 font-mono"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {isRound && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] text-foreground block mb-1">Driver Bata / Day (₹)</label>
-                          <Input
-                            type="number"
-                            value={driverBataPerDay}
-                            onChange={(e) => setDriverBataPerDay(Number(e.target.value))}
-                            className="bg-card border-border text-xs h-9 font-mono"
-                          />
-                        </div>
-                        <div>
                           <label className="text-[11px] text-foreground block mb-1">Night Bata (₹)</label>
                           <Input
                             type="number"
@@ -852,8 +862,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                             className="bg-card border-border text-xs h-9 font-mono"
                           />
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -920,9 +930,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <span>Base Distance Fare:</span>
                         <span className="font-mono text-foreground">{formatINR(baseFare)}</span>
                       </div>
-                      {isRound && (
+                      {isRound && nightBata > 0 && (
                         <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Driver Bata ({billableDays} Days):</span>
+                          <span>Night Bata:</span>
                           <span className="font-mono text-foreground">{formatINR(commercialFare.driverBata)}</span>
                         </div>
                       )}

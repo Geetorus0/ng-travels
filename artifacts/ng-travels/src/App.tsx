@@ -1965,8 +1965,6 @@ function MainApp() {
         customers={customerList}
         drivers={driverList}
         defaultRate={settingsData.defaultRate || 18}
-        defaultMinimumKm={settingsData.minimumKmPerDay || 250}
-        defaultDriverBata={settingsData.driverBataPerDay || 500}
         defaultBillingDayPolicy={
           settingsData.billingDayPolicy || "CALENDAR_DAYS"
         }

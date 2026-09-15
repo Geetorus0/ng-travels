@@ -82165,17 +82165,25 @@ async function viewerFor(req) {
   }
   const token = extractAuthToken(req);
   if (!token) {
+    console.warn(`[auth] ${req.method} ${req.originalUrl}: 401 \u2014 no Authorization bearer token on request`);
     req.viewer = null;
     return null;
   }
   try {
     const { data, error: error61 } = await supabaseServer.auth.getUser(token);
     if (error61 || !data?.user) {
+      console.warn(`[auth] ${req.method} ${req.originalUrl}: 401 \u2014 Supabase rejected the token: ${error61?.message || "no user in response"}`);
       req.viewer = null;
       return null;
     }
     const rows = await db.select().from(usersTable).where(eq(usersTable.authUserId, data.user.id)).limit(1);
-    if (rows.length === 0 || rows[0].status !== "active") {
+    if (rows.length === 0) {
+      console.warn(`[auth] ${req.method} ${req.originalUrl}: 401 \u2014 no users row with authUserId=${data.user.id} (Supabase auth user ${data.user.email || data.user.id} has no linked app account)`);
+      req.viewer = null;
+      return null;
+    }
+    if (rows[0].status !== "active") {
+      console.warn(`[auth] ${req.method} ${req.originalUrl}: 401 \u2014 user id=${rows[0].id} (${rows[0].email}) has status="${rows[0].status}", not "active"`);
       req.viewer = null;
       return null;
     }
