@@ -74120,7 +74120,12 @@ var isRemote = Boolean(
 var pool = new Pool3({
   connectionString,
   ssl: isRemote ? { rejectUnauthorized: false } : void 0,
-  connectionTimeoutMillis: 5e3
+  connectionTimeoutMillis: 5e3,
+  keepAlive: true,
+  idleTimeoutMillis: 3e4
+});
+pool.on("error", (err) => {
+  console.error("[db] Unexpected error on idle client:", err.message);
 });
 var db = drizzle(pool, { schema: schema_exports });
 
@@ -82917,263 +82922,6 @@ setInterval(() => {
 var todayStr = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata"
 }).format(/* @__PURE__ */ new Date());
-var memDrivers = [
-  {
-    id: 1,
-    driverCode: "DRV-101",
-    name: "Suresh K",
-    mobile: "+91 98450 11223",
-    email: "suresh.driver@ngtravels.in",
-    licenseNumber: "DL-KA01-2018004921",
-    licenseExpiry: "2029-12-31",
-    emergencyContact: "+91 98450 99887 (Wife)",
-    status: "active",
-    availability: "on_trip",
-    rating: "4.9",
-    notes: "Senior driver. Expert in Bangalore-Mysore-Coorg outstation routes.",
-    createdAt: /* @__PURE__ */ new Date("2024-01-10T10:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 2,
-    driverCode: "DRV-102",
-    name: "Ramesh Babu",
-    mobile: "+91 98765 22334",
-    email: "ramesh.driver@ngtravels.in",
-    licenseNumber: "DL-KA05-2019001822",
-    licenseExpiry: "2030-05-15",
-    emergencyContact: "+91 98765 88776 (Brother)",
-    status: "active",
-    availability: "available",
-    rating: "4.8",
-    notes: "Punctual, speaks English & Hindi. Ideal for airport transfers.",
-    createdAt: /* @__PURE__ */ new Date("2024-03-15T09:30:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 3,
-    driverCode: "DRV-103",
-    name: "Anand V",
-    mobile: "+91 91234 33445",
-    email: "anand.driver@ngtravels.in",
-    licenseNumber: "DL-KA03-2020008811",
-    licenseExpiry: "2031-08-20",
-    emergencyContact: "+91 91234 77665 (Father)",
-    status: "active",
-    availability: "available",
-    rating: "4.7",
-    notes: "Corporate vehicle specialist.",
-    createdAt: /* @__PURE__ */ new Date("2024-06-01T11:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 4,
-    driverCode: "DRV-104",
-    name: "Rajesh M",
-    mobile: "+91 99887 44556",
-    email: "rajesh.driver@ngtravels.in",
-    licenseNumber: "DL-KA04-2017006655",
-    licenseExpiry: "2028-11-10",
-    emergencyContact: "+91 99887 66554 (Brother)",
-    status: "on_leave",
-    availability: "on_leave",
-    rating: "4.9",
-    notes: "On medical leave until next week.",
-    createdAt: /* @__PURE__ */ new Date("2023-11-20T08:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  }
-];
-var memVehicles = [
-  {
-    id: 1,
-    vehicleNumber: "KA-01-MJ-5050",
-    vehicleType: "Innova Crysta",
-    brand: "Toyota",
-    model: "Innova Crysta 2.4 ZX",
-    year: 2023,
-    capacity: 7,
-    fuelType: "Diesel",
-    rcNumber: "RC-KA01-2023-998811",
-    insurancePolicy: "HDFC-ERGO-COM-889102",
-    insuranceExpiry: "2026-11-20",
-    permitNumber: "AITP-KA-2024-5510",
-    permitExpiry: "2027-03-31",
-    fitnessCertNumber: "FIT-KA01-2024-110",
-    fitnessExpiry: "2026-12-15",
-    pollutionCertNumber: "PUC-KA-2026-9912",
-    pollutionExpiry: "2026-10-10",
-    assignedDriverId: 1,
-    status: "active",
-    maintenanceStatus: "good",
-    lastServiceDate: "2026-08-10",
-    nextServiceDate: "2026-11-10",
-    currentOdometerKm: "45350",
-    notes: "Top-tier premium luxury fleet vehicle. Immaculate condition.",
-    createdAt: /* @__PURE__ */ new Date("2024-01-15T10:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 2,
-    vehicleNumber: "KA-05-AB-7744",
-    vehicleType: "Sedan",
-    brand: "Maruti Suzuki",
-    model: "Dzire VXI",
-    year: 2022,
-    capacity: 4,
-    fuelType: "CNG/Petrol",
-    rcNumber: "RC-KA05-2022-441100",
-    insurancePolicy: "ICICI-LOMB-778811",
-    insuranceExpiry: "2026-09-28",
-    permitNumber: "KA-STATE-2023-441",
-    permitExpiry: "2026-10-05",
-    fitnessCertNumber: "FIT-KA05-2023-881",
-    fitnessExpiry: "2027-05-20",
-    pollutionCertNumber: "PUC-KA-2026-5522",
-    pollutionExpiry: "2026-09-15",
-    assignedDriverId: 2,
-    status: "active",
-    maintenanceStatus: "good",
-    lastServiceDate: "2026-07-20",
-    nextServiceDate: "2026-10-20",
-    currentOdometerKm: "68200",
-    notes: "Punctual airport transfer vehicle. High fuel economy.",
-    createdAt: /* @__PURE__ */ new Date("2024-02-10T11:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 3,
-    vehicleNumber: "KA-03-MM-1234",
-    vehicleType: "SUV",
-    brand: "Maruti Suzuki",
-    model: "Ertiga ZXI",
-    year: 2024,
-    capacity: 6,
-    fuelType: "Petrol",
-    rcNumber: "RC-KA03-2024-112233",
-    insurancePolicy: "TATA-AIG-665544",
-    insuranceExpiry: "2027-02-15",
-    permitNumber: "AITP-KA-2024-9912",
-    permitExpiry: "2027-08-30",
-    fitnessCertNumber: "FIT-KA03-2024-332",
-    fitnessExpiry: "2028-02-15",
-    pollutionCertNumber: "PUC-KA-2026-3311",
-    pollutionExpiry: "2027-02-15",
-    assignedDriverId: 3,
-    status: "active",
-    maintenanceStatus: "good",
-    lastServiceDate: "2026-08-25",
-    nextServiceDate: "2026-12-25",
-    currentOdometerKm: "18400",
-    notes: "Corporate vehicle.",
-    createdAt: /* @__PURE__ */ new Date("2024-03-01T09:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  }
-];
-var memCustomers = [
-  {
-    id: 1,
-    customerCode: "CUS-1002341",
-    name: "Rajesh Sharma",
-    mobile: "+91 98450 12345",
-    whatsapp: "+91 98450 12345",
-    email: "rajesh.sharma@example.com",
-    address: "Indiranagar, 100 Feet Rd, Bengaluru",
-    notes: "VIP Corporate client. Prefers premium sedan.",
-    archived: false,
-    createdAt: /* @__PURE__ */ new Date("2026-08-15T09:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-08-15T09:00:00Z")
-  },
-  {
-    id: 2,
-    customerCode: "CUS-1002342",
-    name: "Priya Patel",
-    mobile: "+91 98765 43210",
-    whatsapp: "+91 98765 43210",
-    email: "priya.p@techcorp.in",
-    address: "Whitefield, ITPL Main Rd, Bengaluru",
-    notes: "Regular airport transfer traveller.",
-    archived: false,
-    createdAt: /* @__PURE__ */ new Date("2026-08-18T11:30:00Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-08-18T11:30:00Z")
-  },
-  {
-    id: 3,
-    customerCode: "CUS-1002343",
-    name: "Bangalore Tech Solutions",
-    mobile: "+91 91234 56780",
-    whatsapp: "+91 91234 56780",
-    email: "logistics@bangaloretech.in",
-    address: "Electronic City Phase 1, Bengaluru",
-    notes: "Monthly billing account.",
-    archived: false,
-    createdAt: /* @__PURE__ */ new Date("2026-08-20T14:15:00Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-08-20T14:15:00Z")
-  },
-  {
-    id: 4,
-    customerCode: "CUS-1002344",
-    name: "Anita Rao",
-    mobile: "+91 99887 76655",
-    whatsapp: "+91 99887 76655",
-    email: "anita.rao@gmail.com",
-    address: "Koramangala 4th Block, Bengaluru",
-    notes: "Family weekend outstation booking.",
-    archived: false,
-    createdAt: /* @__PURE__ */ new Date("2026-08-25T16:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-08-25T16:00:00Z")
-  },
-  {
-    id: 5,
-    customerCode: "CUS-1002345",
-    name: "Vikram Malhotra",
-    mobile: "+91 97654 32190",
-    whatsapp: "+91 97654 32190",
-    email: "vikram.m@cloudventures.co",
-    address: "MG Road, Bengaluru",
-    notes: "Requires English speaking driver with clean car.",
-    archived: false,
-    createdAt: /* @__PURE__ */ new Date("2026-08-28T10:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-08-28T10:00:00Z")
-  }
-];
-var memEnquiries = [
-  {
-    id: 1,
-    enquiryCode: "ENQ-2026-001",
-    customerName: "Dr. Arvind Swaminathan",
-    customerMobile: "+91 98451 99221",
-    customerEmail: "arvind.doc@apollo.org",
-    pickup: "Jayanagar 4th Block, Bengaluru",
-    destination: "Ooty Botanical Gardens, Nilgiris",
-    tripType: "outstation_round_trip",
-    startDate: todayStr,
-    passengerCount: 4,
-    estimatedBudget: "20000.00",
-    quotedFare: "18500.00",
-    status: "quoted",
-    notes: "Wants Innova Crysta for 3 days sightseeing.",
-    createdAt: /* @__PURE__ */ new Date("2026-09-01T09:00:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 2,
-    enquiryCode: "ENQ-2026-002",
-    customerName: "Cognizant Logistics Desk",
-    customerMobile: "+91 98860 11990",
-    customerEmail: "corp.travel@cognizant.com",
-    pickup: "Manyata Embassy Tech Park",
-    destination: "Electronic City Phase 2",
-    tripType: "local_rental",
-    startDate: todayStr,
-    passengerCount: 6,
-    estimatedBudget: "8000.00",
-    quotedFare: "7500.00",
-    status: "pending",
-    notes: "Corporate client VIP delegation transfer.",
-    createdAt: /* @__PURE__ */ new Date("2026-09-02T08:30:00Z"),
-    updatedAt: /* @__PURE__ */ new Date()
-  }
-];
 var memTrips = [
   {
     id: 1,
@@ -83365,136 +83113,6 @@ var memTrips = [
     isLocked: false,
     createdAt: /* @__PURE__ */ new Date("2026-09-02T06:00:00Z"),
     updatedAt: /* @__PURE__ */ new Date()
-  }
-];
-var memPayments = [
-  {
-    id: 1,
-    tripId: 1,
-    amount: "3000.00",
-    method: "UPI",
-    paymentType: "advance",
-    paymentDate: todayStr,
-    reference: "UPI/260902/894102",
-    notes: "Advance payment received via GPay",
-    recordedBy: "Operations Admin",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 2,
-    tripId: 2,
-    amount: "1195.00",
-    method: "Card",
-    paymentType: "full",
-    paymentDate: todayStr,
-    reference: "POS/TXN-49210",
-    notes: "Full payment prepaid online",
-    recordedBy: "Operations Admin",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 3,
-    tripId: 3,
-    amount: "1750.00",
-    method: "Bank Transfer",
-    paymentType: "full",
-    paymentDate: todayStr,
-    reference: "NEFT/TECHCORP/0921",
-    notes: "Corporate payment",
-    recordedBy: "Operations Admin",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 4,
-    tripId: 4,
-    amount: "6400.00",
-    method: "Cash",
-    paymentType: "full",
-    paymentDate: todayStr,
-    reference: "CASH-REC-108",
-    notes: "Paid in full at pickup",
-    recordedBy: "Driver Suresh",
-    createdAt: /* @__PURE__ */ new Date()
-  }
-];
-var memExpenses = [
-  {
-    id: 1,
-    tripId: 1,
-    driverId: 1,
-    category: "Fuel",
-    amount: "1200.00",
-    expenseDate: todayStr,
-    notes: "Indian Oil Petrol Pump, Mysore Rd - 12.5L Diesel",
-    receiptPath: null,
-    status: "approved",
-    approvedBy: "Operations Admin",
-    approvedAt: /* @__PURE__ */ new Date(),
-    location: "Mysore Expressway Indian Oil",
-    recordedBy: "Driver Suresh",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 2,
-    tripId: 3,
-    driverId: 3,
-    category: "Parking",
-    amount: "150.00",
-    expenseDate: todayStr,
-    notes: "Manyata Tech Park visitor multi-level parking",
-    receiptPath: null,
-    status: "approved",
-    approvedBy: "Operations Admin",
-    approvedAt: /* @__PURE__ */ new Date(),
-    location: "Manyata Tech Park",
-    recordedBy: "Driver Anand",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 3,
-    tripId: 4,
-    driverId: 1,
-    category: "Fuel",
-    amount: "1800.00",
-    expenseDate: todayStr,
-    notes: "HPCL Nelamangala - 18.2L Diesel",
-    receiptPath: null,
-    status: "approved",
-    approvedBy: "Operations Admin",
-    approvedAt: /* @__PURE__ */ new Date(),
-    location: "Nelamangala Highway HPCL",
-    recordedBy: "Driver Suresh",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 4,
-    tripId: 4,
-    driverId: 1,
-    category: "Toll",
-    amount: "300.00",
-    expenseDate: todayStr,
-    notes: "Fastag toll charges",
-    receiptPath: null,
-    status: "approved",
-    approvedBy: "Operations Admin",
-    approvedAt: /* @__PURE__ */ new Date(),
-    location: "Kushalnagar Toll Plaza",
-    recordedBy: "Driver Suresh",
-    createdAt: /* @__PURE__ */ new Date()
-  },
-  {
-    id: 5,
-    tripId: 1,
-    driverId: 1,
-    category: "Food",
-    amount: "250.00",
-    expenseDate: todayStr,
-    notes: "Driver breakfast at Mandya Woodlands",
-    receiptPath: null,
-    status: "pending",
-    location: "Mandya Woodlands",
-    recordedBy: "Driver Suresh",
-    createdAt: /* @__PURE__ */ new Date()
   }
 ];
 var memNotifications = [
@@ -84123,54 +83741,8 @@ router2.get("/dashboard", requireOwner, async (_req, res) => {
       }))
     });
   } catch (err) {
-    console.warn("[dashboard] Database query fallback to memory store:", err?.message);
-    const todayTrps = memTrips.filter((t) => t.startDate === currentDay);
-    const activeTrips = memTrips.filter((t) => ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status));
-    const rev = todayTrps.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
-    const exp = memExpenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const col = todayTrps.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
-    res.json({
-      date: /* @__PURE__ */ new Date(`${currentDay}T00:00:00Z`),
-      metrics: {
-        totalTrips: memTrips.length,
-        todaysTrips: todayTrps.length,
-        upcomingTrips: todayTrps.filter((t) => ["upcoming", "confirmed", "ready"].includes(t.status)).length,
-        started: todayTrps.filter((t) => t.status === "started").length,
-        inProgress: activeTrips.length,
-        completedToday: todayTrps.filter((t) => t.status === "completed").length,
-        paymentPending: memTrips.filter((t) => Number(t.remainingBalance || 0) > 0).length,
-        todaysRevenue: rev,
-        todaysCollection: col,
-        todaysExpenses: exp,
-        todaysProfit: rev - exp,
-        weeklyRevenue: rev,
-        weeklyExpenses: exp,
-        weeklyProfit: rev - exp,
-        monthlyRevenue: rev,
-        monthlyExpenses: exp,
-        monthlyProfit: rev - exp,
-        availableDrivers: memDrivers.filter((d) => d.availability === "available").length,
-        driversOnTrip: memDrivers.filter((d) => d.availability === "on_trip").length,
-        availableVehicles: memVehicles.filter((v) => v.status === "active").length,
-        vehiclesOnTrip: memVehicles.filter((v) => v.status === "active" && v.assignedDriverId).length
-      },
-      schedule: todayTrps.map((t) => ({
-        id: t.id,
-        bookingId: t.bookingId,
-        time: t.startTime,
-        pickup: t.pickup?.name || "Pickup",
-        destination: t.destination?.name || "Destination",
-        customerName: "Corporate Customer",
-        driverName: t.driverName ?? "Unassigned",
-        status: t.status
-      })),
-      recentActivity: memAuditLogs.slice(0, 10).map((a) => ({
-        id: a.id,
-        title: a.action,
-        detail: `${a.entity} ${a.entityId}`,
-        timestamp: a.createdAt
-      }))
-    });
+    console.error("[dashboard] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load dashboard data. Please try again." } });
   }
 });
 router2.get("/drivers", requireOwner, async (_req, res) => {
@@ -84178,8 +83750,8 @@ router2.get("/drivers", requireOwner, async (_req, res) => {
     const rows = await db.select().from(driversTable).orderBy(asc(driversTable.name));
     res.json(rows);
   } catch (err) {
-    console.warn("[drivers] DB fallback to memory store:", err?.message);
-    res.json(memDrivers);
+    console.error("[drivers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load drivers. Please try again." } });
   }
 });
 router2.post("/drivers", requireOwner, async (req, res) => {
@@ -84278,8 +83850,8 @@ router2.get("/vehicles", async (_req, res) => {
     const rows = await db.select().from(vehiclesTable).orderBy(asc(vehiclesTable.vehicleNumber));
     res.json(rows.map(enrichVehicleWithAlerts));
   } catch (err) {
-    console.warn("[vehicles] DB fallback to memory store:", err?.message);
-    res.json(memVehicles.map(enrichVehicleWithAlerts));
+    console.error("[vehicles] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load vehicles. Please try again." } });
   }
 });
 router2.get("/vehicles/expiry-alerts", async (_req, res) => {
@@ -84384,8 +83956,8 @@ router2.get("/customers", requireOwner, async (req, res) => {
     const views = await Promise.all(rows.map(customerView));
     res.json({ items: views, total: views.length });
   } catch (err) {
-    console.warn("[customers] DB fallback to memory store:", err?.message);
-    res.json({ items: memCustomers, total: memCustomers.length });
+    console.error("[customers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load customers. Please try again." } });
   }
 });
 router2.post("/customers", requireOwner, async (req, res) => {
@@ -84457,8 +84029,8 @@ router2.get("/enquiries", requireOwner, async (_req, res) => {
     const rows = await db.select().from(enquiriesTable).orderBy(desc(enquiriesTable.createdAt));
     res.json(rows);
   } catch (err) {
-    console.warn("[enquiries] DB fallback to memory store:", err?.message);
-    res.json(memEnquiries);
+    console.error("[enquiries] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load enquiries. Please try again." } });
   }
 });
 router2.post("/enquiries", requireOwner, async (req, res) => {
@@ -84643,8 +84215,8 @@ router2.get("/trips", async (req, res) => {
     ) : tripViews;
     res.json({ items: filtered, total: filtered.length });
   } catch (err) {
-    console.warn("[trips] DB fallback to memory store:", err?.message);
-    res.json({ items: memTrips, total: memTrips.length });
+    console.error("[trips] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load trips. Please try again." } });
   }
 });
 router2.post("/trips", requireOwner, async (req, res) => {
@@ -85016,7 +84588,7 @@ router2.get("/driver/current-trip", async (req, res) => {
       )
     ).orderBy(desc(tripsTable.updatedAt)).limit(1);
     if (trips.length === 0) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
+      res.json(null);
       return;
     }
     const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, trips[0].customerId));
@@ -85024,11 +84596,7 @@ router2.get("/driver/current-trip", async (req, res) => {
   } catch (err) {
     console.warn("[driver/current-trip] DB fallback:", err?.message);
     const active = memTrips.find((t) => ["started", "in_progress", "reached_pickup", "customer_picked_up"].includes(t.status)) || memTrips[0] || null;
-    if (!active) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
-      return;
-    }
-    res.json(active);
+    res.json(active || null);
   }
 });
 router2.get("/driver/vehicle", async (req, res) => {
@@ -85044,7 +84612,7 @@ router2.get("/driver/vehicle", async (req, res) => {
       vehicle = firstV;
     }
     if (!vehicle) {
-      res.status(404).json({ success: false, message: "No vehicle assigned" });
+      res.json(null);
       return;
     }
     res.json(enrichVehicleWithAlerts(vehicle));
@@ -85267,13 +84835,33 @@ router2.post("/driver/trips/:id/location", async (req, res) => {
     res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
   }
 });
+router2.get("/trips/:id/live-location", async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const [latest] = await db.select().from(driverLocationsTable).where(eq(driverLocationsTable.tripId, id)).orderBy(desc(driverLocationsTable.timestamp)).limit(1);
+    if (!latest) {
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "No location telemetry recorded yet" } });
+      return;
+    }
+    res.json({
+      latitude: Number(latest.latitude),
+      longitude: Number(latest.longitude),
+      speed: latest.speed != null ? Number(latest.speed) : null,
+      heading: latest.heading != null ? Number(latest.heading) : null,
+      accuracy: latest.accuracy != null ? Number(latest.accuracy) : null,
+      timestamp: latest.timestamp
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+  }
+});
 router2.get("/payments", async (_req, res) => {
   try {
     const rows = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err) {
-    console.warn("[payments] DB fallback to memory store:", err?.message);
-    res.json(memPayments);
+    console.error("[payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 router2.get("/trips/:id/payments", async (req, res) => {
@@ -85282,8 +84870,8 @@ router2.get("/trips/:id/payments", async (req, res) => {
     const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.tripId, id)).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err) {
-    console.warn("[trips/:id/payments] DB fallback:", err?.message);
-    res.json(memPayments.filter((p) => p.tripId === id));
+    console.error("[trips/:id/payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 async function recordPaymentHandler(req, res) {
@@ -85339,8 +84927,8 @@ router2.get("/expenses", async (_req, res) => {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
     res.json(rows);
   } catch (err) {
-    console.warn("[expenses] DB fallback to memory store:", err?.message);
-    res.json(memExpenses);
+    console.error("[expenses] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load expenses. Please try again." } });
   }
 });
 router2.post("/expenses", async (req, res) => {
@@ -85462,8 +85050,8 @@ router2.get("/notifications", async (req, res) => {
     ).orderBy(desc(notificationsTable.createdAt)).limit(30);
     res.json(rows);
   } catch (err) {
-    console.warn("[notifications] DB fallback to memory store:", err?.message);
-    res.json(memNotifications);
+    console.error("[notifications] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load notifications. Please try again." } });
   }
 });
 router2.post("/notifications/:id/read", async (req, res) => {
@@ -85490,8 +85078,8 @@ router2.get("/audit-logs", requireOwner, async (_req, res) => {
     const rows = await db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(100);
     res.json(rows);
   } catch (err) {
-    console.warn("[audit-logs] DB fallback to memory store:", err?.message);
-    res.json(memAuditLogs);
+    console.error("[audit-logs] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load audit logs. Please try again." } });
   }
 });
 router2.get("/settings", requireOwner, async (_req, res) => {
@@ -85541,6 +85129,7 @@ var logger = (0, import_pino.default)({
 
 // src/app.ts
 var app = (0, import_express4.default)();
+app.set("etag", false);
 var httpLogger = typeof import_pino_http.default === "function" ? import_pino_http.default : import_pino_http.default.default || import_pino_http.default;
 app.use(
   httpLogger({
