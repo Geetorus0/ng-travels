@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/trips/${trip.id}/payments`, {
+      const res = await apiFetch(`/api/trips/${trip.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -67,50 +68,50 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
       {loading && <TripActionLoader action="payment" />}
 
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 p-6 rounded-2xl shadow-2xl">
+        <DialogContent className="max-w-md bg-background text-foreground border-border p-6 rounded-2xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-zinc-100 flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-emerald-400" />
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
               Record Passenger / Client Payment
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-2 text-xs">
-            <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800 space-y-1">
+            <div className="bg-card/60 p-3 rounded-xl border border-border space-y-1">
               <div className="flex justify-between">
-                <span className="text-zinc-400">Booking: <strong className="text-amber-400 font-mono">{trip.bookingId}</strong></span>
-                <span className="text-zinc-400">Customer: <strong className="text-zinc-200">{trip.customerName || "Customer"}</strong></span>
+                <span className="text-muted-foreground">Booking: <strong className="text-amber-700 dark:text-amber-400 font-mono">{trip.bookingId}</strong></span>
+                <span className="text-muted-foreground">Customer: <strong className="text-foreground">{trip.customerName || "Customer"}</strong></span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-zinc-800/80 font-mono text-[11px]">
-                <span>Total Fare: <strong className="text-zinc-200">{formatINR(totalFare)}</strong></span>
-                <span>Paid So Far: <strong className="text-emerald-400">{formatINR(totalPaid)}</strong></span>
-                <span>Due Balance: <strong className="text-amber-400">{formatINR(remaining)}</strong></span>
+              <div className="flex justify-between pt-1 border-t border-border/80 font-mono text-[11px]">
+                <span>Total Fare: <strong className="text-foreground">{formatINR(totalFare)}</strong></span>
+                <span>Paid So Far: <strong className="text-emerald-700 dark:text-emerald-400">{formatINR(totalPaid)}</strong></span>
+                <span>Due Balance: <strong className="text-amber-700 dark:text-amber-400">{formatINR(remaining)}</strong></span>
               </div>
             </div>
 
             <div>
-              <label className="text-xs text-zinc-300 font-semibold block mb-1">Payment Amount (₹) *</label>
+              <label className="text-xs text-foreground font-semibold block mb-1">Payment Amount (₹) *</label>
               <div className="relative">
-                <IndianRupee className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                <IndianRupee className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                 <Input
                   type="number"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={`e.g. ${remaining > 0 ? remaining : 2500}`}
-                  className="pl-9 bg-zinc-900 border-zinc-800 text-base font-mono font-bold text-emerald-400"
+                  className="pl-9 bg-card border-border text-base font-mono font-bold text-emerald-700 dark:text-emerald-400"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-300 font-semibold block mb-1">Payment Method</label>
+                <label className="text-xs text-foreground font-semibold block mb-1">Payment Method</label>
                 <Select value={paymentMode} onValueChange={setPaymentMode}>
-                  <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs">
+                  <SelectTrigger className="bg-card border-border text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200 text-xs">
+                  <SelectContent className="bg-card border-border text-foreground text-xs">
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="upi">UPI (GPay / PhonePe)</SelectItem>
                     <SelectItem value="card">Debit / Credit Card</SelectItem>
@@ -121,12 +122,12 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs text-zinc-300 font-semibold block mb-1">Payment Category</label>
+                <label className="text-xs text-foreground font-semibold block mb-1">Payment Category</label>
                 <Select value={paymentType} onValueChange={setPaymentType}>
-                  <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs">
+                  <SelectTrigger className="bg-card border-border text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200 text-xs">
+                  <SelectContent className="bg-card border-border text-foreground text-xs">
                     <SelectItem value="advance">Advance Deposit</SelectItem>
                     <SelectItem value="partial">Partial Milestone</SelectItem>
                     <SelectItem value="final">Final Settlement</SelectItem>
@@ -136,12 +137,12 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs text-zinc-300 font-semibold block mb-1">Transaction Ref / Cheque No.</label>
+              <label className="text-xs text-foreground font-semibold block mb-1">Transaction Ref / Cheque No.</label>
               <Input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 placeholder="e.g. UPI Ref / UTR: 429188201992 or Cheque #104921"
-                className="bg-zinc-900 border-zinc-800 text-xs font-mono"
+                className="bg-card border-border text-xs font-mono"
               />
             </div>
 

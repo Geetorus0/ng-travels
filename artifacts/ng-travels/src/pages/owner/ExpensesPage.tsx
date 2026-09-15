@@ -1,25 +1,49 @@
 import React, { useState } from "react";
-import { Fuel, Search, CheckCircle2, XCircle, Check, X, Filter, CircleDollarSign } from "lucide-react";
+import { Fuel, Search, CheckCircle2, XCircle, Check, X, Filter, CircleDollarSign, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/fareEngine";
+import { NGTravelsLoader } from "@/components/loading";
 
 interface ExpensesPageProps {
   expenses: any[];
   trips: any[];
-  onApprove: (id: number) => void;
-  onReject: (id: number) => void;
+  isLoading?: boolean;
+  onApprove: (id: number) => void | Promise<void>;
+  onReject: (id: number) => void | Promise<void>;
 }
 
 export const ExpensesPage: React.FC<ExpensesPageProps> = ({
   expenses = [],
   trips = [],
+  isLoading = false,
   onApprove,
   onReject,
 }) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [pendingAction, setPendingAction] = useState<{ id: number; action: "approve" | "reject" } | null>(null);
+
+  const handleApprove = async (id: number) => {
+    if (pendingAction) return;
+    setPendingAction({ id, action: "approve" });
+    try {
+      await onApprove(id);
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    if (pendingAction) return;
+    setPendingAction({ id, action: "reject" });
+    try {
+      await onReject(id);
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   const expenseList = Array.isArray(expenses) ? expenses : (Array.isArray((expenses as any)?.items) ? (expenses as any).items : []);
   const tripList = Array.isArray(trips) ? trips : (Array.isArray((trips as any)?.items) ? (trips as any).items : []);
@@ -38,27 +62,27 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <Fuel className="w-5 h-5 text-rose-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Fuel className="w-5 h-5 text-rose-700 dark:text-rose-400" />
             Company Expense Approvals & Fleet Spend
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Review driver receipts, approve diesel/toll claims, and track company operating expenditure.
           </p>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-right">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Total Approved Spend</span>
-          <span className="text-xl font-mono font-bold text-rose-400">{formatINR(totalApproved)}</span>
+        <div className="bg-card border border-border px-4 py-2 rounded-xl text-right">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Total Approved Spend</span>
+          <span className="text-xl font-mono font-bold text-rose-700 dark:text-rose-400">{formatINR(totalApproved)}</span>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
+      <div className="flex flex-col sm:flex-row gap-3 bg-card/60 p-4 rounded-xl border border-border">
         <div className="w-full sm:w-52">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs">
+            <SelectTrigger className="bg-card border-border text-xs">
               <SelectValue placeholder="Approval Status" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
+            <SelectContent className="bg-card border-border text-foreground text-xs">
               <SelectItem value="all">All Approvals</SelectItem>
               <SelectItem value="pending">Pending Approval</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
@@ -69,10 +93,10 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
 
         <div className="w-full sm:w-52">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs">
+            <SelectTrigger className="bg-card border-border text-xs">
               <SelectValue placeholder="Expense Category" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
+            <SelectContent className="bg-card border-border text-foreground text-xs">
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="Fuel">Fuel (Diesel / Petrol)</SelectItem>
               <SelectItem value="Toll">Toll</SelectItem>
@@ -84,9 +108,10 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
         </div>
       </div>
 
-      <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="bg-card/70 border border-border rounded-xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 uppercase text-[10px] tracking-wider">
+          <thead className="bg-card text-muted-foreground border-b border-border uppercase text-[10px] tracking-wider">
             <tr>
               <th className="py-3 px-4">Date</th>
               <th className="py-3 px-4">Category</th>
@@ -98,10 +123,18 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
               <th className="py-3 px-4 text-right">Approval Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/60">
-            {filtered.length === 0 ? (
+          <tbody className="divide-y divide-border/60">
+            {isLoading && expenseList.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-zinc-500">
+                <td colSpan={8} className="py-12">
+                  <div className="flex justify-center">
+                    <NGTravelsLoader size="sm" text="Loading expenses..." />
+                  </div>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-muted-foreground">
                   No expense records match the selected filters.
                 </td>
               </tr>
@@ -113,25 +146,25 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                   month: "short",
                 });
                 return (
-                  <tr key={exp.id} className="hover:bg-zinc-800/40 transition-all">
-                    <td className="py-3 px-4 text-zinc-400">{dateStr}</td>
-                    <td className="py-3 px-4 font-semibold text-zinc-200">{exp.category}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-amber-400">
+                  <tr key={exp.id} className="hover:bg-muted/40 transition-all">
+                    <td className="py-3 px-4 text-muted-foreground">{dateStr}</td>
+                    <td className="py-3 px-4 font-semibold text-foreground">{exp.category}</td>
+                    <td className="py-3 px-4 font-mono font-bold text-amber-700 dark:text-amber-400">
                       {trip?.bookingId || `Trip #${exp.tripId}`}
                     </td>
-                    <td className="py-3 px-4 text-zinc-300">{exp.recordedBy || "Driver"}</td>
+                    <td className="py-3 px-4 text-foreground">{exp.recordedBy || "Driver"}</td>
                     <td className="py-3 px-4 max-w-[240px]">
-                      <div className="truncate text-zinc-300">{exp.notes || "Standard claim"}</div>
-                      {exp.location && <div className="text-[10px] text-zinc-500 truncate">{exp.location}</div>}
+                      <div className="truncate text-foreground">{exp.notes || "Standard claim"}</div>
+                      {exp.location && <div className="text-[10px] text-muted-foreground truncate">{exp.location}</div>}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-rose-400 text-sm">
+                    <td className="py-3 px-4 text-right font-mono font-bold text-rose-700 dark:text-rose-400 text-sm">
                       {formatINR(exp.amount)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize ${
-                        exp.status === "approved" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                        exp.status === "rejected" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" :
-                        "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                        exp.status === "approved" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" :
+                        exp.status === "rejected" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30" :
+                        "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 animate-pulse"
                       }`}>
                         {exp.status}
                       </span>
@@ -141,22 +174,32 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                         <div className="flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
-                            onClick={() => onApprove(exp.id)}
+                            onClick={() => handleApprove(exp.id)}
+                            disabled={Boolean(pendingAction)}
                             className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px]"
                           >
-                            <Check className="w-3.5 h-3.5 mr-1" /> Approve
+                            {pendingAction && pendingAction.id === exp.id && pendingAction.action === "approve" ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <><Check className="w-3.5 h-3.5 mr-1" /> Approve</>
+                            )}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onReject(exp.id)}
-                            className="h-7 px-2 text-rose-400 hover:bg-rose-950/30 text-[11px]"
+                            onClick={() => handleReject(exp.id)}
+                            disabled={Boolean(pendingAction)}
+                            className="h-7 px-2 text-rose-700 dark:text-rose-400 hover:bg-rose-950/30 text-[11px]"
                           >
-                            <X className="w-3.5 h-3.5 mr-1" /> Reject
+                            {pendingAction && pendingAction.id === exp.id && pendingAction.action === "reject" ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <><X className="w-3.5 h-3.5 mr-1" /> Reject</>
+                            )}
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-zinc-500">
+                        <span className="text-[11px] text-muted-foreground">
                           {exp.status === "approved" ? `Approved by ${exp.approvedBy || "Admin"}` : "Rejected"}
                         </span>
                       )}
@@ -167,6 +210,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

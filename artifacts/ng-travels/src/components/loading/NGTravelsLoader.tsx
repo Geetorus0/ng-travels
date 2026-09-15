@@ -29,7 +29,7 @@ export const NGTravelsLoader: React.FC<NGTravelsLoaderProps> = ({
         {/* Origin Node */}
         <div className="relative z-10 flex items-center justify-center">
           <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/50 animate-ng-pulse-ring" />
-          <div className="absolute w-1.5 h-1.5 rounded-full bg-zinc-950" />
+          <div className="absolute w-1.5 h-1.5 rounded-full bg-background" />
         </div>
 
         {/* Route Connecting Line */}
@@ -112,7 +112,7 @@ export const NGTravelsLoader: React.FC<NGTravelsLoaderProps> = ({
         {/* Destination Pin */}
         <div className="relative z-10 flex items-center justify-center">
           <svg
-            className="w-5 h-5 text-amber-400 drop-shadow-[0_2px_8px_rgba(245,158,11,0.6)] animate-pulse"
+            className="w-5 h-5 text-amber-700 dark:text-amber-400 drop-shadow-[0_2px_8px_rgba(245,158,11,0.6)] animate-pulse"
             viewBox="0 0 24 24"
             fill="currentColor"
           >
@@ -126,14 +126,14 @@ export const NGTravelsLoader: React.FC<NGTravelsLoaderProps> = ({
         <div className="mt-2 space-y-0.5">
           <p
             className={cn(
-              "font-bold text-zinc-200 tracking-wide",
+              "font-bold text-foreground tracking-wide",
               size === "sm" ? "text-[11px]" : size === "lg" ? "text-sm" : "text-xs"
             )}
           >
             {text}
           </p>
           {subtext && (
-            <p className="text-[10px] font-mono text-zinc-400">
+            <p className="text-[10px] font-mono text-muted-foreground">
               {subtext}
             </p>
           )}

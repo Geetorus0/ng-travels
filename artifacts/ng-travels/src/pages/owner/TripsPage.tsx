@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/fareEngine";
+import { NGTravelsLoader } from "@/components/loading";
 
 interface TripsPageProps {
   trips: any[];
+  isLoading?: boolean;
   onOpenCreateTrip: () => void;
   onOpenCustomerCopy: (trip: any) => void;
   onOpenPaymentModal: (trip: any) => void;
@@ -20,6 +22,7 @@ interface TripsPageProps {
 
 export const TripsPage: React.FC<TripsPageProps> = ({
   trips = [],
+  isLoading = false,
   onOpenCreateTrip,
   onOpenCustomerCopy,
   onOpenPaymentModal,
@@ -57,18 +60,18 @@ export const TripsPage: React.FC<TripsPageProps> = ({
   const renderStatusBadge = (status: string) => {
     const s = String(status || "").toLowerCase();
     if (s === "completed") {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Completed</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">Completed</span>;
     }
     if (s === "in_progress") {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">In Progress</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 animate-pulse">In Progress</span>;
     }
     if (s === "started" || s === "reached_pickup" || s === "customer_picked_up") {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-500/20 text-sky-300 border border-sky-500/30">{s.replaceAll("_", " ")}</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-500/30">{s.replaceAll("_", " ")}</span>;
     }
     if (s === "cancelled") {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/30">Cancelled</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30">Cancelled</span>;
     }
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-800 text-zinc-400">{s.replaceAll("_", " ")}</span>;
+    return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">{s.replaceAll("_", " ")}</span>;
   };
 
   return (
@@ -76,11 +79,11 @@ export const TripsPage: React.FC<TripsPageProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg sm:text-xl font-black text-zinc-100 flex items-center gap-2">
-            <Navigation className="w-5 h-5 text-amber-400" />
+          <h1 className="text-lg sm:text-xl font-black text-foreground flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Trip Operations Management
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Dispatch fleet bookings, inspect fare breakdowns, record multi-payments, and monitor driver runs.
           </p>
         </div>
@@ -94,22 +97,22 @@ export const TripsPage: React.FC<TripsPageProps> = ({
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="flex flex-col sm:flex-row gap-2.5 bg-zinc-900/60 p-3 sm:p-4 rounded-xl border border-zinc-800">
+      <div className="flex flex-col sm:flex-row gap-2.5 bg-card/60 p-3 sm:p-4 rounded-xl border border-border">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
           <Input
             placeholder="Search Booking ID, Customer, Driver, Place..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-zinc-900 border-zinc-800 pl-9 text-xs h-9 w-full"
+            className="bg-card border-border pl-9 text-xs h-9 w-full"
           />
         </div>
         <div className="w-full sm:w-52">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs h-9">
+            <SelectTrigger className="bg-card border-border text-xs h-9">
               <SelectValue placeholder="Filter Status" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
+            <SelectContent className="bg-card border-border text-foreground text-xs">
               <SelectItem value="all">All Statuses ({trips.length})</SelectItem>
               <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="started">Started</SelectItem>
@@ -123,8 +126,12 @@ export const TripsPage: React.FC<TripsPageProps> = ({
 
       {/* MOBILE TRIP CARDS (< lg screens) */}
       <div className="block lg:hidden space-y-3">
-        {filteredTrips.length === 0 ? (
-          <div className="p-8 text-center bg-zinc-900/60 rounded-xl border border-zinc-800 text-zinc-500 text-xs">
+        {isLoading && tripList.length === 0 ? (
+          <div className="p-8 flex justify-center bg-card/60 rounded-xl border border-border">
+            <NGTravelsLoader size="sm" text="Loading trips..." />
+          </div>
+        ) : filteredTrips.length === 0 ? (
+          <div className="p-8 text-center bg-card/60 rounded-xl border border-border text-muted-foreground text-xs">
             No trips match your criteria.
           </div>
         ) : (
@@ -135,27 +142,27 @@ export const TripsPage: React.FC<TripsPageProps> = ({
             });
             const hasBalance = Number(trip.remainingBalance || 0) > 0;
             return (
-              <div key={trip.id} className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 space-y-3 shadow-md">
+              <div key={trip.id} className="bg-card/90 border border-border rounded-xl p-4 space-y-3 shadow-md">
                 {/* Header Row: Booking ID + Status + Schedule */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Link href={`/trips/${trip.id}`} className="font-mono font-black text-amber-400 text-sm hover:underline">
+                    <Link href={`/trips/${trip.id}`} className="font-mono font-black text-amber-700 dark:text-amber-400 text-sm hover:underline">
                       {trip.bookingId}
                     </Link>
                     {renderStatusBadge(trip.status)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[11px] text-muted-foreground font-mono">
                     {startDateStr} • {trip.startTime}
                   </div>
                 </div>
 
                 {/* Route */}
-                <div className="bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-800/80 space-y-1">
-                  <div className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <div className="bg-background/80 p-2.5 rounded-lg border border-border/80 space-y-1">
+                  <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 flex-shrink-0" />
                     <span>{getRouteText(trip)}</span>
                   </div>
-                  <div className="text-[10px] text-zinc-400 pl-5 flex items-center gap-2">
+                  <div className="text-[10px] text-muted-foreground pl-5 flex items-center gap-2">
                     <span>{trip.billingKm} km</span>
                     <span>•</span>
                     <span>₹{trip.ratePerKm}/km</span>
@@ -167,30 +174,30 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                 {/* Customer & Driver Info */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-[10px] text-zinc-500 block uppercase">Customer</span>
-                    <div className="font-semibold text-zinc-200 truncate">{trip.customerName}</div>
-                    <div className="text-[10px] text-zinc-400">{trip.customerMobile}</div>
+                    <span className="text-[10px] text-muted-foreground block uppercase">Customer</span>
+                    <div className="font-semibold text-foreground truncate">{trip.customerName}</div>
+                    <div className="text-[10px] text-muted-foreground">{trip.customerMobile}</div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-zinc-500 block uppercase">Driver</span>
-                    <div className="font-semibold text-zinc-200 truncate">{trip.driverName || "Unassigned"}</div>
-                    <div className="text-[10px] text-zinc-400">{trip.driverMobile || "-"}</div>
+                    <span className="text-[10px] text-muted-foreground block uppercase">Driver</span>
+                    <div className="font-semibold text-foreground truncate">{trip.driverName || "Unassigned"}</div>
+                    <div className="text-[10px] text-muted-foreground">{trip.driverMobile || "-"}</div>
                   </div>
                 </div>
 
                 {/* Financial Breakdown Bar */}
-                <div className="flex items-center justify-between bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 text-xs font-mono">
+                <div className="flex items-center justify-between bg-background p-2.5 rounded-lg border border-border text-xs font-mono">
                   <div>
-                    <span className="text-[9px] text-zinc-500 block uppercase">Total</span>
-                    <span className="font-bold text-zinc-100">{formatINR(trip.customerTotal)}</span>
+                    <span className="text-[9px] text-muted-foreground block uppercase">Total</span>
+                    <span className="font-bold text-foreground">{formatINR(trip.customerTotal)}</span>
                   </div>
                   <div>
                     <span className="text-[9px] text-emerald-500 block uppercase">Paid</span>
-                    <span className="font-bold text-emerald-400">{formatINR(trip.totalPaid)}</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">{formatINR(trip.totalPaid)}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[9px] text-amber-400 block uppercase">Balance</span>
-                    <span className={`font-bold ${hasBalance ? "text-amber-300" : "text-zinc-500"}`}>
+                    <span className="text-[9px] text-amber-700 dark:text-amber-400 block uppercase">Balance</span>
+                    <span className={`font-bold ${hasBalance ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}`}>
                       {formatINR(trip.remainingBalance)}
                     </span>
                   </div>
@@ -199,7 +206,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                 {/* Action Buttons Grid */}
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <Link href={`/trips/${trip.id}`} className="w-full">
-                    <Button size="sm" variant="outline" className="w-full text-xs h-8 border-zinc-700 hover:border-zinc-600">
+                    <Button size="sm" variant="outline" className="w-full text-xs h-8 border-border hover:border-muted-foreground/40">
                       <Eye className="w-3.5 h-3.5 mr-1" /> View
                     </Button>
                   </Link>
@@ -208,7 +215,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={() => onOpenCustomerCopy(trip)}
-                    className="w-full text-xs h-8 border-amber-500/40 text-amber-300 hover:bg-amber-950/30"
+                    className="w-full text-xs h-8 border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-950/30"
                   >
                     <FileText className="w-3.5 h-3.5 mr-1" /> Voucher
                   </Button>
@@ -226,7 +233,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                       size="sm"
                       variant="ghost"
                       disabled
-                      className="w-full text-xs h-8 text-emerald-400 opacity-80"
+                      className="w-full text-xs h-8 text-emerald-700 dark:text-emerald-400 opacity-80"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Cleared
                     </Button>
@@ -239,10 +246,10 @@ export const TripsPage: React.FC<TripsPageProps> = ({
       </div>
 
       {/* DESKTOP DATA TABLE (lg+ screens) */}
-      <div className="hidden lg:block bg-zinc-900/70 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="hidden lg:block bg-card/70 border border-border rounded-xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 uppercase text-[10px] tracking-wider">
+            <thead className="bg-card text-muted-foreground border-b border-border uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-4">Booking ID</th>
                 <th className="py-3 px-4">Schedule</th>
@@ -256,10 +263,18 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {filteredTrips.length === 0 ? (
+            <tbody className="divide-y divide-border/60">
+              {isLoading && tripList.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-zinc-500">
+                  <td colSpan={10} className="py-12">
+                    <div className="flex justify-center">
+                      <NGTravelsLoader size="sm" text="Loading trips..." />
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredTrips.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     No trips match the current filter criteria.
                   </td>
                 </tr>
@@ -270,55 +285,55 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                     month: "short",
                   });
                   return (
-                    <tr key={trip.id} className="hover:bg-zinc-800/40 transition-all">
+                    <tr key={trip.id} className="hover:bg-muted/40 transition-all">
                       {/* Booking ID */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                      <td className="py-3.5 px-4 font-mono font-bold text-amber-700 dark:text-amber-400">
                         <Link href={`/trips/${trip.id}`} className="hover:underline">
                           {trip.bookingId}
                         </Link>
                       </td>
 
                       {/* Schedule */}
-                      <td className="py-3.5 px-4 text-zinc-300">
+                      <td className="py-3.5 px-4 text-foreground">
                         <div>{startDateStr}</div>
-                        <div className="text-[11px] text-zinc-500">{trip.startTime}</div>
+                        <div className="text-[11px] text-muted-foreground">{trip.startTime}</div>
                       </td>
 
                       {/* Customer */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-zinc-200">{trip.customerName}</div>
-                        <div className="text-[11px] text-zinc-500">{trip.customerMobile}</div>
+                        <div className="font-semibold text-foreground">{trip.customerName}</div>
+                        <div className="text-[11px] text-muted-foreground">{trip.customerMobile}</div>
                       </td>
 
                       {/* Route */}
                       <td className="py-3.5 px-4 max-w-[200px]">
-                        <div className="font-medium text-zinc-200 truncate">
+                        <div className="font-medium text-foreground truncate">
                           {getRouteText(trip)}
                         </div>
-                        <div className="text-[11px] text-zinc-500">
+                        <div className="text-[11px] text-muted-foreground">
                           {trip.billingKm} km • ₹{trip.ratePerKm}/km
                         </div>
                       </td>
 
                       {/* Driver */}
-                      <td className="py-3.5 px-4 text-zinc-300">
+                      <td className="py-3.5 px-4 text-foreground">
                         <div className="font-medium">{trip.driverName || "Unassigned"}</div>
-                        <div className="text-[11px] text-zinc-500">{trip.driverMobile || "-"}</div>
+                        <div className="text-[11px] text-muted-foreground">{trip.driverMobile || "-"}</div>
                       </td>
 
                       {/* Total */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-zinc-100">
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-foreground">
                         {formatINR(trip.customerTotal)}
                       </td>
 
                       {/* Paid */}
-                      <td className="py-3.5 px-4 text-right font-mono font-medium text-emerald-400">
+                      <td className="py-3.5 px-4 text-right font-mono font-medium text-emerald-700 dark:text-emerald-400">
                         {formatINR(trip.totalPaid)}
                       </td>
 
                       {/* Balance */}
                       <td className="py-3.5 px-4 text-right font-mono font-bold">
-                        <span className={Number(trip.remainingBalance) > 0 ? "text-amber-300" : "text-zinc-500"}>
+                        <span className={Number(trip.remainingBalance) > 0 ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}>
                           {formatINR(trip.remainingBalance)}
                         </span>
                       </td>
@@ -332,7 +347,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Link href={`/trips/${trip.id}`}>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 cursor-pointer">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer">
                               <Eye className="w-3.5 h-3.5" />
                             </Button>
                           </Link>
@@ -340,7 +355,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onOpenCustomerCopy(trip)}
-                            className="h-7 w-7 p-0 text-amber-400 hover:bg-amber-950/30 cursor-pointer"
+                            className="h-7 w-7 p-0 text-amber-700 dark:text-amber-400 hover:bg-amber-950/30 cursor-pointer"
                             title="Customer Booking Copy"
                           >
                             <FileText className="w-3.5 h-3.5" />
@@ -350,7 +365,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                               size="sm"
                               variant="ghost"
                               onClick={() => onOpenPaymentModal(trip)}
-                              className="h-7 w-7 p-0 text-emerald-400 hover:bg-emerald-950/30 cursor-pointer"
+                              className="h-7 w-7 p-0 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-950/30 cursor-pointer"
                               title="Record Payment"
                             >
                               <Receipt className="w-3.5 h-3.5" />
@@ -361,7 +376,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                               size="sm"
                               variant="ghost"
                               onClick={() => onOpenCancelModal(trip)}
-                              className="h-7 w-7 p-0 text-rose-400 hover:bg-rose-950/30 cursor-pointer"
+                              className="h-7 w-7 p-0 text-rose-700 dark:text-rose-400 hover:bg-rose-950/30 cursor-pointer"
                               title="Cancel Trip"
                             >
                               <XCircle className="w-3.5 h-3.5" />

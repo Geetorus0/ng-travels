@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -47,7 +48,7 @@ export const VehiclesPage: React.FC = () => {
     queryKey: ["/api/vehicles"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/vehicles");
+        const res = await apiFetch("/api/vehicles");
         if (!res.ok) return [];
         const json = await res.json();
         return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
@@ -66,7 +67,7 @@ export const VehiclesPage: React.FC = () => {
   const { data: drivers = [] } = useQuery({
     queryKey: ["/api/drivers"],
     queryFn: async () => {
-      const res = await fetch("/api/drivers");
+      const res = await apiFetch("/api/drivers");
       if (!res.ok) return [];
       return res.json();
     },
@@ -75,7 +76,7 @@ export const VehiclesPage: React.FC = () => {
   // Create Mutation
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const res = await fetch("/api/vehicles", {
+      const res = await apiFetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -96,7 +97,7 @@ export const VehiclesPage: React.FC = () => {
   // Update Mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: any }) => {
-      const res = await fetch(`/api/vehicles/${id}`, {
+      const res = await apiFetch(`/api/vehicles/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -137,6 +138,12 @@ export const VehiclesPage: React.FC = () => {
       maintenanceStatus: "good",
       notes: "",
     });
+  };
+
+  const handleOpenAdd = () => {
+    setEditingVehicle(null);
+    resetForm();
+    setAddModalOpen(true);
   };
 
   const handleOpenEdit = (v: any) => {
@@ -206,10 +213,10 @@ export const VehiclesPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 flex items-center gap-2 tracking-tight">
-            <Car className="w-6 h-6 text-amber-400" /> Commercial Fleet Vehicles
+          <h1 className="text-xl sm:text-2xl font-black text-foreground flex items-center gap-2 tracking-tight">
+            <Car className="w-6 h-6 text-amber-700 dark:text-amber-400" /> Commercial Fleet Vehicles
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Registered commercial vehicles, driver assignments, service intervals, and document compliance
           </p>
         </div>
@@ -226,46 +233,46 @@ export const VehiclesPage: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-xl">
-          <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Total Fleet</div>
-          <div className="text-2xl font-black text-zinc-100 mt-1">{vehicles.length}</div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">Commercial transport units</div>
+        <div className="bg-card/90 border border-border p-4 rounded-xl">
+          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total Fleet</div>
+          <div className="text-2xl font-black text-foreground mt-1">{vehicles.length}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Commercial transport units</div>
         </div>
 
-        <div className="bg-zinc-900/90 border border-emerald-500/20 p-4 rounded-xl">
-          <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Active on Road</div>
-          <div className="text-2xl font-black text-emerald-400 mt-1">{activeVehicles}</div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">Ready for trip dispatch</div>
+        <div className="bg-card/90 border border-emerald-300 dark:border-emerald-500/20 p-4 rounded-xl">
+          <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Active on Road</div>
+          <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{activeVehicles}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Ready for trip dispatch</div>
         </div>
 
-        <div className="bg-zinc-900/90 border border-amber-500/20 p-4 rounded-xl">
-          <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Doc Expirations</div>
-          <div className="text-2xl font-black text-amber-400 mt-1">{expiringVehicles}</div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">Expiring within 30 days</div>
+        <div className="bg-card/90 border border-amber-300 dark:border-amber-500/20 p-4 rounded-xl">
+          <div className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Doc Expirations</div>
+          <div className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1">{expiringVehicles}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Expiring within 30 days</div>
         </div>
 
-        <div className="bg-zinc-900/90 border border-sky-500/20 p-4 rounded-xl">
-          <div className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">Maintenance Due</div>
-          <div className="text-2xl font-black text-sky-400 mt-1">{maintenanceVehicles}</div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">Service interval scheduled</div>
+        <div className="bg-card/90 border border-sky-300 dark:border-sky-500/20 p-4 rounded-xl">
+          <div className="text-[11px] font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider">Maintenance Due</div>
+          <div className="text-2xl font-black text-sky-700 dark:text-sky-400 mt-1">{maintenanceVehicles}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Service interval scheduled</div>
         </div>
       </div>
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
+          <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vehicle number (e.g. KA-01-MJ-5050), model, or brand..."
-            className="pl-9 bg-zinc-900/90 border-zinc-800 text-xs py-5 rounded-xl placeholder:text-zinc-500"
+            className="pl-9 bg-card/90 border-border text-xs py-5 rounded-xl placeholder:text-muted-foreground"
           />
         </div>
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="bg-zinc-900/90 border border-zinc-800 text-zinc-200 text-xs px-3 py-2.5 rounded-xl cursor-pointer"
+          className="bg-card/90 border border-border text-foreground text-xs px-3 py-2.5 rounded-xl cursor-pointer"
         >
           <option value="all">All Vehicle Types</option>
           <option value="Innova Crysta">Innova Crysta</option>
@@ -285,10 +292,10 @@ export const VehiclesPage: React.FC = () => {
           />
         </div>
       ) : vehicles.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
-          <Car className="w-12 h-12 text-zinc-600 mx-auto" />
-          <div className="text-sm font-semibold text-zinc-300">No fleet vehicles registered yet</div>
-          <div className="text-xs text-zinc-500 max-w-sm mx-auto">
+        <div className="p-12 text-center bg-card/50 rounded-2xl border border-border text-muted-foreground space-y-3">
+          <Car className="w-12 h-12 text-muted-foreground mx-auto" />
+          <div className="text-sm font-semibold text-foreground">No fleet vehicles registered yet</div>
+          <div className="text-xs text-muted-foreground max-w-sm mx-auto">
             Get started by registering your first commercial taxi, sedan, Innova, or Tempo Traveller.
           </div>
           <Button onClick={handleOpenAdd} className="bg-amber-400 hover:bg-amber-500 text-zinc-950 font-bold text-xs mt-2">
@@ -297,7 +304,7 @@ export const VehiclesPage: React.FC = () => {
           </Button>
         </div>
       ) : filteredVehicles.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 text-xs">
+        <div className="p-12 text-center bg-card/50 rounded-2xl border border-border text-muted-foreground text-xs">
           No vehicles found matching your criteria.
         </div>
       ) : (
@@ -307,20 +314,20 @@ export const VehiclesPage: React.FC = () => {
             return (
               <div
                 key={v.id}
-                className="bg-zinc-900/90 border border-zinc-800/90 hover:border-zinc-700 p-5 rounded-2xl space-y-4 shadow-xl transition-all"
+                className="bg-card/90 border border-border/90 hover:border-border p-5 rounded-2xl space-y-4 shadow-xl transition-all"
               >
                 {/* Top Card Header */}
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="inline-block px-2 py-0.5 rounded font-mono text-xs font-black bg-amber-400/10 text-amber-300 border border-amber-400/30">
+                    <span className="inline-block px-2 py-0.5 rounded font-mono text-xs font-black bg-amber-100 dark:bg-amber-400/10 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-400/30">
                       {v.vehicleNumber}
                     </span>
-                    <h3 className="text-base font-extrabold text-zinc-100 mt-1.5">{v.brand} {v.model}</h3>
-                    <div className="text-[11px] text-zinc-400">{v.vehicleType} • {v.capacity} Seater • {v.fuelType}</div>
+                    <h3 className="text-base font-extrabold text-foreground mt-1.5">{v.brand} {v.model}</h3>
+                    <div className="text-[11px] text-muted-foreground">{v.vehicleType} • {v.capacity} Seater • {v.fuelType}</div>
                   </div>
                   <button
                     onClick={() => handleOpenEdit(v)}
-                    className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-muted/80 hover:bg-muted text-foreground transition-colors cursor-pointer"
                     title="Edit vehicle"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -328,55 +335,55 @@ export const VehiclesPage: React.FC = () => {
                 </div>
 
                 {/* Assigned Driver */}
-                <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/70 text-xs space-y-1">
-                  <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                    <User className="w-3 h-3 text-amber-400" /> Assigned Pilot
+                <div className="bg-background/70 p-3 rounded-xl border border-border/70 text-xs space-y-1">
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                    <User className="w-3 h-3 text-amber-700 dark:text-amber-400" /> Assigned Pilot
                   </div>
-                  <div className="font-bold text-zinc-200">
-                    {assignedDriver ? assignedDriver.name : <span className="text-zinc-500 font-normal">Unassigned</span>}
+                  <div className="font-bold text-foreground">
+                    {assignedDriver ? assignedDriver.name : <span className="text-muted-foreground font-normal">Unassigned</span>}
                   </div>
                   {assignedDriver && (
-                    <div className="text-[10px] text-zinc-400 font-mono">{assignedDriver.mobile}</div>
+                    <div className="text-[10px] text-muted-foreground font-mono">{assignedDriver.mobile}</div>
                   )}
                 </div>
 
                 {/* Document Status Badges */}
                 <div className="space-y-1.5">
-                  <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                    <FileText className="w-3 h-3 text-zinc-400" /> Regulatory Compliance
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                    <FileText className="w-3 h-3 text-muted-foreground" /> Regulatory Compliance
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
                     <div className={`p-1.5 rounded border flex justify-between ${
-                      v.insuranceStatus === "expired" ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-bold" :
-                      v.insuranceStatus === "expiring_soon" ? "bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold" :
-                      "bg-zinc-950 text-zinc-400 border-zinc-800"
+                      v.insuranceStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-500/30 font-bold" :
+                      v.insuranceStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30 font-bold" :
+                      "bg-background text-muted-foreground border-border"
                     }`}>
                       <span>Insurance:</span>
                       <span>{v.insuranceExpiry || "N/A"}</span>
                     </div>
 
                     <div className={`p-1.5 rounded border flex justify-between ${
-                      v.permitStatus === "expired" ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-bold" :
-                      v.permitStatus === "expiring_soon" ? "bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold" :
-                      "bg-zinc-950 text-zinc-400 border-zinc-800"
+                      v.permitStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-500/30 font-bold" :
+                      v.permitStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30 font-bold" :
+                      "bg-background text-muted-foreground border-border"
                     }`}>
                       <span>Permit:</span>
                       <span>{v.permitExpiry || "N/A"}</span>
                     </div>
 
                     <div className={`p-1.5 rounded border flex justify-between ${
-                      v.fitnessStatus === "expired" ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-bold" :
-                      v.fitnessStatus === "expiring_soon" ? "bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold" :
-                      "bg-zinc-950 text-zinc-400 border-zinc-800"
+                      v.fitnessStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-500/30 font-bold" :
+                      v.fitnessStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30 font-bold" :
+                      "bg-background text-muted-foreground border-border"
                     }`}>
                       <span>Fitness:</span>
                       <span>{v.fitnessExpiry || "N/A"}</span>
                     </div>
 
                     <div className={`p-1.5 rounded border flex justify-between ${
-                      v.pollutionStatus === "expired" ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-bold" :
-                      v.pollutionStatus === "expiring_soon" ? "bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold" :
-                      "bg-zinc-950 text-zinc-400 border-zinc-800"
+                      v.pollutionStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-500/30 font-bold" :
+                      v.pollutionStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30 font-bold" :
+                      "bg-background text-muted-foreground border-border"
                     }`}>
                       <span>PUC:</span>
                       <span>{v.pollutionExpiry || "N/A"}</span>
@@ -386,8 +393,8 @@ export const VehiclesPage: React.FC = () => {
 
                 {/* Expiry Alerts Callout if any */}
                 {v.hasExpiringDocuments && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-[11px] text-amber-300 flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-xl p-2.5 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <div className="font-bold">Attention Required</div>
                       <div className="text-[10px] text-amber-300/80">{v.documentAlerts.join(" • ")}</div>
@@ -396,14 +403,14 @@ export const VehiclesPage: React.FC = () => {
                 )}
 
                 {/* Bottom Odometer & Status */}
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs">
-                  <div className="text-zinc-400 font-mono">
-                    <span className="text-[10px] text-zinc-500 uppercase">Odometer: </span>
-                    <span className="font-bold text-zinc-200">{Number(v.currentOdometerKm || 0).toLocaleString()} KM</span>
+                <div className="pt-2 border-t border-border/80 flex items-center justify-between text-xs">
+                  <div className="text-muted-foreground font-mono">
+                    <span className="text-[10px] text-muted-foreground uppercase">Odometer: </span>
+                    <span className="font-bold text-foreground">{Number(v.currentOdometerKm || 0).toLocaleString()} KM</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    v.status === "active" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                    "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    v.status === "active" ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20" :
+                    "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/20"
                   }`}>
                     {v.status}
                   </span>
@@ -421,10 +428,10 @@ export const VehiclesPage: React.FC = () => {
           setEditingVehicle(null);
         }
       }}>
-        <DialogContent className="sm:max-w-2xl bg-zinc-950 border-zinc-800 text-zinc-100 p-6 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl bg-background border-border text-foreground p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <Car className="w-5 h-5 text-amber-400" />
+              <Car className="w-5 h-5 text-amber-700 dark:text-amber-400" />
               {editingVehicle ? "Edit Commercial Vehicle" : "Register New Commercial Vehicle"}
             </DialogTitle>
           </DialogHeader>
@@ -433,22 +440,22 @@ export const VehiclesPage: React.FC = () => {
             {/* Core Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Registration Number *</Label>
+                <Label className="text-xs font-semibold text-foreground">Registration Number *</Label>
                 <Input
                   required
                   placeholder="KA-01-MJ-5050"
                   value={formData.vehicleNumber}
                   onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
-                  className="bg-zinc-900 border-zinc-800 text-xs uppercase font-mono"
+                  className="bg-card border-border text-xs uppercase font-mono"
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Vehicle Type</Label>
+                <Label className="text-xs font-semibold text-foreground">Vehicle Type</Label>
                 <select
                   value={formData.vehicleType}
                   onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs px-3 py-2 rounded-lg"
+                  className="w-full bg-card border border-border text-foreground text-xs px-3 py-2 rounded-lg"
                 >
                   <option value="Innova Crysta">Innova Crysta (7 Seater)</option>
                   <option value="Sedan">Sedan (Dzire / Etios - 4 Seater)</option>
@@ -459,31 +466,31 @@ export const VehiclesPage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Brand</Label>
+                <Label className="text-xs font-semibold text-foreground">Brand</Label>
                 <Input
                   placeholder="Toyota"
                   value={formData.brand}
                   onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                  className="bg-zinc-900 border-zinc-800 text-xs"
+                  className="bg-card border-border text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Model Name</Label>
+                <Label className="text-xs font-semibold text-foreground">Model Name</Label>
                 <Input
                   placeholder="Innova Crysta 2.4 ZX"
                   value={formData.model}
                   onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                  className="bg-zinc-900 border-zinc-800 text-xs"
+                  className="bg-card border-border text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Assigned Driver</Label>
+                <Label className="text-xs font-semibold text-foreground">Assigned Driver</Label>
                 <select
                   value={formData.assignedDriverId}
                   onChange={(e) => setFormData({ ...formData, assignedDriverId: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs px-3 py-2 rounded-lg"
+                  className="w-full bg-card border border-border text-foreground text-xs px-3 py-2 rounded-lg"
                 >
                   <option value="">Unassigned</option>
                   {drivers.map((d: any) => (
@@ -495,60 +502,60 @@ export const VehiclesPage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-zinc-300">Current Odometer (KM)</Label>
+                <Label className="text-xs font-semibold text-foreground">Current Odometer (KM)</Label>
                 <Input
                   type="number"
                   placeholder="45200"
                   value={formData.currentOdometerKm}
                   onChange={(e) => setFormData({ ...formData, currentOdometerKm: e.target.value })}
-                  className="bg-zinc-900 border-zinc-800 text-xs font-mono"
+                  className="bg-card border-border text-xs font-mono"
                 />
               </div>
             </div>
 
             {/* Compliance Documents & Expiry */}
-            <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
-              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="p-3.5 rounded-xl bg-card/60 border border-border space-y-3">
+              <div className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4" /> Regulatory Documents & Expiry Dates
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[11px] text-zinc-400">Insurance Policy Expiry</Label>
+                  <Label className="text-[11px] text-muted-foreground">Insurance Policy Expiry</Label>
                   <Input
                     type="date"
                     value={formData.insuranceExpiry}
                     onChange={(e) => setFormData({ ...formData, insuranceExpiry: e.target.value })}
-                    className="bg-zinc-950 border-zinc-800 text-xs"
+                    className="bg-background border-border text-xs"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[11px] text-zinc-400">State / All India Permit Expiry</Label>
+                  <Label className="text-[11px] text-muted-foreground">State / All India Permit Expiry</Label>
                   <Input
                     type="date"
                     value={formData.permitExpiry}
                     onChange={(e) => setFormData({ ...formData, permitExpiry: e.target.value })}
-                    className="bg-zinc-950 border-zinc-800 text-xs"
+                    className="bg-background border-border text-xs"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[11px] text-zinc-400">Fitness Certificate Expiry</Label>
+                  <Label className="text-[11px] text-muted-foreground">Fitness Certificate Expiry</Label>
                   <Input
                     type="date"
                     value={formData.fitnessExpiry}
                     onChange={(e) => setFormData({ ...formData, fitnessExpiry: e.target.value })}
-                    className="bg-zinc-950 border-zinc-800 text-xs"
+                    className="bg-background border-border text-xs"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[11px] text-zinc-400">Pollution (PUC) Expiry</Label>
+                  <Label className="text-[11px] text-muted-foreground">Pollution (PUC) Expiry</Label>
                   <Input
                     type="date"
                     value={formData.pollutionExpiry}
                     onChange={(e) => setFormData({ ...formData, pollutionExpiry: e.target.value })}
-                    className="bg-zinc-950 border-zinc-800 text-xs"
+                    className="bg-background border-border text-xs"
                   />
                 </div>
               </div>
@@ -563,7 +570,7 @@ export const VehiclesPage: React.FC = () => {
                   setAddModalOpen(false);
                   setEditingVehicle(null);
                 }}
-                className="w-1/2 border-zinc-800 text-zinc-300 text-xs py-5 cursor-pointer"
+                className="w-1/2 border-border text-foreground text-xs py-5 cursor-pointer"
               >
                 Cancel
               </Button>

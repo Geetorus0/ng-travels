@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LocationPicker } from "@/components/trips/LocationPicker";
 import {
   calculateCommercialFare,
   calculateBillableDays,
@@ -12,7 +14,7 @@ import {
   formatKM,
 } from "@/lib/fareEngine";
 import {
-  User, Calendar, MapPin, Navigation, IndianRupee, ShieldCheck, CheckCircle2,
+  User, Calendar, Navigation, IndianRupee, ShieldCheck, CheckCircle2,
   Plus, Trash2, ArrowRight, ArrowLeft, Sparkles, AlertTriangle,
   Clock, Car, Search, Calculator, Receipt, CreditCard
 } from "lucide-react";
@@ -76,13 +78,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   // Step 3: Route & Direct Distance (Zero autofill)
   const [pickupInput, setPickupInput] = useState("");
   const [pickupLocation, setPickupLocation] = useState<any>(null);
-  const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
-  const [searchingPickup, setSearchingPickup] = useState(false);
-
   const [destInput, setDestInput] = useState("");
   const [destLocation, setDestLocation] = useState<any>(null);
-  const [destSuggestions, setDestSuggestions] = useState<any[]>([]);
-  const [searchingDest, setSearchingDest] = useState(false);
 
   const [stops, setStops] = useState<{ name: string; address: string }[]>([]);
   const [stopInput, setStopInput] = useState("");
@@ -118,7 +115,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     queryKey: ["/api/vehicles"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/vehicles");
+        const res = await apiFetch("/api/vehicles");
         if (!res.ok) return [];
         const json = await res.json();
         return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
@@ -134,60 +131,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     ? (rawVehicles as any).items
     : [];
 
-  // Autocomplete for Pickup (debounced)
-  useEffect(() => {
-    if (!pickupInput || pickupInput.length < 2) {
-      setPickupSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingPickup(true);
-      try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(pickupInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setPickupSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") setPickupSuggestions([]);
-      } finally {
-        setSearchingPickup(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [pickupInput]);
-
-  // Autocomplete for Destination (debounced)
-  useEffect(() => {
-    if (!destInput || destInput.length < 2) {
-      setDestSuggestions([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setSearchingDest(true);
-      try {
-        const res = await fetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(destInput)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        setDestSuggestions(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (err.name !== "AbortError") setDestSuggestions([]);
-      } finally {
-        setSearchingDest(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [destInput]);
-
   // Optional: Auto-Estimate Distance from Driving Network in background
   const handleAutoEstimateDistance = async () => {
     if (!pickupInput.trim() || !destInput.trim()) {
@@ -198,7 +141,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     try {
       const pLoc = pickupLocation || { name: pickupInput, address: pickupInput };
       const dLoc = destLocation || { name: destInput, address: destInput };
-      const res = await fetch("/api/maps/routes", {
+      const res = await apiFetch("/api/maps/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -339,7 +282,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       let customerId = selectedCustomerId;
 
       if (isCreatingNewCustomer) {
-        const custRes = await fetch("/api/customers", {
+        const custRes = await apiFetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -402,7 +345,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         paymentReference,
       };
 
-      const res = await fetch("/api/trips", {
+      const res = await apiFetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -441,14 +384,14 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       {loading && <TripActionLoader action="create" />}
 
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[96vw] max-w-3xl bg-zinc-950 border-zinc-800 text-zinc-100 max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-2xl">
-          <DialogHeader className="border-b border-zinc-800/80 pb-3 sm:pb-4">
+        <DialogContent className="w-[96vw] max-w-3xl bg-background border-border text-foreground max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-2xl">
+          <DialogHeader className="border-b border-border/80 pb-3 sm:pb-4">
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-base sm:text-xl font-black text-amber-400 flex items-center gap-1.5 sm:gap-2">
-                <Navigation className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+              <DialogTitle className="text-base sm:text-xl font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5 sm:gap-2">
+                <Navigation className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-400" />
                 CREATE TRIP & DISPATCH
               </DialogTitle>
-              <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 sm:py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+              <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 sm:py-1 rounded bg-card border border-border text-muted-foreground">
                 STEP {step}/5
               </span>
             </div>
@@ -463,11 +406,11 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         ? "bg-emerald-400"
                         : step === idx + 1
                         ? "bg-amber-400 animate-pulse"
-                        : "bg-zinc-800"
+                        : "bg-muted"
                     }`}
                   />
                   <div className={`text-[9px] sm:text-[10px] font-medium truncate mt-0.5 sm:mt-1 hidden xs:block ${
-                    step === idx + 1 ? "text-amber-400 font-bold" : "text-zinc-500"
+                    step === idx + 1 ? "text-amber-700 dark:text-amber-400 font-bold" : "text-muted-foreground"
                   }`}>{label}</div>
                 </div>
               ))}
@@ -480,14 +423,14 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-200">Customer Identification</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">Select an existing corporate profile or quickly register a new client.</p>
+                    <h3 className="text-sm font-bold text-foreground">Customer Identification</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Select an existing corporate profile or quickly register a new client.</p>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setIsCreatingNewCustomer(!isCreatingNewCustomer)}
-                    className="border-amber-500/40 text-amber-300 text-xs h-8 cursor-pointer"
+                    className="border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs h-8 cursor-pointer"
                   >
                     {isCreatingNewCustomer ? "Select Existing Customer" : "+ Add New Customer"}
                   </Button>
@@ -496,18 +439,18 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 {!isCreatingNewCustomer ? (
                   <div className="space-y-3">
                     <div className="relative">
-                      <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                      <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                       <Input
                         placeholder="Search customer by name, mobile, or company (e.g. Rajesh, 98450)..."
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
-                        className="pl-9 bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500"
+                        className="pl-9 bg-card border-border text-xs h-10 placeholder:text-muted-foreground"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
                       {filteredCustomers.length === 0 ? (
-                        <div className="col-span-2 text-center py-8 text-zinc-500 text-xs bg-zinc-900/40 rounded-xl border border-zinc-800">
+                        <div className="col-span-2 text-center py-8 text-muted-foreground text-xs bg-card/40 rounded-xl border border-border">
                           No matching customer accounts. Click "+ Add New Customer" above to register.
                         </div>
                       ) : (
@@ -519,16 +462,16 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                               onClick={() => setSelectedCustomerId(cust.id)}
                               className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
                                 isSelected
-                                  ? "bg-amber-950/40 border-amber-400 text-zinc-100 shadow-md shadow-amber-400/10"
-                                  : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                                  ? "bg-amber-950/40 border-amber-400 text-foreground shadow-md shadow-amber-400/10"
+                                  : "bg-card/60 border-border hover:border-border text-foreground"
                               }`}
                             >
                               <div className="font-bold text-xs flex items-center justify-between">
                                 <span>{cust.name}</span>
-                                {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
+                                {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-700 dark:text-amber-400" />}
                               </div>
-                              <div className="text-[11px] text-zinc-400 mt-0.5">{cust.mobile}</div>
-                              <div className="text-[10px] text-zinc-500 truncate mt-1">{cust.address || "No address on file"}</div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">{cust.mobile}</div>
+                              <div className="text-[10px] text-muted-foreground truncate mt-1">{cust.address || "No address on file"}</div>
                             </div>
                           );
                         })
@@ -536,44 +479,44 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
+                  <div className="space-y-3 bg-card/40 p-4 rounded-xl border border-border">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] text-zinc-400 block mb-1">Customer Full Name *</label>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Customer Full Name *</label>
                         <Input
                           placeholder="e.g. Rajesh Sharma / Infosys Corporate"
                           value={newCustomerName}
                           onChange={(e) => setNewCustomerName(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 placeholder:text-zinc-500"
+                          className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-400 block mb-1">Mobile Number *</label>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Mobile Number *</label>
                         <Input
                           placeholder="e.g. +91 98450 12345 (10 digits)"
                           value={newCustomerMobile}
                           onChange={(e) => setNewCustomerMobile(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono placeholder:text-zinc-500"
+                          className="bg-card border-border text-xs h-9 font-mono placeholder:text-muted-foreground"
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] text-zinc-400 block mb-1">WhatsApp Number</label>
+                        <label className="text-[11px] text-muted-foreground block mb-1">WhatsApp Number</label>
                         <Input
                           placeholder="e.g. +91 98450 12345 (for booking updates)"
                           value={newCustomerWhatsapp}
                           onChange={(e) => setNewCustomerWhatsapp(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono placeholder:text-zinc-500"
+                          className="bg-card border-border text-xs h-9 font-mono placeholder:text-muted-foreground"
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-400 block mb-1">Customer Address</label>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Customer Address</label>
                         <Input
                           placeholder="e.g. #42, 100ft Road, Indiranagar, Bengaluru - 560038"
                           value={newCustomerAddress}
                           onChange={(e) => setNewCustomerAddress(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 placeholder:text-zinc-500"
+                          className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
                         />
                       </div>
                     </div>
@@ -586,9 +529,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             {step === 2 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-zinc-200">Trip Category & Schedule</h3>
+                  <h3 className="text-sm font-bold text-foreground">Trip Category & Schedule</h3>
                   {isRound && (
-                    <span className="text-[11px] font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded border border-amber-400/30">
+                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-400/10 px-2.5 py-1 rounded border border-amber-300 dark:border-amber-400/30">
                       Calculated Billable Days: {billableDays} Day(s)
                     </span>
                   )}
@@ -611,60 +554,60 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         onClick={() => setTripType(t.id as any)}
                         className={`p-3 rounded-xl border cursor-pointer text-left transition-all ${
                           isSelected
-                            ? "bg-amber-950/40 border-amber-400 text-zinc-100"
-                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                            ? "bg-amber-950/40 border-amber-400 text-foreground"
+                            : "bg-card/60 border-border hover:border-border text-muted-foreground"
                         }`}
                       >
                         <div className="font-bold text-xs flex items-center justify-between">
                           <span>{t.label}</span>
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />}
                         </div>
-                        <div className="text-[10px] text-zinc-500 mt-1">{t.desc}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">{t.desc}</div>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Dates & Times */}
-                <div className="bg-zinc-900/40 p-4 rounded-xl border border-zinc-800 space-y-3">
+                <div className="bg-card/40 p-4 rounded-xl border border-border space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-amber-400" /> Start Date & Time *
+                      <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Start Date & Time *
                       </label>
                       <div className="grid grid-cols-2 gap-2">
                         <Input
                           type="date"
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                          className="bg-card border-border text-xs h-9"
                         />
                         <Input
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                          className="bg-card border-border text-xs h-9"
                         />
                       </div>
                     </div>
 
                     {isRound && (
                       <div className="space-y-2">
-                        <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-purple-400" /> Return Date & Time *
+                        <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-purple-700 dark:text-purple-400" /> Return Date & Time *
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <Input
                             type="date"
                             value={returnDate}
                             onChange={(e) => setReturnDate(e.target.value)}
-                            className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                            className="bg-card border-border text-xs h-9"
                           />
                           <Input
                             type="time"
                             value={returnTime}
                             onChange={(e) => setReturnTime(e.target.value)}
-                            className="bg-zinc-900 border-zinc-800 text-xs h-9"
+                            className="bg-card border-border text-xs h-9"
                           />
                         </div>
                       </div>
@@ -673,23 +616,23 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <div>
-                      <label className="text-[11px] text-zinc-400 block mb-1">Passenger Count</label>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Passenger Count</label>
                       <Input
                         type="number"
                         min={1}
                         max={50}
                         value={passengerCount}
                         onChange={(e) => setPassengerCount(Number(e.target.value))}
-                        className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                        className="bg-card border-border text-xs h-9 font-mono"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-zinc-400 block mb-1">Special Passenger Instructions</label>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Special Passenger Instructions</label>
                       <Input
                         placeholder="e.g. Keep AC turned on, 2 mineral water bottles, passenger luggage assistance"
                         value={specialInstructions}
                         onChange={(e) => setSpecialInstructions(e.target.value)}
-                        className="bg-zinc-900 border-zinc-800 text-xs h-9 placeholder:text-zinc-500"
+                        className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
                       />
                     </div>
                   </div>
@@ -702,15 +645,15 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-200">Route & Driving Distance</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">Enter pickup, destination, stops, and specify the road distance in KM.</p>
+                    <h3 className="text-sm font-bold text-foreground">Route & Driving Distance</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Enter pickup, destination, stops, and specify the road distance in KM.</p>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handleAutoEstimateDistance}
                     disabled={calculatingDistance}
-                    className="border-amber-500/40 text-amber-300 text-xs h-8 flex items-center gap-1.5 cursor-pointer hover:bg-amber-400/10"
+                    className="border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs h-8 flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 hover:dark:bg-amber-400/10"
                   >
                     {calculatingDistance ? (
                       <ButtonLoader label="Calculating..." />
@@ -723,92 +666,52 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 </div>
 
                 {/* Pickup & Destination Inputs (Zero autofill) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" /> Pickup Location *
-                    </label>
-                    <Input
-                      placeholder="Type pickup place (e.g. Kempegowda Airport, Indiranagar, MG Road)..."
-                      value={pickupInput}
-                      onChange={(e) => {
-                        setPickupInput(e.target.value);
-                        setPickupLocation(null);
-                      }}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500"
-                    />
-                    {searchingPickup && <span className="text-[10px] text-zinc-500 absolute right-3 top-9">Searching...</span>}
-                    {pickupSuggestions.length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 top-16 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
-                        {pickupSuggestions.map((place, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setPickupInput(place.formattedAddress || place.name);
-                              setPickupLocation(place);
-                              setPickupSuggestions([]);
-                            }}
-                            className="p-2.5 hover:bg-zinc-800 text-xs text-zinc-200 cursor-pointer border-b border-zinc-800/60 last:border-0"
-                          >
-                            <div className="font-semibold">{place.name}</div>
-                            <div className="text-[10px] text-zinc-400 truncate">{place.formattedAddress}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-card/40 p-4 rounded-xl border border-border">
+                  <LocationPicker
+                    label="Pickup Location *"
+                    accent="emerald"
+                    searchPlaceholder="Type pickup place (e.g. Kempegowda Airport, Indiranagar, MG Road)..."
+                    value={pickupInput}
+                    onInputChange={(text) => {
+                      setPickupInput(text);
+                      setPickupLocation(null);
+                    }}
+                    onSelect={(place) => {
+                      setPickupLocation(place);
+                    }}
+                  />
 
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" /> Destination *
-                    </label>
-                    <Input
-                      placeholder="Type destination (e.g. Mysore Palace, Ooty, Coorg, Chennai Central)..."
-                      value={destInput}
-                      onChange={(e) => {
-                        setDestInput(e.target.value);
-                        setDestLocation(null);
-                      }}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500"
-                    />
-                    {searchingDest && <span className="text-[10px] text-zinc-500 absolute right-3 top-9">Searching...</span>}
-                    {destSuggestions.length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 top-16 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
-                        {destSuggestions.map((place, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setDestInput(place.formattedAddress || place.name);
-                              setDestLocation(place);
-                              setDestSuggestions([]);
-                            }}
-                            className="p-2.5 hover:bg-zinc-800 text-xs text-zinc-200 cursor-pointer border-b border-zinc-800/60 last:border-0"
-                          >
-                            <div className="font-semibold">{place.name}</div>
-                            <div className="text-[10px] text-zinc-400 truncate">{place.formattedAddress}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <LocationPicker
+                    label="Destination *"
+                    accent="amber"
+                    searchPlaceholder="Type destination (e.g. Mysore Palace, Ooty, Coorg, Chennai Central)..."
+                    value={destInput}
+                    onInputChange={(text) => {
+                      setDestInput(text);
+                      setDestLocation(null);
+                    }}
+                    onSelect={(place) => {
+                      setDestLocation(place);
+                    }}
+                  />
                 </div>
 
                 {/* Intermediate Stops */}
-                <div className="space-y-2 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-                  <label className="text-xs font-semibold text-zinc-300 block">Waypoints & Intermediate Stops (Optional)</label>
+                <div className="space-y-2 bg-card/40 p-4 rounded-xl border border-border">
+                  <label className="text-xs font-semibold text-foreground block">Waypoints & Intermediate Stops (Optional)</label>
                   <div className="flex gap-2">
                     <Input
                       placeholder="Add intermediate stop (e.g. Mandya, Maddur Tiffany's, Channapatna Toys)..."
                       value={stopInput}
                       onChange={(e) => setStopInput(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddStop())}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-9 placeholder:text-zinc-500"
+                      className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
                     />
                     <Button
                       size="sm"
                       type="button"
                       onClick={handleAddStop}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs h-9 cursor-pointer"
+                      className="bg-muted hover:bg-muted text-foreground text-xs h-9 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1" /> Add
                     </Button>
@@ -817,13 +720,13 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   {stops.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-2">
                       {stops.map((stop, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 bg-zinc-800/90 text-zinc-200 px-2.5 py-1 rounded-lg text-xs border border-zinc-700">
-                          <span className="text-[10px] text-amber-400 font-mono">#{idx + 1}</span>
+                        <div key={idx} className="flex items-center gap-1.5 bg-muted/90 text-foreground px-2.5 py-1 rounded-lg text-xs border border-border">
+                          <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono">#{idx + 1}</span>
                           <span>{stop.name}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveStop(idx)}
-                            className="text-zinc-400 hover:text-rose-400 cursor-pointer ml-1"
+                            className="text-muted-foreground hover:text-rose-700 hover:dark:text-rose-400 cursor-pointer ml-1"
                           >
                             ×
                           </button>
@@ -834,19 +737,19 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 </div>
 
                 {/* Direct Editable Road Distance & Billing KM */}
-                <div className="bg-zinc-900/60 p-4 rounded-xl border border-amber-500/40 bg-amber-950/10 space-y-3">
+                <div className="bg-card/60 p-4 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-950/10 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Calculator className="w-4 h-4" /> Road Distance & Billable Volume
                     </span>
-                    <span className="text-[11px] font-mono text-zinc-400">
+                    <span className="text-[11px] font-mono text-muted-foreground">
                       Minimum Billable: {commercialFare.minimumBillableKm} KM
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="text-[11px] text-zinc-300 block mb-1">
+                      <label className="text-[11px] text-foreground block mb-1">
                         Total Road Distance (KM) *
                       </label>
                       <Input
@@ -855,19 +758,19 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         value={distanceKm || ""}
                         onChange={(e) => setDistanceKm(Math.max(0, Number(e.target.value)))}
                         placeholder="e.g. 350"
-                        className="bg-zinc-900 border-zinc-800 text-sm h-10 font-mono font-bold text-amber-400 placeholder:text-zinc-500"
+                        className="bg-card border-border text-sm h-10 font-mono font-bold text-amber-700 dark:text-amber-400 placeholder:text-muted-foreground"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-zinc-400 block mb-1">
+                      <label className="text-[11px] text-muted-foreground block mb-1">
                         Effective Billable KM
                       </label>
-                      <div className="h-10 px-3 flex items-center font-mono font-bold text-sm bg-zinc-950 border border-zinc-800 rounded-md text-emerald-400">
+                      <div className="h-10 px-3 flex items-center font-mono font-bold text-sm bg-background border border-border rounded-md text-emerald-700 dark:text-emerald-400">
                         {commercialFare.totalBillableDistance} KM
                       </div>
                     </div>
                     <div>
-                      <label className="text-[11px] text-zinc-400 block mb-1">
+                      <label className="text-[11px] text-muted-foreground block mb-1">
                         Toll Charge (₹)
                       </label>
                       <Input
@@ -876,7 +779,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         value={finalToll || ""}
                         onChange={(e) => setFinalToll(Math.max(0, Number(e.target.value)))}
                         placeholder="e.g. 450"
-                        className="bg-zinc-900 border-zinc-800 text-sm h-10 font-mono font-bold text-zinc-200 placeholder:text-zinc-500"
+                        className="bg-card border-border text-sm h-10 font-mono font-bold text-foreground placeholder:text-muted-foreground"
                       />
                     </div>
                   </div>
@@ -889,11 +792,11 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                      <IndianRupee className="w-4 h-4 text-amber-400" />
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <IndianRupee className="w-4 h-4 text-amber-700 dark:text-amber-400" />
                       Commercial Pricing Engine & Transparent Calculation
                     </h3>
-                    <p className="text-[11px] text-zinc-400">
+                    <p className="text-[11px] text-muted-foreground">
                       100% dynamic distance-rate calculation with minimum KM policy, driver bata, state permits, and real tolls.
                     </p>
                   </div>
@@ -901,29 +804,29 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Left Column: Editable Rates & Surcharges */}
-                  <div className="space-y-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 text-xs">
-                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                  <div className="space-y-3 bg-card/50 p-4 rounded-xl border border-border text-xs">
+                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">
                       Commercial Rate Parameters
                     </span>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] text-zinc-300 block mb-1">Rate Per KM (₹) *</label>
+                        <label className="text-[11px] text-foreground block mb-1">Rate Per KM (₹) *</label>
                         <Input
                           type="number"
                           value={ratePerKm}
                           onChange={(e) => setRatePerKm(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono font-bold text-amber-400"
+                          className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400"
                         />
                       </div>
                       {isRound && (
                         <div>
-                          <label className="text-[11px] text-zinc-300 block mb-1">Min KM / Day *</label>
+                          <label className="text-[11px] text-foreground block mb-1">Min KM / Day *</label>
                           <Input
                             type="number"
                             value={minimumKmPerDay}
                             onChange={(e) => setMinimumKmPerDay(Number(e.target.value))}
-                            className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                            className="bg-card border-border text-xs h-9 font-mono"
                           />
                         </div>
                       )}
@@ -932,21 +835,21 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     {isRound && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[11px] text-zinc-300 block mb-1">Driver Bata / Day (₹)</label>
+                          <label className="text-[11px] text-foreground block mb-1">Driver Bata / Day (₹)</label>
                           <Input
                             type="number"
                             value={driverBataPerDay}
                             onChange={(e) => setDriverBataPerDay(Number(e.target.value))}
-                            className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                            className="bg-card border-border text-xs h-9 font-mono"
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-zinc-300 block mb-1">Night Bata (₹)</label>
+                          <label className="text-[11px] text-foreground block mb-1">Night Bata (₹)</label>
                           <Input
                             type="number"
                             value={nightBata}
                             onChange={(e) => setNightBata(Number(e.target.value))}
-                            className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                            className="bg-card border-border text-xs h-9 font-mono"
                           />
                         </div>
                       </div>
@@ -954,103 +857,103 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] text-zinc-300 block mb-1">State Permit (₹)</label>
+                        <label className="text-[11px] text-foreground block mb-1">State Permit (₹)</label>
                         <Input
                           type="number"
                           value={permitCharge}
                           onChange={(e) => setPermitCharge(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                          className="bg-card border-border text-xs h-9 font-mono"
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-300 block mb-1">Final Toll (₹)</label>
+                        <label className="text-[11px] text-foreground block mb-1">Final Toll (₹)</label>
                         <Input
                           type="number"
                           value={finalToll}
                           onChange={(e) => setFinalToll(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                          className="bg-card border-border text-xs h-9 font-mono"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1">Parking (₹)</label>
+                        <label className="text-[10px] text-muted-foreground block mb-1">Parking (₹)</label>
                         <Input
                           type="number"
                           value={parking}
                           onChange={(e) => setParking(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-8 font-mono"
+                          className="bg-card border-border text-xs h-8 font-mono"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1">Waiting (₹)</label>
+                        <label className="text-[10px] text-muted-foreground block mb-1">Waiting (₹)</label>
                         <Input
                           type="number"
                           value={waitingCharge}
                           onChange={(e) => setWaitingCharge(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-8 font-mono"
+                          className="bg-card border-border text-xs h-8 font-mono"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1">Discount (₹)</label>
+                        <label className="text-[10px] text-muted-foreground block mb-1">Discount (₹)</label>
                         <Input
                           type="number"
                           value={discount}
                           onChange={(e) => setDiscount(Number(e.target.value))}
-                          className="bg-zinc-900 border-zinc-800 text-xs h-8 font-mono text-rose-400"
+                          className="bg-card border-border text-xs h-8 font-mono text-rose-700 dark:text-rose-400"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Right Column: Live Itemized Fare Ledger */}
-                  <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between text-xs space-y-3">
+                  <div className="bg-card/80 border border-border rounded-xl p-4 flex flex-col justify-between text-xs space-y-3">
                     <div className="space-y-2">
-                      <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-                        <span className="font-bold text-zinc-200">Billable Volume:</span>
-                        <span className="font-mono text-zinc-300">
+                      <div className="flex justify-between items-center border-b border-border pb-2">
+                        <span className="font-bold text-foreground">Billable Volume:</span>
+                        <span className="font-mono text-foreground">
                           {commercialFare.totalBillableDistance} KM @ ₹{ratePerKm}/km
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-zinc-400">
+                      <div className="flex justify-between items-center text-muted-foreground">
                         <span>Base Distance Fare:</span>
-                        <span className="font-mono text-zinc-200">{formatINR(baseFare)}</span>
+                        <span className="font-mono text-foreground">{formatINR(baseFare)}</span>
                       </div>
                       {isRound && (
-                        <div className="flex justify-between items-center text-zinc-400">
+                        <div className="flex justify-between items-center text-muted-foreground">
                           <span>Driver Bata ({billableDays} Days):</span>
-                          <span className="font-mono text-zinc-200">{formatINR(commercialFare.driverBata)}</span>
+                          <span className="font-mono text-foreground">{formatINR(commercialFare.driverBata)}</span>
                         </div>
                       )}
                       {(finalToll > 0 || permitCharge > 0) && (
-                        <div className="flex justify-between items-center text-zinc-400">
+                        <div className="flex justify-between items-center text-muted-foreground">
                           <span>Toll & Permit:</span>
-                          <span className="font-mono text-zinc-200">{formatINR(finalToll + permitCharge)}</span>
+                          <span className="font-mono text-foreground">{formatINR(finalToll + permitCharge)}</span>
                         </div>
                       )}
                       {(parking > 0 || waitingCharge > 0) && (
-                        <div className="flex justify-between items-center text-zinc-400">
+                        <div className="flex justify-between items-center text-muted-foreground">
                           <span>Parking & Waiting:</span>
-                          <span className="font-mono text-zinc-200">{formatINR(parking + waitingCharge)}</span>
+                          <span className="font-mono text-foreground">{formatINR(parking + waitingCharge)}</span>
                         </div>
                       )}
                       {discount > 0 && (
-                        <div className="flex justify-between items-center text-rose-400">
+                        <div className="flex justify-between items-center text-rose-700 dark:text-rose-400">
                           <span>Discount Applied:</span>
                           <span className="font-mono">- {formatINR(discount)}</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="pt-3 border-t border-zinc-800 space-y-2">
-                      <div className="flex justify-between items-center text-zinc-400">
+                    <div className="pt-3 border-t border-border space-y-2">
+                      <div className="flex justify-between items-center text-muted-foreground">
                         <span>Subtotal:</span>
-                        <span className="font-mono font-bold text-zinc-200">{formatINR(commercialFare.subtotal)}</span>
+                        <span className="font-mono font-bold text-foreground">{formatINR(commercialFare.subtotal)}</span>
                       </div>
-                      <div className="flex justify-between items-center bg-zinc-950 p-3 rounded-lg border border-amber-500/30">
-                        <span className="font-black text-xs text-amber-400 uppercase">Customer Total Fare:</span>
-                        <span className="text-xl font-black font-mono text-emerald-400">{formatINR(customerTotal)}</span>
+                      <div className="flex justify-between items-center bg-background p-3 rounded-lg border border-amber-300 dark:border-amber-500/30">
+                        <span className="font-black text-xs text-amber-700 dark:text-amber-400 uppercase">Customer Total Fare:</span>
+                        <span className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">{formatINR(customerTotal)}</span>
                       </div>
                     </div>
                   </div>
@@ -1061,12 +964,12 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             {/* STEP 5: DRIVER, FLEET ASSIGNMENT & DISPATCH */}
             {step === 5 && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-zinc-200">Driver Roster & Advance Payment</h3>
+                <h3 className="text-sm font-bold text-foreground">Driver Roster & Advance Payment</h3>
 
                 {/* Driver & Vehicle Selector */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-300">Assign Operational Driver</label>
+                    <label className="text-xs font-bold text-foreground">Assign Operational Driver</label>
                     <Select
                       value={selectedDriverId ? String(selectedDriverId) : "unassigned"}
                       onValueChange={(val) => {
@@ -1078,10 +981,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         }
                       }}
                     >
-                      <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs h-10">
+                      <SelectTrigger className="bg-card border-border text-xs h-10">
                         <SelectValue placeholder="Select driver..." />
                       </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                      <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem value="unassigned">Unassigned (Assign Later)</SelectItem>
                         {drivers.map((d) => (
                           <SelectItem key={d.id} value={String(d.id)}>
@@ -1093,15 +996,15 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-300">Assign Commercial Vehicle</label>
+                    <label className="text-xs font-bold text-foreground">Assign Commercial Vehicle</label>
                     <Select
                       value={selectedVehicleId ? String(selectedVehicleId) : "unassigned"}
                       onValueChange={(val) => setSelectedVehicleId(val === "unassigned" ? null : Number(val))}
                     >
-                      <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs h-10">
+                      <SelectTrigger className="bg-card border-border text-xs h-10">
                         <SelectValue placeholder="Select fleet vehicle..." />
                       </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                      <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem value="unassigned">Unassigned (Assign Later)</SelectItem>
                         {vehicles.map((v: any) => (
                           <SelectItem key={v.id} value={String(v.id)}>
@@ -1114,23 +1017,23 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 </div>
 
                 {/* Advance Collection */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-card/40 p-4 rounded-xl border border-border">
                   <div>
-                    <label className="text-[11px] text-zinc-400 block mb-1">Advance Amount (₹)</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Advance Amount (₹)</label>
                     <Input
                       type="number"
                       value={advanceAmount}
                       onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono"
+                      className="bg-card border-border text-xs h-9 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-zinc-400 block mb-1">Payment Method</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Payment Method</label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="bg-zinc-900 border-zinc-800 text-xs h-9">
+                      <SelectTrigger className="bg-card border-border text-xs h-9">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                      <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem value="UPI">UPI / GPay / PhonePe</SelectItem>
                         <SelectItem value="Cash">Cash</SelectItem>
                         <SelectItem value="Card">Credit / Debit Card</SelectItem>
@@ -1139,34 +1042,34 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     </Select>
                   </div>
                   <div>
-                    <label className="text-[11px] text-zinc-400 block mb-1">Payment Reference / UTR</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Payment Reference / UTR</label>
                     <Input
                       placeholder="e.g. UPI Ref / UTR: 429188201992"
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
-                      className="bg-zinc-900 border-zinc-800 text-xs h-9 font-mono placeholder:text-zinc-500"
+                      className="bg-card border-border text-xs h-9 font-mono placeholder:text-muted-foreground"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center p-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-mono">
+                <div className="flex justify-between items-center p-3.5 rounded-xl bg-card border border-border text-xs font-mono">
                   <div>
-                    <span className="text-zinc-400 block">Total Fare: {formatINR(customerTotal)}</span>
-                    <span className="text-emerald-400 block">Advance Paid: {formatINR(advanceAmount)}</span>
+                    <span className="text-muted-foreground block">Total Fare: {formatINR(customerTotal)}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 block">Advance Paid: {formatINR(advanceAmount)}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-zinc-400 text-[10px] block uppercase">Remaining Balance Due</span>
-                    <span className="text-amber-300 font-bold text-base">{formatINR(remainingBalance)}</span>
+                    <span className="text-muted-foreground text-[10px] block uppercase">Remaining Balance Due</span>
+                    <span className="text-amber-700 dark:text-amber-300 font-bold text-base">{formatINR(remainingBalance)}</span>
                   </div>
                 </div>
 
                 {/* Final Route & Schedule Summary */}
-                <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800/80 text-xs space-y-1">
-                  <div className="text-zinc-300 font-medium flex items-center gap-1.5">
-                    <Navigation className="w-3.5 h-3.5 text-amber-400" />
+                <div className="bg-card/60 p-3 rounded-xl border border-border/80 text-xs space-y-1">
+                  <div className="text-foreground font-medium flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
                     <span>{pickupInput} ➔ {destInput}</span>
                   </div>
-                  <div className="text-zinc-500 text-[11px]">
+                  <div className="text-muted-foreground text-[11px]">
                     {startDate} at {startTime} • {tripType.replaceAll("_", " ")} • {commercialFare.totalBillableDistance} Billable KM
                   </div>
                 </div>
@@ -1175,13 +1078,13 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           </div>
 
           {/* Dialog Action Buttons */}
-          <div className="flex justify-between items-center pt-3 border-t border-zinc-800">
+          <div className="flex justify-between items-center pt-3 border-t border-border">
             {step > 1 ? (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleBack}
-                className="border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs h-9 cursor-pointer"
+                className="border-border hover:border-border text-foreground text-xs h-9 cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back
               </Button>
@@ -1190,7 +1093,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={onClose}
-                className="border-zinc-800 text-zinc-400 text-xs h-9 cursor-pointer"
+                className="border-border text-muted-foreground text-xs h-9 cursor-pointer"
               >
                 Cancel
               </Button>

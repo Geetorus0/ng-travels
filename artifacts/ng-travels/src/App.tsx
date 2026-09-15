@@ -1,27 +1,69 @@
-import React, { type ReactNode, createContext, useContext, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ClerkProvider, useClerk, useUser } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
-import { shadcn } from "@clerk/themes";
+import React, {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
-  Archive, ArrowLeft, ArrowUpRight, BarChart3, Bell, CalendarDays,
-  Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, Clock3,
-  Download, FileText, Fuel, LayoutDashboard, LogOut, MapPin, Menu,
-  Navigation, Pencil, Plus, Receipt, RefreshCw, Search, Settings2, ShieldCheck,
-  SlidersHorizontal, Sparkles, TrendingUp, Users, WalletCards, X, XCircle,
-  Car, FileQuestion, Radio, Smartphone, AlertTriangle, AlertCircle, Eye, EyeOff,
-  Lock, Mail, KeyRound
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { Router, Route, Switch, Redirect, useLocation } from "wouter";
+import type { Session } from "@supabase/supabase-js";
+import {
+  Archive,
+  ArrowLeft,
+  ArrowUpRight,
+  BarChart3,
+  Bell,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  Download,
+  FileText,
+  Fuel,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Menu,
+  Navigation,
+  Pencil,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
+  Users,
+  WalletCards,
+  X,
+  XCircle,
+  Car,
+  FileQuestion,
+  Radio,
+  Smartphone,
+  AlertTriangle,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  KeyRound,
 } from "lucide-react";
-import { Redirect, Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from "wouter";
-
-import { ErrorBoundary } from "@/components/error-boundary";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { AppSplashLoader, ButtonLoader } from "@/components/loading";
 import { syncEngine } from "@/lib/syncEngine";
 import { supabase } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/apiFetch";
 
 // Initialize universal sync engine (standalone offline + remote sync)
 syncEngine.init();
@@ -29,6 +71,12 @@ syncEngine.init();
 // Modular Layouts
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
 import { DriverLayout } from "@/components/layout/DriverLayout";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AppSplashLoader, ButtonLoader } from "@/components/loading";
 
 // Modular Modals & Vouchers
 import { CreateTripModal } from "@/components/trips/CreateTripModal";
@@ -68,11 +116,6 @@ import { DriverVehiclePage } from "@/pages/driver/DriverVehiclePage";
 import { DriverHistoryPage } from "@/pages/driver/DriverHistoryPage";
 
 const queryClient = new QueryClient();
-const rawClerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const hasClerkKey = Boolean(rawClerkKey && rawClerkKey.trim() !== "" && !rawClerkKey.includes("undefined"));
-const clerkPubKey = hasClerkKey
-  ? rawClerkKey
-  : (publishableKeyFromHost(window.location.hostname, undefined) || "");
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string) {
@@ -87,6 +130,12 @@ export interface AuthUser {
   firstName?: string;
   username?: string;
   role: "owner" | "admin" | "driver";
+  // The account's actual server-side role, from the Supabase session — unlike
+  // `role`, this is never overwritten by the cosmetic switchRole() preview
+  // toggle, so it can be used to tell whether owner-only actions will really
+  // succeed (a driver account previewing the Admin UI still can't approve
+  // expenses etc. — the backend checks this same underlying role, not the UI).
+  realRole: "owner" | "admin" | "driver";
   driverId?: number | null;
   phone?: string | null;
   email?: string | null;
@@ -97,14 +146,25 @@ export interface AuthContextType {
   user: AuthUser | null;
   isSignedIn: boolean;
   isLoaded: boolean;
+  isPasswordRecovery: boolean;
+  accessToken: string | null;
   signOut: (options?: { redirectUrl?: string }) => Promise<void>;
   signInWithCredentials: (params: {
     type: "admin" | "driver";
     email?: string;
     password?: string;
     identifier?: string;
-    pin?: string;
   }) => Promise<{ success: boolean; error?: string }>;
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  completePasswordReset: (
+    newPassword: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  requestDriverPasswordReset: (
+    identifier: string,
+    note?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   switchRole: (role: "admin" | "driver") => void;
 }
 
@@ -112,129 +172,108 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isSignedIn: false,
   isLoaded: false,
+  isPasswordRecovery: false,
+  accessToken: null,
   signOut: async () => {},
-  signInWithCredentials: async () => ({ success: false, error: "Uninitialized" }),
+  signInWithCredentials: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  requestPasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  completePasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
+  requestDriverPasswordReset: async () => ({
+    success: false,
+    error: "Uninitialized",
+  }),
   switchRole: () => {},
 });
+
+function authUserFromSession(session: Session): AuthUser {
+  const rawRole = (session.user.user_metadata?.role || "owner").toUpperCase();
+  const role = rawRole === "DRIVER" ? "driver" : "owner";
+  const fullName =
+    session.user.user_metadata?.full_name ||
+    session.user.email?.split("@")[0] ||
+    "Operations User";
+  return {
+    id: session.user.id as any,
+    fullName,
+    firstName: fullName.split(" ")[0],
+    role,
+    realRole: role,
+    driverId: session.user.user_metadata?.driver_id || null,
+    phone: session.user.phone,
+    email: session.user.email,
+    primaryEmailAddress: session.user.email
+      ? { emailAddress: session.user.email }
+      : undefined,
+  };
+}
 
 export function ProductionAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  // Restore authenticated session from Supabase or server on mount
+  // Restore and track the Supabase Auth session (the single source of truth for identity)
   useEffect(() => {
     let isMounted = true;
 
-    async function checkAuthSession() {
-      // 1. Check native Supabase Auth session first
+    async function restoreSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user && isMounted) {
-          const rawRole = (session.user.user_metadata?.role || "OWNER").toUpperCase();
-          const role = rawRole === "DRIVER" ? "driver" : "owner";
-          const authUser: AuthUser = {
-            id: session.user.id as any,
-            fullName: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Operations Owner",
-            firstName: (session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User").split(" ")[0],
-            role,
-            driverId: session.user.user_metadata?.driver_id || null,
-            phone: session.user.phone,
-            email: session.user.email,
-            primaryEmailAddress: session.user.email ? { emailAddress: session.user.email } : undefined,
-          };
-          setUser(authUser);
-          setIsSignedIn(true);
-          localStorage.setItem("ng_user_role", role);
-          setIsLoaded(true);
-          return;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (isMounted) {
+          if (session?.user) {
+            setUser(authUserFromSession(session));
+            setAccessToken(session.access_token || null);
+            setIsSignedIn(true);
+          } else {
+            setUser(null);
+            setAccessToken(null);
+            setIsSignedIn(false);
+          }
         }
       } catch (err) {
         console.warn("[Auth] Supabase session check notice:", err);
-      }
-
-      // 2. Check token in localStorage
-      const token = localStorage.getItem("ng_auth_token");
-      if (!token) {
         if (isMounted) {
           setUser(null);
+          setAccessToken(null);
           setIsSignedIn(false);
-          setIsLoaded(true);
-        }
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user && isMounted) {
-            const role = data.user.role === "driver" ? "driver" : "owner";
-            const authUser: AuthUser = {
-              id: data.user.id,
-              fullName: data.user.fullName,
-              firstName: data.user.fullName?.split(" ")[0] || "User",
-              role,
-              driverId: data.user.driverId,
-              phone: data.user.phone,
-              email: data.user.email,
-              primaryEmailAddress: data.user.email ? { emailAddress: data.user.email } : undefined,
-            };
-            setUser(authUser);
-            setIsSignedIn(true);
-            localStorage.setItem("ng_user_role", role);
-          } else if (isMounted) {
-            localStorage.removeItem("ng_auth_token");
-            setUser(null);
-            setIsSignedIn(false);
-          }
-        } else {
-          localStorage.removeItem("ng_auth_token");
-          if (isMounted) {
-            setUser(null);
-            setIsSignedIn(false);
-          }
-        }
-      } catch (err) {
-        console.warn("[Auth] Session restore notice:", err);
-        if (isMounted && token) {
-          const savedRole = (localStorage.getItem("ng_user_role") as "driver" | "owner") || "owner";
-          setIsSignedIn(true);
-          setUser({
-            fullName: savedRole === "driver" ? "Driver Pilot" : "Operations Owner",
-            role: savedRole,
-          });
         }
       } finally {
-        if (isMounted) {
-          setIsLoaded(true);
-        }
+        if (isMounted) setIsLoaded(true);
       }
     }
 
-    checkAuthSession();
+    restoreSession();
 
-    // Subscribe to Supabase Auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
-      if (session?.user) {
-        const rawRole = (session.user.user_metadata?.role || "OWNER").toUpperCase();
-        const role = rawRole === "DRIVER" ? "driver" : "owner";
-        setUser({
-          id: session.user.id as any,
-          fullName: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
-          firstName: (session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User").split(" ")[0],
-          role,
-          driverId: session.user.user_metadata?.driver_id || null,
-          phone: session.user.phone,
-          email: session.user.email,
-        });
-        setIsSignedIn(true);
-        localStorage.setItem("ng_user_role", role);
+      if (_event === "PASSWORD_RECOVERY") {
+        setIsPasswordRecovery(true);
       }
+      if (session?.user) {
+        setUser(authUserFromSession(session));
+        setAccessToken(session.access_token || null);
+        setIsSignedIn(true);
+      } else {
+        setUser(null);
+        setAccessToken(null);
+        setIsSignedIn(false);
+      }
+      setIsLoaded(true);
     });
 
     return () => {
@@ -251,75 +290,131 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
     pin?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     try {
-      // 1. Direct Supabase Auth attempt for admin
-      if (params.type === "admin" && params.email && params.password) {
-        try {
-          const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
-            email: params.email.trim(),
-            password: params.password,
-          });
-
-          if (!sbError && sbData?.session?.user) {
-            const rawRole = (sbData.session.user.user_metadata?.role || "OWNER").toUpperCase();
-            const role = rawRole === "DRIVER" ? "driver" : "owner";
-            const authUser: AuthUser = {
-              id: sbData.session.user.id as any,
-              fullName: sbData.session.user.user_metadata?.full_name || "Operations Admin",
-              firstName: (sbData.session.user.user_metadata?.full_name || "Admin").split(" ")[0],
-              role,
-              email: sbData.session.user.email,
-            };
-            localStorage.setItem("ng_user_role", role);
-            setUser(authUser);
-            setIsSignedIn(true);
-            return { success: true };
-          }
-        } catch (e) {
-          console.warn("[Auth] Supabase direct auth notice:", e);
+      if (params.type === "admin") {
+        if (!params.email || !params.password) {
+          return { success: false, error: "Email and password are required." };
         }
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: params.email.trim(),
+          password: params.password,
+        });
+        if (error || !data?.session?.user) {
+          return {
+            success: false,
+            error: error?.message || "Invalid email or password.",
+          };
+        }
+        setUser(authUserFromSession(data.session));
+        setIsSignedIn(true);
+        return { success: true };
       }
 
-      // 2. Primary API server authentication
-      const endpoint = params.type === "admin" ? "/api/auth/login" : "/api/auth/driver-login";
-      const body = params.type === "admin"
-        ? { email: params.email?.trim(), password: params.password }
-        : { identifier: params.identifier?.trim(), pin: params.pin?.trim() };
-
-      const res = await fetch(endpoint, {
+      // Driver: exchange identifier + password for a real Supabase session via the server
+      const res = await apiFetch("/api/auth/driver-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          identifier: params.identifier?.trim(),
+          password: params.password?.trim(),
+        }),
       });
-
       const data = await res.json();
-      if (!res.ok || !data.token) {
+      if (!res.ok || !data?.session?.accessToken) {
         return {
           success: false,
-          error: data.message || data.error?.message || "Invalid credentials. Please verify and try again.",
+          error:
+            data?.error?.message || "Invalid driver credentials or password.",
         };
       }
 
-      localStorage.setItem("ng_auth_token", data.token);
-      const role = data.user.role === "driver" ? "driver" : "owner";
-      const authUser: AuthUser = {
-        id: data.user.id,
-        fullName: data.user.fullName,
-        firstName: data.user.fullName?.split(" ")[0] || "User",
-        role,
-        driverId: data.user.driverId,
-        phone: data.user.phone,
-        email: data.user.email,
-        primaryEmailAddress: data.user.email ? { emailAddress: data.user.email } : undefined,
-      };
+      const { data: sessionData, error: setErr } =
+        await supabase.auth.setSession({
+          access_token: data.session.accessToken,
+          refresh_token: data.session.refreshToken,
+        });
+      if (setErr || !sessionData?.session) {
+        return {
+          success: false,
+          error: setErr?.message || "Unable to establish driver session.",
+        };
+      }
 
-      localStorage.setItem("ng_user_role", role);
-      setUser(authUser);
+      setUser(authUserFromSession(sessionData.session));
       setIsSignedIn(true);
       return { success: true };
     } catch (err: any) {
       return {
         success: false,
-        error: "Unable to connect to authentication server. Please check your network.",
+        error:
+          "Unable to connect to authentication server. Please check your network.",
+      };
+    }
+  };
+
+  const requestPasswordReset = async (
+    email: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const redirectTo = `${window.location.origin}${basePath}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo },
+      );
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error:
+          "Unable to reach the authentication server. Please check your network.",
+      };
+    }
+  };
+
+  const completePasswordReset = async (
+    newPassword: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) return { success: false, error: error.message };
+      setIsPasswordRecovery(false);
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error: "Unable to update your password. Please check your network.",
+      };
+    }
+  };
+
+  const requestDriverPasswordReset = async (
+    identifier: string,
+    note?: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await apiFetch("/api/auth/driver-password-reset-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          note: note?.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data?.error?.message || "Unable to submit the request.",
+        };
+      }
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error:
+          "Unable to reach the operations desk. Please check your network.",
       };
     }
   };
@@ -328,24 +423,12 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
     try {
       await supabase.auth.signOut();
     } catch {}
-    const token = localStorage.getItem("ng_auth_token");
-    if (token) {
-      try {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } catch {}
-    }
-    localStorage.removeItem("ng_auth_token");
-    localStorage.removeItem("ng_user_role");
     setUser(null);
     setIsSignedIn(false);
+    setIsPasswordRecovery(false);
   };
 
   const switchRole = (role: "admin" | "driver") => {
-    // In production, switching roles triggers dedicated sign-in or context shift
-    localStorage.setItem("ng_user_role", role);
     if (user) {
       setUser({ ...user, role: role === "driver" ? "driver" : "owner" });
     }
@@ -357,8 +440,13 @@ export function ProductionAuthProvider({ children }: { children: ReactNode }) {
         user,
         isSignedIn,
         isLoaded,
+        isPasswordRecovery,
+        accessToken,
         signOut,
         signInWithCredentials,
+        requestPasswordReset,
+        completePasswordReset,
+        requestDriverPasswordReset,
         switchRole,
       }}
     >
@@ -377,29 +465,57 @@ function useAppAuth(): AuthContextType {
 // -------------------------------------------------------------
 // SIGN IN PAGE WITH AUTHENTIC DATABASE CREDENTIAL VALIDATION
 // -------------------------------------------------------------
+type AdminView = "password" | "forgot";
+type DriverView = "password" | "forgot";
+
 function SignInPage() {
-  const { signInWithCredentials } = useAppAuth();
+  const {
+    signInWithCredentials,
+    requestPasswordReset,
+    requestDriverPasswordReset,
+  } = useAppAuth();
   const [, setLocation] = useLocation();
 
   const [activeTab, setActiveTab] = useState<"admin" | "driver">(() => {
-    if (typeof window !== "undefined" && (window as any).NG_APP_ROLE === "driver") {
+    if (
+      typeof window !== "undefined" &&
+      (window as any).NG_APP_ROLE === "driver"
+    ) {
       return "driver";
     }
     return "admin";
   });
 
   // Admin form state
-  const [adminEmail, setAdminEmail] = useState("admin@ngtravels.in");
-  const [adminPassword, setAdminPassword] = useState("NGTravels@2026");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [adminView, setAdminView] = useState<AdminView>("password");
+  const [forgotSent, setForgotSent] = useState(false);
 
   // Driver form state
-  const [driverIdentifier, setDriverIdentifier] = useState("DRV-101");
-  const [driverPin, setDriverPin] = useState("123456");
-  const [showDriverPin, setShowDriverPin] = useState(false);
+  const [driverIdentifier, setDriverIdentifier] = useState("");
+  const [driverPassword, setDriverPassword] = useState("");
+  const [showDriverPassword, setShowDriverPassword] = useState(false);
+  const [driverView, setDriverView] = useState<DriverView>("password");
+  const [passwordResetIdentifier, setPasswordResetIdentifier] = useState("");
+  const [passwordResetNote, setPasswordResetNote] = useState("");
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const resetAdminViewState = () => {
+    setAdminView("password");
+    setForgotSent(false);
+    setErrorMessage(null);
+  };
+
+  const resetDriverViewState = () => {
+    setDriverView("password");
+    setPasswordResetSent(false);
+    setErrorMessage(null);
+  };
 
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -432,16 +548,38 @@ function SignInPage() {
     }
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    if (!adminEmail.trim()) {
+      setErrorMessage("Please enter your operations email address.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await requestPasswordReset(adminEmail);
+      if (!res.success) {
+        setErrorMessage(res.error || "Unable to send the reset link.");
+      } else {
+        setForgotSent(true);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDriverSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     if (!driverIdentifier.trim()) {
-      setErrorMessage("Please enter your Driver Code (e.g. DRV-101) or registered mobile number.");
+      setErrorMessage(
+        "Please enter your Driver Code (e.g. DRV-101) or registered mobile number.",
+      );
       return;
     }
-    if (!driverPin.trim()) {
-      setErrorMessage("Please enter your 6-digit Driver Security PIN.");
+    if (!driverPassword.trim()) {
+      setErrorMessage("Please enter your driver password.");
       return;
     }
 
@@ -450,7 +588,7 @@ function SignInPage() {
       const res = await signInWithCredentials({
         type: "driver",
         identifier: driverIdentifier,
-        pin: driverPin,
+        password: driverPassword,
       });
 
       if (!res.success) {
@@ -463,204 +601,581 @@ function SignInPage() {
     }
   };
 
+  const handleDriverPasswordResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    if (!passwordResetIdentifier.trim()) {
+      setErrorMessage(
+        "Please enter your Driver Code or registered mobile number.",
+      );
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await requestDriverPasswordReset(
+        passwordResetIdentifier,
+        passwordResetNote,
+      );
+      if (!res.success) {
+        setErrorMessage(res.error || "Unable to submit the request.");
+      } else {
+        setPasswordResetSent(true);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 text-zinc-100 selection:bg-amber-400 selection:text-zinc-950">
-      <div className="w-full max-w-md bg-zinc-900/95 border border-zinc-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-foreground selection:bg-amber-400 selection:text-zinc-950">
+      <div className="w-full max-w-md bg-card/95 border border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             <img
               src="/logo.png"
               alt="NG Travels - Travel with Comfort & Safety"
-              className="w-24 h-24 rounded-2xl object-contain bg-black p-1.5 border border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
+              className="w-24 h-24 rounded-2xl object-contain bg-black p-1.5 border border-amber-300 dark:border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
             />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-zinc-100 tracking-tight">NG TRAVELS</h1>
-            <p className="text-xs text-amber-400 font-semibold tracking-wide mt-0.5">Travel with Comfort & Safety</p>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">Operations Command & Dispatch Platform</p>
+            <h1 className="text-2xl font-black text-foreground tracking-tight">
+              NG TRAVELS
+            </h1>
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold tracking-wide mt-0.5">
+              Travel with Comfort & Safety
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+              Operations Command & Dispatch Platform
+            </p>
           </div>
         </div>
 
-        {/* Role Segmented Tabs */}
-        <div className="grid grid-cols-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("admin");
-              setErrorMessage(null);
-            }}
-            className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === "admin"
-                ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" /> Operations Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("driver");
-              setErrorMessage(null);
-            }}
-            className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === "driver"
-                ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <Car className="w-4 h-4" /> Driver Pilot
-          </button>
-        </div>
+        {/* Role Segmented Tabs (hidden while inside a sub-view; use Back to return) */}
+        {!(
+          (activeTab === "admin" && adminView !== "password") ||
+          (activeTab === "driver" && driverView !== "password")
+        ) && (
+          <div className="grid grid-cols-2 p-1 bg-background rounded-xl border border-border text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("admin");
+                resetDriverViewState();
+                setErrorMessage(null);
+              }}
+              className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === "admin"
+                  ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" /> Operations Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("driver");
+                resetAdminViewState();
+                setErrorMessage(null);
+              }}
+              className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === "driver"
+                  ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Car className="w-4 h-4" /> Driver Pilot
+            </button>
+          </div>
+        )}
 
         {/* Error Alert Message */}
         {errorMessage && (
-          <div className="bg-rose-950/40 border border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
-            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">{errorMessage}</div>
           </div>
         )}
 
         {/* Tab 1: Operations Admin Login */}
         {activeTab === "admin" ? (
-          <form onSubmit={handleAdminSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                <span>Operations Email</span>
-                <span className="text-[10px] text-zinc-500 font-mono">admin@ngtravels.in</span>
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
-                <Input
-                  type="email"
-                  required
-                  placeholder="admin@ngtravels.in"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
-                />
-              </div>
-            </div>
+          <>
+            {adminView === "password" && (
+              <form onSubmit={handleAdminSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span>Operations Email</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                    <Input
+                      type="email"
+                      required
+                      placeholder="admin@ngtravels.in"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                <span>Password</span>
-                <span className="text-[10px] text-zinc-500 font-mono">Secure Salted Scrypt</span>
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
-                <Input
-                  type={showAdminPassword ? "text" : "password"}
-                  required
-                  placeholder="Enter your operations password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
-                />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span>Password</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMessage(null);
+                        setForgotSent(false);
+                        setAdminView("forgot");
+                      }}
+                      className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-700 hover:dark:text-amber-300 cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                    <Input
+                      type={showAdminPassword ? "text" : "password"}
+                      required
+                      placeholder="Enter your operations password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword(!showAdminPassword)}
+                      className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      {showAdminPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+                >
+                  {submitting ? (
+                    <ButtonLoader label="Authenticating Operations..." />
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" /> Sign In to Operations
+                      Desk
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+
+            {adminView === "forgot" && (
+              <div className="space-y-4">
                 <button
                   type="button"
-                  onClick={() => setShowAdminPassword(!showAdminPassword)}
-                  className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  onClick={resetAdminViewState}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
                 >
-                  {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to password sign-in
                 </button>
+                {forgotSent ? (
+                  <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      If an account exists for{" "}
+                      <span className="font-semibold">{adminEmail}</span>, a
+                      password reset link has been sent. Check your inbox.
+                    </div>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={handleForgotPasswordSubmit}
+                    className="space-y-4"
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Enter your operations email and we'll send a link to reset
+                      your password.
+                    </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground">
+                        Operations Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                        <Input
+                          type="email"
+                          required
+                          placeholder="admin@ngtravels.in"
+                          value={adminEmail}
+                          onChange={(e) => setAdminEmail(e.target.value)}
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+                    >
+                      {submitting ? (
+                        <ButtonLoader label="Sending Link..." />
+                      ) : (
+                        <>Send Reset Link</>
+                      )}
+                    </Button>
+                  </form>
+                )}
               </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
-            >
-              {submitting ? (
-                <ButtonLoader label="Authenticating Operations..." />
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4" /> Sign In to Operations Desk
-                </>
-              )}
-            </Button>
-          </form>
+            )}
+          </>
         ) : (
           /* Tab 2: Driver Pilot Login */
-          <form onSubmit={handleDriverSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                <span>Driver Code or Mobile</span>
-                <span className="text-[10px] text-zinc-500 font-mono">DRV-101 / +91 98450 11223</span>
-              </label>
-              <div className="relative">
-                <Car className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
-                <Input
-                  type="text"
-                  required
-                  placeholder="e.g. DRV-101 or 9845011223"
-                  value={driverIdentifier}
-                  onChange={(e) => setDriverIdentifier(e.target.value)}
-                  className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono"
-                />
-              </div>
-            </div>
+          <>
+            {driverView === "password" && (
+              <form onSubmit={handleDriverSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span>Driver Code or Mobile</span>
+                  </label>
+                  <div className="relative">
+                    <Car className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                    <Input
+                      type="text"
+                      required
+                      placeholder="e.g. DRV-101 or 9845011223"
+                      value={driverIdentifier}
+                      onChange={(e) => setDriverIdentifier(e.target.value)}
+                      className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400 font-mono"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                <span>Driver Security PIN</span>
-                <span className="text-[10px] text-zinc-500 font-mono">6 Digits</span>
-              </label>
-              <div className="relative">
-                <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
-                <Input
-                  type={showDriverPin ? "text" : "password"}
-                  maxLength={6}
-                  required
-                  placeholder="Enter 6-digit PIN"
-                  value={driverPin}
-                  onChange={(e) => setDriverPin(e.target.value)}
-                  className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono tracking-widest text-center text-sm"
-                />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span>Driver Password</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMessage(null);
+                        setPasswordResetSent(false);
+                        setPasswordResetIdentifier(driverIdentifier);
+                        setDriverView("forgot");
+                      }}
+                      className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-700 hover:dark:text-amber-300 cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                    <Input
+                      type={showDriverPassword ? "text" : "password"}
+                      required
+                      placeholder="Enter your driver password"
+                      value={driverPassword}
+                      onChange={(e) => setDriverPassword(e.target.value)}
+                      className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDriverPassword(!showDriverPassword)}
+                      className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      {showDriverPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+                >
+                  {submitting ? (
+                    <ButtonLoader label="Authenticating Driver..." />
+                  ) : (
+                    <>
+                      <Car className="w-4 h-4" /> Sign In to Driver Duty Cockpit
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+
+            {driverView === "forgot" && (
+              <div className="space-y-4">
                 <button
                   type="button"
-                  onClick={() => setShowDriverPin(!showDriverPin)}
-                  className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  onClick={resetDriverViewState}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
                 >
-                  {showDriverPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to password sign-in
                 </button>
+                {passwordResetSent ? (
+                  <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      If a driver account exists for{" "}
+                      <span className="font-semibold">
+                        {passwordResetIdentifier}
+                      </span>
+                      , the operations desk has been notified and will assist
+                      with password reset.
+                    </div>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={handleDriverPasswordResetSubmit}
+                    className="space-y-4"
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Enter your driver code or registered mobile number. The
+                      operations desk will assist you with password reset.
+                    </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground">
+                        Driver Code or Mobile
+                      </label>
+                      <div className="relative">
+                        <Car className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                        <Input
+                          type="text"
+                          required
+                          placeholder="e.g. DRV-101 or 9845011223"
+                          value={passwordResetIdentifier}
+                          onChange={(e) =>
+                            setPasswordResetIdentifier(e.target.value)
+                          }
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground">
+                        Note (Optional)
+                      </label>
+                      <div className="relative">
+                        <FileText className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                        <Input
+                          type="text"
+                          placeholder="Brief description of your issue"
+                          value={passwordResetNote}
+                          onChange={(e) => setPasswordResetNote(e.target.value)}
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+                    >
+                      {submitting ? (
+                        <ButtonLoader label="Submitting Request..." />
+                      ) : (
+                        <>Request Password Reset</>
+                      )}
+                    </Button>
+                  </form>
+                )}
               </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
-            >
-              {submitting ? (
-                <ButtonLoader label="Verifying Duty PIN..." />
-              ) : (
-                <>
-                  <Car className="w-4 h-4" /> Sign In to Driver Duty Cockpit
-                </>
-              )}
-            </Button>
-          </form>
+            )}
+          </>
         )}
 
-        <div className="text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/80 text-center font-mono">
-          Single Source of Truth: PostgreSQL Database Auth • Cryptographic Token Session
+        <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/80 text-center font-mono">
+          Secured by Supabase Auth
         </div>
       </div>
     </div>
   );
 }
 
+function ResetPasswordPage() {
+  const { completePasswordReset, signOut } = useAppAuth();
+  const [, setLocation] = useLocation();
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (newPassword.length < 8) {
+      setErrorMessage("Password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await completePasswordReset(newPassword);
+      if (!res.success) {
+        setErrorMessage(res.error || "Unable to update your password.");
+      } else {
+        setDone(true);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-foreground selection:bg-amber-400 selection:text-zinc-950">
+      <div className="w-full max-w-md bg-card/95 border border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
+        <div className="text-center space-y-2">
+          <div className="flex justify-center">
+            <img
+              src="/logo.png"
+              alt="NG Travels - Travel with Comfort & Safety"
+              className="w-20 h-20 rounded-2xl object-contain bg-black p-1.5 border border-amber-300 dark:border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
+            />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-foreground tracking-tight">
+              Reset Your Password
+            </h1>
+            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+              Operations Command & Dispatch Platform
+            </p>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
+
+        {done ? (
+          <div className="space-y-4">
+            <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                Your password has been updated.
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setLocation("/dashboard")}
+              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer"
+            >
+              Continue to Operations Desk
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                New Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  placeholder="At least 8 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  placeholder="Re-enter your new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-6 text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer mt-2"
+            >
+              {submitting ? (
+                <ButtonLoader label="Updating Password..." />
+              ) : (
+                <>Update Password</>
+              )}
+            </Button>
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut();
+                setLocation("/");
+              }}
+              className="w-full text-center text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Cancel and return to sign-in
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 
 function MainApp() {
-  const { user, isSignedIn, isLoaded, signOut, switchRole } = useAppAuth();
+  const {
+    user,
+    isSignedIn,
+    isLoaded,
+    isPasswordRecovery,
+    accessToken,
+    signOut,
+    switchRole,
+  } = useAppAuth();
   const [location, setLocation] = useLocation();
   const qc = useQueryClient();
 
   // Connect Real-Time Server-Sent Events Sync
   const { status: realtimeStatus } = useRealtimeSync();
+  const { theme, toggleTheme } = useTheme();
 
   // Modal States
   const [createTripOpen, setCreateTripOpen] = useState(false);
@@ -668,17 +1183,31 @@ function MainApp() {
   const [customerCopyTrip, setCustomerCopyTrip] = useState<any | null>(null);
   const [paymentRecordTrip, setPaymentRecordTrip] = useState<any | null>(null);
   const [cancelTrip, setCancelTrip] = useState<any | null>(null);
-  const [receiptPayment, setReceiptPayment] = useState<{ payment: any; trip: any } | null>(null);
-  const [driverKmTrip, setDriverKmTrip] = useState<{ trip: any; mode: "start" | "end" } | null>(null);
-  const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(null);
-  const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<any | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<{
+    payment: any;
+    trip: any;
+  } | null>(null);
+  const [driverKmTrip, setDriverKmTrip] = useState<{
+    trip: any;
+    mode: "start" | "end";
+  } | null>(null);
+  const [driverExpenseTripId, setDriverExpenseTripId] = useState<number | null>(
+    null,
+  );
+  const [initialEnquiryForTrip, setInitialEnquiryForTrip] = useState<
+    any | null
+  >(null);
 
   // Helper for safe query responses
   const safeJsonArray = async (res: Response) => {
     if (!res.ok) return [];
     try {
       const json = await res.json();
-      return Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+      return Array.isArray(json)
+        ? json
+        : Array.isArray(json?.items)
+          ? json.items
+          : [];
     } catch {
       return [];
     }
@@ -687,9 +1216,10 @@ function MainApp() {
   // Queries
   const { data: dashboardData = {}, isLoading: dashboardLoading } = useQuery({
     queryKey: ["/api/dashboard"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/dashboard", {
+        const res = await apiFetch("/api/dashboard", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         if (!res.ok) return {};
@@ -702,11 +1232,12 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: tripsData = [] } = useQuery({
+  const { data: tripsData = [], isLoading: tripsLoading } = useQuery({
     queryKey: ["/api/trips"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/trips?limit=100", {
+        const res = await apiFetch("/api/trips?limit=100", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -717,11 +1248,12 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: customersData = [] } = useQuery({
+  const { data: customersData = [], isLoading: customersLoading } = useQuery({
     queryKey: ["/api/customers"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/customers?limit=100", {
+        const res = await apiFetch("/api/customers?limit=100", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -731,11 +1263,12 @@ function MainApp() {
     },
   });
 
-  const { data: driversData = [] } = useQuery({
+  const { data: driversData = [], isLoading: driversLoading } = useQuery({
     queryKey: ["/api/drivers"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/drivers", {
+        const res = await apiFetch("/api/drivers", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -745,11 +1278,12 @@ function MainApp() {
     },
   });
 
-  const { data: rawVehicles = [] } = useQuery({
+  const { data: rawVehicles = [], isLoading: vehiclesLoading } = useQuery({
     queryKey: ["/api/vehicles"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/vehicles", {
+        const res = await apiFetch("/api/vehicles", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -759,11 +1293,12 @@ function MainApp() {
     },
   });
 
-  const { data: enquiriesData = [] } = useQuery({
+  const { data: enquiriesData = [], isLoading: enquiriesLoading } = useQuery({
     queryKey: ["/api/enquiries"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/enquiries", {
+        const res = await apiFetch("/api/enquiries", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -773,11 +1308,12 @@ function MainApp() {
     },
   });
 
-  const { data: paymentsData = [] } = useQuery({
+  const { data: paymentsData = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/payments"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/payments", {
+        const res = await apiFetch("/api/payments", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -787,11 +1323,12 @@ function MainApp() {
     },
   });
 
-  const { data: expensesData = [] } = useQuery({
+  const { data: expensesData = [], isLoading: expensesLoading } = useQuery({
     queryKey: ["/api/expenses"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/expenses", {
+        const res = await apiFetch("/api/expenses", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -801,11 +1338,12 @@ function MainApp() {
     },
   });
 
-  const { data: notificationsData = [] } = useQuery({
+  const { data: notificationsData = [], isLoading: notificationsLoading } = useQuery({
     queryKey: ["/api/notifications"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/notifications", {
+        const res = await apiFetch("/api/notifications", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -816,11 +1354,12 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: auditLogsData = [] } = useQuery({
+  const { data: auditLogsData = [], isLoading: auditLogsLoading } = useQuery({
     queryKey: ["/api/audit-logs"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/audit-logs", {
+        const res = await apiFetch("/api/audit-logs", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         return await safeJsonArray(res);
@@ -832,9 +1371,10 @@ function MainApp() {
 
   const { data: settingsData = {} } = useQuery({
     queryKey: ["/api/settings"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/settings", {
+        const res = await apiFetch("/api/settings", {
           headers: { "x-user-role": user?.role || "owner" },
         });
         if (!res.ok) return {};
@@ -847,11 +1387,12 @@ function MainApp() {
   });
 
   // Dedicated Driver Queries
-  const { data: driverTodayTrips = [] } = useQuery({
+  const { data: driverTodayTrips = [], isLoading: driverTodayLoading } = useQuery({
     queryKey: ["/api/driver/today"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/driver/today", {
+        const res = await apiFetch("/api/driver/today", {
           headers: { "x-user-role": "driver" },
         });
         return await safeJsonArray(res);
@@ -862,11 +1403,32 @@ function MainApp() {
     refetchInterval: 6000,
   });
 
-  const { data: driverCurrentTrip } = useQuery({
-    queryKey: ["/api/driver/current-trip"],
+  // The signed-in driver's own profile. /api/drivers is owner-only and 403s
+  // for a driver session, so drivers must resolve their own identity here
+  // rather than by searching the (inaccessible) fleet-wide driver list.
+  const { data: driverMe = null } = useQuery({
+    queryKey: ["/api/driver/me"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
-        const res = await fetch("/api/driver/current-trip", {
+        const res = await apiFetch("/api/driver/me", {
+          headers: { "x-user-role": "driver" },
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return json && typeof json === "object" && !json.error ? json : null;
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  const { data: driverCurrentTrip } = useQuery({
+    queryKey: ["/api/driver/current-trip"],
+    enabled: isSignedIn,
+    queryFn: async () => {
+      try {
+        const res = await apiFetch("/api/driver/current-trip", {
           headers: { "x-user-role": "driver" },
         });
         if (!res.ok) return null;
@@ -880,16 +1442,56 @@ function MainApp() {
   });
 
   // Normalized collections: guarantees an array whether data is { items: [] } or raw array []
-  const tripList: any[] = Array.isArray(tripsData) ? tripsData : (Array.isArray((tripsData as any)?.items) ? (tripsData as any).items : []);
-  const customerList: any[] = Array.isArray(customersData) ? customersData : (Array.isArray((customersData as any)?.items) ? (customersData as any).items : []);
-  const driverList: any[] = Array.isArray(driversData) ? driversData : (Array.isArray((driversData as any)?.items) ? (driversData as any).items : []);
-  const vehicleList: any[] = Array.isArray(rawVehicles) ? rawVehicles : (Array.isArray((rawVehicles as any)?.items) ? (rawVehicles as any).items : []);
-  const paymentList: any[] = Array.isArray(paymentsData) ? paymentsData : (Array.isArray((paymentsData as any)?.items) ? (paymentsData as any).items : []);
-  const expenseList: any[] = Array.isArray(expensesData) ? expensesData : (Array.isArray((expensesData as any)?.items) ? (expensesData as any).items : []);
-  const notificationList: any[] = Array.isArray(notificationsData) ? notificationsData : (Array.isArray((notificationsData as any)?.items) ? (notificationsData as any).items : []);
-  const enquiryList: any[] = Array.isArray(enquiriesData) ? enquiriesData : (Array.isArray((enquiriesData as any)?.items) ? (enquiriesData as any).items : []);
-  const auditLogList: any[] = Array.isArray(auditLogsData) ? auditLogsData : (Array.isArray((auditLogsData as any)?.items) ? (auditLogsData as any).items : []);
-  const driverTodayTripList: any[] = Array.isArray(driverTodayTrips) ? driverTodayTrips : (Array.isArray((driverTodayTrips as any)?.items) ? (driverTodayTrips as any).items : []);
+  const tripList: any[] = Array.isArray(tripsData)
+    ? tripsData
+    : Array.isArray((tripsData as any)?.items)
+      ? (tripsData as any).items
+      : [];
+  const customerList: any[] = Array.isArray(customersData)
+    ? customersData
+    : Array.isArray((customersData as any)?.items)
+      ? (customersData as any).items
+      : [];
+  const driverList: any[] = Array.isArray(driversData)
+    ? driversData
+    : Array.isArray((driversData as any)?.items)
+      ? (driversData as any).items
+      : [];
+  const vehicleList: any[] = Array.isArray(rawVehicles)
+    ? rawVehicles
+    : Array.isArray((rawVehicles as any)?.items)
+      ? (rawVehicles as any).items
+      : [];
+  const paymentList: any[] = Array.isArray(paymentsData)
+    ? paymentsData
+    : Array.isArray((paymentsData as any)?.items)
+      ? (paymentsData as any).items
+      : [];
+  const expenseList: any[] = Array.isArray(expensesData)
+    ? expensesData
+    : Array.isArray((expensesData as any)?.items)
+      ? (expensesData as any).items
+      : [];
+  const notificationList: any[] = Array.isArray(notificationsData)
+    ? notificationsData
+    : Array.isArray((notificationsData as any)?.items)
+      ? (notificationsData as any).items
+      : [];
+  const enquiryList: any[] = Array.isArray(enquiriesData)
+    ? enquiriesData
+    : Array.isArray((enquiriesData as any)?.items)
+      ? (enquiriesData as any).items
+      : [];
+  const auditLogList: any[] = Array.isArray(auditLogsData)
+    ? auditLogsData
+    : Array.isArray((auditLogsData as any)?.items)
+      ? (auditLogsData as any).items
+      : [];
+  const driverTodayTripList: any[] = Array.isArray(driverTodayTrips)
+    ? driverTodayTrips
+    : Array.isArray((driverTodayTrips as any)?.items)
+      ? (driverTodayTrips as any).items
+      : [];
 
   // Action Handlers
   const handleTripCreated = () => {
@@ -900,7 +1502,7 @@ function MainApp() {
   };
 
   const handleApproveExpense = async (id: number) => {
-    await fetch(`/api/expenses/${id}/approve`, {
+    await apiFetch(`/api/expenses/${id}/approve`, {
       method: "PATCH",
       headers: { "x-user-role": "owner" },
     });
@@ -910,7 +1512,7 @@ function MainApp() {
   };
 
   const handleRejectExpense = async (id: number) => {
-    await fetch(`/api/expenses/${id}/reject`, {
+    await apiFetch(`/api/expenses/${id}/reject`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify({ reason: "Expense rejected by operations" }),
@@ -920,17 +1522,22 @@ function MainApp() {
     qc.invalidateQueries({ queryKey: ["/api/trips"] });
   };
 
-  const handleUpdateAvailability = async (driverId: number, availability: string) => {
-    await fetch(`/api/drivers/${driverId}/availability`, {
+  const handleUpdateAvailability = async (
+    driverId: number,
+    availability: string,
+  ) => {
+    await apiFetch(`/api/drivers/${driverId}/availability`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify({ availability }),
     });
     qc.invalidateQueries({ queryKey: ["/api/drivers"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/me"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
   };
 
   const handleSaveSettings = async (updated: any) => {
-    await fetch("/api/settings", {
+    await apiFetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify(updated),
@@ -939,7 +1546,7 @@ function MainApp() {
   };
 
   const handleMarkNotificationRead = async (id: number) => {
-    await fetch(`/api/notifications/${id}/read`, {
+    await apiFetch(`/api/notifications/${id}/read`, {
       method: "POST",
       headers: { "x-user-role": user?.role || "owner" },
     });
@@ -947,37 +1554,67 @@ function MainApp() {
   };
 
   const handleMarkAllNotificationsRead = async () => {
-    await fetch("/api/notifications/read-all", {
+    await apiFetch("/api/notifications/read-all", {
       method: "POST",
       headers: { "x-user-role": user?.role || "owner" },
     });
     qc.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
-  const handleDriverMilestone = async (tripId: number, status: string, note?: string) => {
-    await fetch(`/api/trips/${tripId}/status`, {
-      method: "PATCH",
+  const handleDriverMilestone = async (
+    tripId: number,
+    status: string,
+    note?: string,
+  ) => {
+    const endpoint =
+      status === "accepted"
+        ? `/api/driver/trips/${tripId}/accept`
+        : status === "driver_arrived"
+          ? `/api/driver/trips/${tripId}/arrived`
+          : `/api/driver/trips/${tripId}/milestone`;
+
+    const res = await apiFetch(endpoint, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note, changedBy: "Driver Suresh" }),
+      body: JSON.stringify({ status, note }),
     });
-    qc.invalidateQueries({ queryKey: ["trips"] });
-    qc.invalidateQueries({ queryKey: ["driver-today"] });
-    qc.invalidateQueries({ queryKey: ["driver-current"] });
-    qc.invalidateQueries({ queryKey: ["dashboard"] });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.error?.message || "Failed to update trip status.");
+    }
+
+    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
   };
 
   const nativeRole = (window as any).NG_APP_ROLE;
-  const isDriverWorkspace = nativeRole === "driver" ? true : nativeRole === "owner" ? false : (location.startsWith("/driver") || user?.role === "driver");
+  const isDriverPath =
+    location === "/driver" || location.startsWith("/driver/");
+  const isDriverWorkspace =
+    nativeRole === "driver"
+      ? true
+      : nativeRole === "owner"
+        ? false
+        // A genuine driver account can never render the owner workspace —
+        // regardless of path or the cosmetic switchRole() preview state —
+        // since owner-only actions there would just 403 against the real
+        // server-side role anyway.
+        : user?.realRole === "driver"
+          ? true
+          : isDriverPath || user?.role === "driver";
 
   // Force route alignment if native APK
   useEffect(() => {
     if (!isSignedIn) return;
-    if (nativeRole === "driver" && !location.startsWith("/driver")) {
+    if (nativeRole === "driver" && !isDriverPath) {
       setLocation("/driver");
-    } else if (nativeRole === "owner" && location.startsWith("/driver")) {
+    } else if (nativeRole === "owner" && isDriverPath) {
       setLocation("/dashboard");
     }
-  }, [nativeRole, location, setLocation, isSignedIn]);
+  }, [nativeRole, location, isDriverPath, setLocation, isSignedIn]);
 
   if (!isLoaded) {
     return (
@@ -988,24 +1625,40 @@ function MainApp() {
     );
   }
 
+  if (isPasswordRecovery) {
+    return <ResetPasswordPage />;
+  }
+
   if (!isSignedIn) {
     return <SignInPage />;
   }
 
-  const currentDriver = Array.isArray(driverList)
-    ? (driverList.find((d: any) => d?.id === user?.driverId) || driverList[0] || null)
-    : null;
+  const currentDriver =
+    driverMe ||
+    (Array.isArray(driverList)
+      ? driverList.find((d: any) => d?.id === user?.driverId) ||
+        driverList[0] ||
+        null
+      : null);
 
   return (
     <>
       {isDriverWorkspace ? (
         <DriverLayout
-          driver={currentDriver || { name: user?.fullName || "Driver Pilot", availability: "available" }}
+          driver={
+            currentDriver || {
+              name: user?.fullName || "Driver Pilot",
+              availability: "available",
+            }
+          }
+          canSwitchToAdmin={user?.realRole === "owner" || user?.realRole === "admin"}
           onSignOut={signOut}
           onSwitchRole={(role) => {
             switchRole(role);
             if (role === "admin") setLocation("/dashboard");
           }}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         >
           <Switch>
             <Route path="/driver">
@@ -1013,8 +1666,13 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                isLoading={driverTodayLoading}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
               />
             </Route>
@@ -1023,31 +1681,55 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                isLoading={driverTodayLoading}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
               />
             </Route>
             <Route path="/driver/today">
               <DriverTodayPage
                 todayTrips={driverTodayTripList}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                isLoading={driverTodayLoading}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
               />
             </Route>
             <Route path="/driver/current-trip">
               <DriverCurrentTripPage
                 trip={driverCurrentTrip || driverTodayTripList[0] || null}
-                onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
-                onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                onOpenStartKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "start" })
+                }
+                onOpenEndKmModal={(trip) =>
+                  setDriverKmTrip({ trip, mode: "end" })
+                }
                 onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
                 onUpdateMilestone={handleDriverMilestone}
               />
             </Route>
             <Route path="/driver/expenses">
               <DriverExpensesPage
-                expenses={Array.isArray(expenseList) ? expenseList.filter((e: any) => !user?.driverId || e?.driverId === user?.driverId) : []}
-                onOpenExpenseModal={() => setDriverExpenseTripId(driverCurrentTrip?.id || null)}
+                expenses={
+                  Array.isArray(expenseList)
+                    ? expenseList.filter(
+                        (e: any) =>
+                          !user?.driverId || e?.driverId === user?.driverId,
+                      )
+                    : []
+                }
+                isLoading={expensesLoading}
+                onOpenExpenseModal={() =>
+                  setDriverExpenseTripId(driverCurrentTrip?.id || null)
+                }
               />
             </Route>
             <Route path="/driver/vehicle">
@@ -1059,7 +1741,10 @@ function MainApp() {
             <Route path="/driver/profile">
               <DriverProfilePage
                 driver={currentDriver}
-                onUpdateAvailability={(avail) => currentDriver?.id && handleUpdateAvailability(currentDriver.id, avail)}
+                onUpdateAvailability={(avail) =>
+                  currentDriver?.id &&
+                  handleUpdateAvailability(currentDriver.id, avail)
+                }
               />
             </Route>
             <Route>
@@ -1075,7 +1760,13 @@ function MainApp() {
             switchRole(role);
             if (role === "driver") setLocation("/driver");
           }}
-          unreadNotificationCount={notificationList.filter((n: any) => !n.isRead && n.audience === "owner").length}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          unreadNotificationCount={
+            notificationList.filter(
+              (n: any) => !n.isRead && n.audience === "owner",
+            ).length
+          }
         >
           <Switch>
             <Route path="/">
@@ -1083,7 +1774,7 @@ function MainApp() {
             </Route>
             <Route path="/dashboard">
               <DashboardPage
-                isLoading={dashboardLoading && !dashboardData}
+                isLoading={dashboardLoading}
                 metrics={dashboardData?.metrics}
                 schedule={dashboardData?.schedule || []}
                 recentActivity={dashboardData?.recentActivity || []}
@@ -1102,7 +1793,7 @@ function MainApp() {
               />
             </Route>
             <Route path="/live-trips">
-              <LiveTripsPage trips={tripList} />
+              <LiveTripsPage trips={tripList} isLoading={tripsLoading} />
             </Route>
             <Route path="/calendar">
               <CalendarPage trips={tripList} />
@@ -1112,8 +1803,14 @@ function MainApp() {
                 onOpenTripWizardWithRoute={(routeData) => {
                   if (routeData) {
                     setInitialEnquiryForTrip({
-                      pickup: routeData.pickup?.address || routeData.pickup?.name || routeData.pickup,
-                      destination: routeData.destination?.address || routeData.destination?.name || routeData.destination,
+                      pickup:
+                        routeData.pickup?.address ||
+                        routeData.pickup?.name ||
+                        routeData.pickup,
+                      destination:
+                        routeData.destination?.address ||
+                        routeData.destination?.name ||
+                        routeData.destination,
                       tripType: routeData.tripType || "round_trip",
                     });
                   } else {
@@ -1126,6 +1823,7 @@ function MainApp() {
             <Route path="/trips">
               <TripsPage
                 trips={tripList}
+                isLoading={tripsLoading}
                 onOpenCreateTrip={() => {
                   setInitialEnquiryForTrip(null);
                   setCreateTripOpen(true);
@@ -1139,8 +1837,12 @@ function MainApp() {
               {(params) => {
                 const tripId = Number(params.id);
                 const currentTrip = tripList.find((t: any) => t.id === tripId);
-                const tripPayments = paymentList.filter((p: any) => p.tripId === tripId);
-                const tripExpenses = expenseList.filter((e: any) => e.tripId === tripId);
+                const tripPayments = paymentList.filter(
+                  (p: any) => p.tripId === tripId,
+                );
+                const tripExpenses = expenseList.filter(
+                  (e: any) => e.tripId === tripId,
+                );
                 return (
                   <TripDetailPage
                     trip={currentTrip}
@@ -1159,11 +1861,12 @@ function MainApp() {
               <VehiclesPage />
             </Route>
             <Route path="/customers">
-              <CustomersPage customers={customerList} />
+              <CustomersPage customers={customerList} isLoading={customersLoading} />
             </Route>
             <Route path="/enquiries">
               <EnquiriesPage
                 enquiries={enquiryList}
+                isLoading={enquiriesLoading}
                 onOpenCreateEnquiry={() => setCreateEnquiryOpen(true)}
                 onConvertToTrip={(enq) => {
                   setInitialEnquiryForTrip(enq);
@@ -1174,12 +1877,14 @@ function MainApp() {
             <Route path="/drivers">
               <DriversPage
                 drivers={driverList}
+                isLoading={driversLoading}
                 onUpdateAvailability={handleUpdateAvailability}
               />
             </Route>
             <Route path="/driver-availability">
               <DriversPage
                 drivers={driverList}
+                isLoading={driversLoading}
                 onUpdateAvailability={handleUpdateAvailability}
               />
             </Route>
@@ -1187,20 +1892,27 @@ function MainApp() {
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
-                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+                isLoading={paymentsLoading}
+                onOpenReceipt={(payment, trip) =>
+                  setReceiptPayment({ payment, trip })
+                }
               />
             </Route>
             <Route path="/refunds">
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
-                onOpenReceipt={(payment, trip) => setReceiptPayment({ payment, trip })}
+                isLoading={paymentsLoading}
+                onOpenReceipt={(payment, trip) =>
+                  setReceiptPayment({ payment, trip })
+                }
               />
             </Route>
             <Route path="/expenses">
               <ExpensesPage
                 expenses={expenseList}
                 trips={tripList}
+                isLoading={expensesLoading}
                 onApprove={handleApproveExpense}
                 onReject={handleRejectExpense}
               />
@@ -1221,13 +1933,16 @@ function MainApp() {
             </Route>
             <Route path="/notifications">
               <NotificationsPage
-                notifications={notificationList.filter((n: any) => n.audience === "owner")}
+                notifications={notificationList.filter(
+                  (n: any) => n.audience === "owner",
+                )}
+                isLoading={notificationsLoading}
                 onMarkRead={handleMarkNotificationRead}
                 onMarkAllRead={handleMarkAllNotificationsRead}
               />
             </Route>
             <Route path="/audit-logs">
-              <AuditLogsPage logs={auditLogList} />
+              <AuditLogsPage logs={auditLogList} isLoading={auditLogsLoading} />
             </Route>
             <Route path="/settings">
               <SettingsPage
@@ -1252,7 +1967,9 @@ function MainApp() {
         defaultRate={settingsData.defaultRate || 18}
         defaultMinimumKm={settingsData.minimumKmPerDay || 250}
         defaultDriverBata={settingsData.driverBataPerDay || 500}
-        defaultBillingDayPolicy={settingsData.billingDayPolicy || "CALENDAR_DAYS"}
+        defaultBillingDayPolicy={
+          settingsData.billingDayPolicy || "CALENDAR_DAYS"
+        }
         initialEnquiry={initialEnquiryForTrip}
       />
 
@@ -1276,8 +1993,8 @@ function MainApp() {
         onClose={() => setCancelTrip(null)}
         trip={cancelTrip}
         onTripCancelled={() => {
-          qc.invalidateQueries({ queryKey: ["trips"] });
-          qc.invalidateQueries({ queryKey: ["dashboard"] });
+          qc.invalidateQueries({ queryKey: ["/api/trips"] });
+          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
         }}
       />
 
@@ -1286,9 +2003,9 @@ function MainApp() {
         onClose={() => setPaymentRecordTrip(null)}
         trip={paymentRecordTrip}
         onPaymentRecorded={() => {
-          qc.invalidateQueries({ queryKey: ["trips"] });
-          qc.invalidateQueries({ queryKey: ["payments"] });
-          qc.invalidateQueries({ queryKey: ["dashboard"] });
+          qc.invalidateQueries({ queryKey: ["/api/trips"] });
+          qc.invalidateQueries({ queryKey: ["/api/payments"] });
+          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
         }}
       />
 
@@ -1299,10 +2016,11 @@ function MainApp() {
           trip={driverKmTrip.trip}
           mode={driverKmTrip.mode}
           onSuccess={() => {
-            qc.invalidateQueries({ queryKey: ["trips"] });
-            qc.invalidateQueries({ queryKey: ["driver-today"] });
-            qc.invalidateQueries({ queryKey: ["driver-current"] });
-            qc.invalidateQueries({ queryKey: ["dashboard"] });
+            qc.invalidateQueries({ queryKey: ["/api/trips"] });
+            qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
+            qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
+            qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+            qc.invalidateQueries({ queryKey: ["/api/drivers"] });
           }}
         />
       )}
@@ -1313,7 +2031,7 @@ function MainApp() {
           onClose={() => setDriverExpenseTripId(null)}
           tripId={driverExpenseTripId}
           onExpenseAdded={() => {
-            qc.invalidateQueries({ queryKey: ["expenses"] });
+            qc.invalidateQueries({ queryKey: ["/api/expenses"] });
           }}
         />
       )}
@@ -1324,16 +2042,18 @@ function MainApp() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <LocalAuthProvider>
-            <WouterRouter base={basePath}>
-              <MainApp />
-            </WouterRouter>
-          </LocalAuthProvider>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <LocalAuthProvider>
+              <Router base={basePath}>
+                <MainApp />
+              </Router>
+            </LocalAuthProvider>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

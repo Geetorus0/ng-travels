@@ -52,40 +52,40 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({ trips = [] }) => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-amber-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Operations Trip Calendar
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Visual schedule of fleet departures, outstation bookings, and return dates.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handlePrevMonth} className="border-zinc-800 h-8 w-8 p-0">
+          <Button size="sm" variant="outline" onClick={handlePrevMonth} className="border-border h-8 w-8 p-0">
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <div className="text-sm font-bold text-zinc-200 min-w-[140px] text-center">
+          <div className="text-sm font-bold text-foreground min-w-[140px] text-center">
             {monthNames[month]} {year}
           </div>
-          <Button size="sm" variant="outline" onClick={handleNextMonth} className="border-zinc-800 h-8 w-8 p-0">
+          <Button size="sm" variant="outline" onClick={handleNextMonth} className="border-border h-8 w-8 p-0">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
-        <div className="grid grid-cols-7 border-b border-zinc-800 text-center text-xs font-bold text-zinc-400 py-3 bg-zinc-900">
+      <div className="bg-card/70 border border-border rounded-xl overflow-hidden shadow-xl">
+        <div className="grid grid-cols-7 border-b border-border text-center text-xs font-bold text-muted-foreground py-3 bg-card">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div key={day}>{day}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 divide-x divide-y divide-zinc-800/60 text-xs">
+        <div className="grid grid-cols-7 divide-x divide-y divide-border/60 text-xs">
           {daysArray.map((dayNum, idx) => {
             if (dayNum === null) {
-              return <div key={idx} className="min-h-[110px] bg-zinc-950/40 p-2" />;
+              return <div key={idx} className="min-h-[110px] bg-background/40 p-2" />;
             }
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
             const dayTrips = tripsByDate[dateStr] || [];
@@ -95,17 +95,17 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({ trips = [] }) => {
               <div
                 key={idx}
                 className={`min-h-[110px] p-2 transition-all ${
-                  isToday ? "bg-amber-950/10 ring-1 ring-amber-400/30" : "bg-zinc-950/20 hover:bg-zinc-900/40"
+                  isToday ? "bg-amber-950/10 ring-1 ring-amber-400/30" : "bg-background/20 hover:bg-card/40"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className={`w-5 h-5 flex items-center justify-center rounded-full font-bold text-xs ${
-                    isToday ? "bg-amber-400 text-zinc-950" : "text-zinc-400"
+                    isToday ? "bg-amber-400 text-zinc-950" : "text-muted-foreground"
                   }`}>
                     {dayNum}
                   </span>
                   {dayTrips.length > 0 && (
-                    <span className="text-[10px] bg-zinc-800 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                    <span className="text-[10px] bg-muted text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded font-mono">
                       {dayTrips.length} run(s)
                     </span>
                   )}
@@ -114,19 +114,19 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({ trips = [] }) => {
                 <div className="space-y-1 overflow-hidden">
                   {dayTrips.slice(0, 3).map((t: any) => (
                     <Link key={t.id} href={`/trips/${t.id}`}>
-                      <div className="bg-zinc-900 hover:bg-zinc-800 p-1.5 rounded border border-zinc-800 text-[10px] truncate cursor-pointer transition-all">
-                        <div className="font-bold text-zinc-200 truncate flex items-center gap-1">
+                      <div className="bg-card hover:bg-muted p-1.5 rounded border border-border text-[10px] truncate cursor-pointer transition-all">
+                        <div className="font-bold text-foreground truncate flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
                           {t.destination?.name || t.destination?.address || "Trip"}
                         </div>
-                        <div className="text-zinc-500 text-[9px] truncate">
+                        <div className="text-muted-foreground text-[9px] truncate">
                           {t.startTime} • {t.customerName || "Customer"}
                         </div>
                       </div>
                     </Link>
                   ))}
                   {dayTrips.length > 3 && (
-                    <div className="text-[9px] text-zinc-500 font-semibold text-center">
+                    <div className="text-[9px] text-muted-foreground font-semibold text-center">
                       +{dayTrips.length - 3} more
                     </div>
                   )}

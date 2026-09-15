@@ -56,14 +56,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/80">
+      <DialogContent className="max-w-md bg-background text-foreground border-border p-0 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/80">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="NG Travels" className="w-7 h-7 rounded-md object-contain bg-black border border-amber-500/30 p-0.5" />
-            <span className="font-bold text-zinc-100">Payment Receipt</span>
+            <img src="/logo.png" alt="NG Travels" className="w-7 h-7 rounded-md object-contain bg-black border border-amber-300 dark:border-amber-500/30 p-0.5" />
+            <span className="font-bold text-foreground">Payment Receipt</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={handlePrint} className="border-zinc-700 hover:bg-zinc-800 text-xs">
+            <Button size="sm" variant="outline" onClick={handlePrint} className="border-border hover:bg-muted text-xs">
               <Printer className="w-3.5 h-3.5 mr-1" /> Print
             </Button>
             <Button size="sm" onClick={handleWhatsApp} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs">
@@ -72,59 +72,59 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-6 text-sm bg-zinc-950">
-          <div className="text-center pb-4 border-b border-zinc-800">
-            <img src="/logo.png" alt="NG Travels" className="w-16 h-16 rounded-xl object-contain bg-black border border-amber-500/30 p-1 mx-auto mb-2 shadow-lg" />
-            <h3 className="font-bold text-lg text-zinc-100">{companyInfo.company}</h3>
-            <p className="text-xs text-amber-400 font-medium">Travel with Comfort & Safety</p>
-            <p className="text-[11px] text-zinc-400 mt-0.5">Payment Acknowledgment Slip</p>
-            <div className="mt-3 text-2xl font-bold font-mono text-emerald-400">
+        <div className="p-6 space-y-6 text-sm bg-background">
+          <div className="text-center pb-4 border-b border-border">
+            <img src="/logo.png" alt="NG Travels" className="w-16 h-16 rounded-xl object-contain bg-black border border-amber-300 dark:border-amber-500/30 p-1 mx-auto mb-2 shadow-lg" />
+            <h3 className="font-bold text-lg text-foreground">{companyInfo.company}</h3>
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Travel with Comfort & Safety</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Payment Acknowledgment Slip</p>
+            <div className="mt-3 text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400">
               {formatINR(payment.amount)}
             </div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide mt-0.5">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">
               Paid via {payment.method} ({payment.paymentType || "Payment"})
             </div>
           </div>
 
-          <div className="space-y-3 bg-zinc-900/60 p-4 rounded-lg border border-zinc-800 text-xs">
+          <div className="space-y-3 bg-card/60 p-4 rounded-lg border border-border text-xs">
             <div className="flex justify-between">
-              <span className="text-zinc-400">Receipt ID:</span>
-              <span className="font-mono text-zinc-200">REC-{payment.id}</span>
+              <span className="text-muted-foreground">Receipt ID:</span>
+              <span className="font-mono text-foreground">REC-{payment.id}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-400">Date:</span>
-              <span className="text-zinc-200">{paymentDateStr}</span>
+              <span className="text-muted-foreground">Date:</span>
+              <span className="text-foreground">{paymentDateStr}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-400">Booking Ref:</span>
-              <span className="font-mono font-bold text-amber-400">{trip.bookingId}</span>
+              <span className="text-muted-foreground">Booking Ref:</span>
+              <span className="font-mono font-bold text-amber-700 dark:text-amber-400">{trip.bookingId}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-400">Customer:</span>
-              <span className="text-zinc-200 font-medium">{trip.customerName}</span>
+              <span className="text-muted-foreground">Customer:</span>
+              <span className="text-foreground font-medium">{trip.customerName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-400">Transaction Ref:</span>
-              <span className="font-mono text-zinc-300">{payment.reference || "N/A"}</span>
+              <span className="text-muted-foreground">Transaction Ref:</span>
+              <span className="font-mono text-foreground">{payment.reference || "N/A"}</span>
             </div>
             {payment.notes && (
-              <div className="flex justify-between pt-1 border-t border-zinc-800">
-                <span className="text-zinc-400">Notes:</span>
-                <span className="text-zinc-300 italic">{payment.notes}</span>
+              <div className="flex justify-between pt-1 border-t border-border">
+                <span className="text-muted-foreground">Notes:</span>
+                <span className="text-foreground italic">{payment.notes}</span>
               </div>
             )}
           </div>
 
-          <div className="bg-amber-950/20 border border-amber-500/20 rounded-lg p-3 text-xs space-y-1.5">
-            <div className="flex justify-between text-zinc-300">
+          <div className="bg-amber-950/20 border border-amber-300 dark:border-amber-500/20 rounded-lg p-3 text-xs space-y-1.5">
+            <div className="flex justify-between text-foreground">
               <span>Total Trip Fare:</span>
               <span className="font-medium">{formatINR(trip.customerTotal)}</span>
             </div>
-            <div className="flex justify-between text-emerald-400 font-medium">
+            <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-medium">
               <span>Cumulative Paid:</span>
               <span>{formatINR(trip.totalPaid)}</span>
             </div>
-            <div className="flex justify-between text-amber-300 font-bold border-t border-amber-500/20 pt-1.5 text-sm">
+            <div className="flex justify-between text-amber-700 dark:text-amber-300 font-bold border-t border-amber-300 dark:border-amber-500/20 pt-1.5 text-sm">
               <span>Outstanding Balance:</span>
               <span>{formatINR(trip.remainingBalance)}</span>
             </div>

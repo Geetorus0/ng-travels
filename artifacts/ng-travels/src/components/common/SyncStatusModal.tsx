@@ -65,17 +65,17 @@ export function SyncStatusModal() {
       <ConnectionIndicator onClick={() => setOpen(true)} />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md bg-zinc-950 border-zinc-800 text-zinc-100 p-6 rounded-2xl shadow-2xl">
+        <DialogContent className="max-w-md bg-background border-border text-foreground p-6 rounded-2xl shadow-2xl">
           <DialogHeader className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/20 text-amber-400">
+              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-400/20 text-amber-700 dark:text-amber-400">
                 <Cloud className="w-5 h-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-bold text-zinc-100">
+                <DialogTitle className="text-base font-bold text-foreground">
                   Operations Backend Network
                 </DialogTitle>
-                <DialogDescription className="text-xs text-zinc-400">
+                <DialogDescription className="text-xs text-muted-foreground">
                   Real-time synchronization across Web, Owner APK, and Driver APK
                 </DialogDescription>
               </div>
@@ -86,17 +86,17 @@ export function SyncStatusModal() {
             {/* Connection Indicator */}
             <div className={`p-4 rounded-xl border flex items-center gap-3 ${
               syncState.status === "connected"
-                ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
+                ? "bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
                 : syncState.status === "connecting"
-                ? "bg-amber-950/20 border-amber-500/30 text-amber-300"
-                : "bg-rose-950/20 border-rose-500/30 text-rose-300"
+                ? "bg-amber-950/20 border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-300"
+                : "bg-rose-950/20 border-rose-300 dark:border-rose-500/30 text-rose-700 dark:text-rose-300"
             }`}>
               {syncState.status === "connected" ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
               ) : syncState.status === "connecting" ? (
-                <Zap className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />
+                <Zap className="w-5 h-5 text-amber-700 dark:text-amber-400 animate-spin flex-shrink-0" />
               ) : (
-                <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-rose-700 dark:text-rose-400 flex-shrink-0" />
               )}
               <div className="flex-1">
                 <div className="font-bold text-sm capitalize">{syncState.status}</div>
@@ -110,8 +110,8 @@ export function SyncStatusModal() {
 
             {/* Server URL Input */}
             <div className="space-y-2 pt-1">
-              <Label htmlFor="server-url" className="text-xs text-zinc-300 flex items-center gap-1.5">
-                <Server className="w-3.5 h-3.5 text-amber-400" />
+              <Label htmlFor="server-url" className="text-xs text-foreground flex items-center gap-1.5">
+                <Server className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
                 Backend API Server Endpoint
               </Label>
               <Input
@@ -119,9 +119,9 @@ export function SyncStatusModal() {
                 value={targetUrl}
                 onChange={(e) => setTargetUrl(e.target.value)}
                 placeholder="https://ng-travels-operations.vercel.app"
-                className="bg-zinc-900 border-zinc-800 text-xs font-mono py-4 text-zinc-200"
+                className="bg-card border-border text-xs font-mono py-4 text-foreground"
               />
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-muted-foreground">
                 Default: Production cloud backend endpoint.
               </p>
             </div>
@@ -130,22 +130,22 @@ export function SyncStatusModal() {
             {testResult && (
               <div className={`p-3 rounded-lg text-[11px] font-mono border ${
                 testResult.success
-                  ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-                  : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+                  ? "bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                  : "bg-rose-950/40 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300"
               }`}>
                 {testResult.message}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 gap-2">
+          <div className="flex items-center justify-between pt-2 border-t border-border/80 gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleTestConnection}
               disabled={testing}
-              className="text-xs border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 cursor-pointer"
+              className="text-xs border-border bg-card hover:bg-muted text-foreground cursor-pointer"
             >
               {testing ? "Testing..." : "Test Connection"}
             </Button>
@@ -156,7 +156,7 @@ export function SyncStatusModal() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setOpen(false)}
-                className="text-xs text-zinc-400 cursor-pointer"
+                className="text-xs text-muted-foreground cursor-pointer"
               >
                 Close
               </Button>

@@ -44,21 +44,21 @@ function DefaultFallback({
 }: ErrorFallbackProps & { componentStack?: string | null }) {
   return (
     <div className="noise grid min-h-[100dvh] w-full place-items-center bg-background p-6 text-foreground">
-      <div className="surface w-full max-w-lg rounded-2xl p-8 text-center border border-zinc-800 bg-zinc-950/90 shadow-2xl backdrop-blur-xl">
+      <div className="surface w-full max-w-lg rounded-2xl p-8 text-center border border-border bg-background/90 shadow-2xl backdrop-blur-xl">
         <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-amber-400 text-xs font-black text-zinc-950 shadow-md shadow-amber-400/20">
           NG
         </span>
-        <p className="eyebrow mt-5 text-amber-400 text-xs font-mono font-bold tracking-widest uppercase">
+        <p className="eyebrow mt-5 text-amber-700 dark:text-amber-400 text-xs font-mono font-bold tracking-widest uppercase">
           Workspace Interruption
         </p>
-        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-zinc-100">
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground">
           Something needs a second look.
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           This view hit an error. Your trip records are safe; try the request again.
         </p>
         {import.meta.env.DEV ? (
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-zinc-900 border border-zinc-800 p-3 text-left text-xs text-amber-300 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono">
+          <pre className="mt-4 overflow-x-auto rounded-lg bg-card border border-border p-3 text-left text-xs text-amber-700 dark:text-amber-300 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono">
             {error.message || String(error)}
             {componentStack ? `\n\nComponent Stack:\n${componentStack}` : ""}
           </pre>
@@ -76,7 +76,7 @@ function DefaultFallback({
             onClick={() => {
               window.location.href = "/dashboard";
             }}
-            className="rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-200 transition-all cursor-pointer"
+            className="rounded-xl border border-border bg-card hover:bg-muted px-5 py-2.5 text-sm font-semibold text-foreground transition-all cursor-pointer"
           >
             Reload Dashboard
           </button>

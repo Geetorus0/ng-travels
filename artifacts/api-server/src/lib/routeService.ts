@@ -1,4 +1,5 @@
 import type { TripLocation, RouteAlternative } from "@workspace/db/schema";
+import { estimateTollForRoute, type TollMatch } from "./tollService.js";
 
 export interface PlaceSearchResult {
   placeId: string;
@@ -35,6 +36,8 @@ export interface ComputedRouteOptions {
   totalDurationMinutes: number;
   estimatedToll: number | null;
   tollAvailable: boolean;
+  tollSource: "google_routes" | "nhai_open_dataset" | null;
+  tollPlazas: TollMatch[];
   alternatives: RouteAlternative[];
 }
 
@@ -203,6 +206,138 @@ export async function searchPlaces(input: string): Promise<PlaceSearchResult[]> 
   }
 
   return [];
+}
+
+/**
+ * Reverse geocode a coordinate pair into a human-readable place, so a
+ * map-pin or pasted lat/lng doesn't have to be shown to the user as bare
+ * numbers. Falls back to a generic "Pinned Location" label if both
+ * providers fail — the coordinates themselves are still usable either way.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<PlaceSearchResult | null> {
+  if (GOOGLE_API_KEY) {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = (await res.json()) as any;
+        const result = json.results?.[0];
+        if (result) {
+          let city: string | undefined, district: string | undefined, state: string | undefined, country: string | undefined;
+          for (const comp of result.address_components || []) {
+            if (comp.types.includes("locality")) city = comp.long_name;
+            if (comp.types.includes("administrative_area_level_2")) district = comp.long_name;
+            if (comp.types.includes("administrative_area_level_1")) state = comp.long_name;
+            if (comp.types.includes("country")) country = comp.long_name;
+          }
+          return {
+            placeId: result.place_id || `geo_${lat}_${lng}`,
+            name: result.formatted_address?.split(",")[0] || "Pinned Location",
+            formattedAddress: result.formatted_address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+            latitude: lat,
+            longitude: lng,
+            lat,
+            lng,
+            city: city || district,
+            district,
+            state,
+            country: country || "India",
+          };
+        }
+      }
+    } catch (err) {
+      console.error("[routeService] Google reverse geocode error:", err);
+    }
+  }
+
+  try {
+    const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=${GEOAPIFY_API_KEY}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      const feat = data.features?.[0];
+      if (feat) {
+        const props = feat.properties || {};
+        return {
+          placeId: props.place_id || `geo_${lat}_${lng}`,
+          name: props.name || props.address_line1 || props.city || "Pinned Location",
+          formattedAddress: props.formatted || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          latitude: lat,
+          longitude: lng,
+          lat,
+          lng,
+          city: props.city || props.county,
+          district: props.state_district || props.county,
+          state: props.state,
+          country: props.country || "India",
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[routeService] Geoapify reverse geocode error:", err);
+  }
+
+  return null;
+}
+
+/**
+ * Pull a lat/lng pair out of free text: a plain "lat,lng", or any of the
+ * common Google Maps URL shapes (@lat,lng, ?q=lat,lng, ll=lat,lng, or the
+ * !3d..!4d.. pattern used on place-detail URLs).
+ */
+export function extractLatLngFromText(text: string): { lat: number; lng: number } | null {
+  const isValid = (lat: number, lng: number) =>
+    Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
+  const plain = text.match(/^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  if (plain) {
+    const lat = parseFloat(plain[1]), lng = parseFloat(plain[2]);
+    if (isValid(lat, lng)) return { lat, lng };
+  }
+
+  const patterns = [
+    /@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+    /[?&]q=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+    /[?&]ll=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+    /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+  ];
+  for (const pattern of patterns) {
+    const m = text.match(pattern);
+    if (m) {
+      const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+      if (isValid(lat, lng)) return { lat, lng };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve a pasted Google Maps link (including shortened goo.gl /
+ * maps.app.goo.gl links, which need a server-side redirect follow — the
+ * browser can't read the final URL of a cross-origin redirect) or a plain
+ * "lat, lng" string into coordinates.
+ */
+export async function resolveLocationInput(input: string): Promise<{ lat: number; lng: number } | null> {
+  const direct = extractLatLngFromText(input);
+  if (direct) return direct;
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const res = await fetch(input, { method: "GET", redirect: "follow" });
+      const finalUrl = res.url || input;
+      const fromRedirect = extractLatLngFromText(finalUrl);
+      if (fromRedirect) return fromRedirect;
+      // Some short links only reveal coordinates in the HTML body, not the redirect URL
+      const body = await res.text();
+      return extractLatLngFromText(body);
+    } catch (err) {
+      console.error("[routeService] resolveLocationInput URL fetch error:", err);
+      return null;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -450,6 +585,22 @@ export async function calculateRouteJourney(
     }
   }
 
+  // Neither Google Routes (not configured here) nor Geoapify provide toll
+  // pricing — fall back to matching NHAI toll plazas (open dataset) against
+  // the outbound road path. Outbound and return normally retrace the same
+  // highway, so this is priced once for the whole journey using the
+  // same-day round-trip rate when applicable, rather than doubling the
+  // one-way rate per leg.
+  let tollSource: ComputedRouteOptions["tollSource"] = tollAvailable ? "google_routes" : null;
+  let tollPlazas: TollMatch[] = [];
+  if (!tollAvailable) {
+    const tollEstimate = estimateTollForRoute(outbound.coordinates, isRoundTrip);
+    estimatedToll = tollEstimate.totalToll;
+    tollPlazas = tollEstimate.plazas;
+    tollAvailable = true;
+    tollSource = "nhai_open_dataset";
+  }
+
   // 3. Alternatives for UI route selection
   const alternatives: RouteAlternative[] = [
     {
@@ -472,6 +623,8 @@ export async function calculateRouteJourney(
     totalDurationMinutes,
     estimatedToll,
     tollAvailable,
+    tollSource,
+    tollPlazas,
     alternatives,
   };
 }

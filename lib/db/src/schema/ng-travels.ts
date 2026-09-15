@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
@@ -102,11 +103,10 @@ export const usersTable = pgTable(
   "users",
   {
     id: serial("id").primaryKey(),
-    clerkId: text("clerk_id"),
+    authUserId: uuid("auth_user_id").unique(),
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
-    passwordHash: text("password_hash"),
     role: text("role").notNull().default("owner"), // owner | admin | driver | manager
     driverId: integer("driver_id").references(() => driversTable.id),
     status: text("status").notNull().default("active"), // active | inactive
@@ -123,23 +123,6 @@ export const usersTable = pgTable(
     uniqueIndex("users_email_idx").on(table.email),
     index("users_phone_idx").on(table.phone),
     index("users_driver_id_idx").on(table.driverId),
-  ],
-);
-
-export const sessionsTable = pgTable(
-  "sessions",
-  {
-    id: serial("id").primaryKey(),
-    token: text("token").notNull(),
-    userId: integer("user_id").notNull().references(() => usersTable.id),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("sessions_token_idx").on(table.token),
-    index("sessions_user_id_idx").on(table.userId),
   ],
 );
 
@@ -565,4 +548,3 @@ export type AuditLog = typeof auditLogsTable.$inferSelect;
 export type Vehicle = typeof vehiclesTable.$inferSelect;
 export type DriverLocation = typeof driverLocationsTable.$inferSelect;
 export type User = typeof usersTable.$inferSelect;
-export type Session = typeof sessionsTable.$inferSelect;

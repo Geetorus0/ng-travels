@@ -16,6 +16,9 @@ const basePath = process.env.BASE_PATH || '/';
 
 export default defineConfig({
   base: basePath,
+  // Share a single .env file with the backend (artifacts/api-server) at the repo root,
+  // instead of keeping a separate copy of the same secrets here.
+  envDir: path.resolve(import.meta.dirname, '..', '..'),
   plugins: [
     react(),
     tailwindcss({ optimize: false }),

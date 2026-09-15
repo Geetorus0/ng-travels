@@ -50,17 +50,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   // 12 Balanced Quick Access Cards
   const quickAccessCards = [
     { title: "New Trip", desc: "Dispatch booking", icon: Plus, href: "#new-trip", onClick: onOpenCreateTrip, primary: true },
-    { title: "Trips", desc: `${tripList.length} Bookings`, icon: Navigation, href: "/trips", color: "text-amber-400" },
-    { title: "Vehicles", desc: `${vehicleList.length} Fleet Units`, icon: Car, href: "/vehicles", color: "text-amber-400" },
-    { title: "Drivers", desc: "Duty Roster", icon: Users, href: "/drivers", color: "text-emerald-400" },
-    { title: "Customers", desc: `${customerList.length} Profiles`, icon: Users, href: "/customers", color: "text-sky-400" },
-    { title: "Payments", desc: "Ledger", icon: CircleDollarSign, href: "/payments", color: "text-emerald-400" },
-    { title: "Expenses", desc: "Claims", icon: Receipt, href: "/expenses", color: "text-rose-400" },
-    { title: "Reports", desc: "Excel / PDF", icon: BarChart3, href: "/reports", color: "text-amber-400" },
-    { title: "Enquiries", desc: "Quotes", icon: MessageSquareQuote, href: "/enquiries", color: "text-purple-400" },
-    { title: "Route Planner", desc: "Maps & Tolls", icon: MapPin, href: "/route-planner", color: "text-amber-400" },
-    { title: "Alerts", desc: "Notifications", icon: Bell, href: "/notifications", color: "text-amber-300" },
-    { title: "Settings", desc: "Rates & Profile", icon: Settings, href: "/settings", color: "text-zinc-400" },
+    { title: "Trips", desc: `${tripList.length} Bookings`, icon: Navigation, href: "/trips", color: "text-amber-700 dark:text-amber-400" },
+    { title: "Vehicles", desc: `${vehicleList.length} Fleet Units`, icon: Car, href: "/vehicles", color: "text-amber-700 dark:text-amber-400" },
+    { title: "Drivers", desc: "Duty Roster", icon: Users, href: "/drivers", color: "text-emerald-700 dark:text-emerald-400" },
+    { title: "Customers", desc: `${customerList.length} Profiles`, icon: Users, href: "/customers", color: "text-sky-700 dark:text-sky-400" },
+    { title: "Payments", desc: "Ledger", icon: CircleDollarSign, href: "/payments", color: "text-emerald-700 dark:text-emerald-400" },
+    { title: "Expenses", desc: "Claims", icon: Receipt, href: "/expenses", color: "text-rose-700 dark:text-rose-400" },
+    { title: "Reports", desc: "Excel / PDF", icon: BarChart3, href: "/reports", color: "text-amber-700 dark:text-amber-400" },
+    { title: "Enquiries", desc: "Quotes", icon: MessageSquareQuote, href: "/enquiries", color: "text-purple-700 dark:text-purple-400" },
+    { title: "Route Planner", desc: "Maps & Tolls", icon: MapPin, href: "/route-planner", color: "text-amber-700 dark:text-amber-400" },
+    { title: "Alerts", desc: "Notifications", icon: Bell, href: "/notifications", color: "text-amber-700 dark:text-amber-300" },
+    { title: "Settings", desc: "Rates & Profile", icon: Settings, href: "/settings", color: "text-muted-foreground" },
   ];
 
   const [perfViewMode, setPerfViewMode] = useState<"all_time" | "today">("all_time");
@@ -125,7 +125,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const s = String(status || "").toLowerCase();
     if (s === "in_progress") {
       return (
-        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">
+        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 uppercase">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           IN PROGRESS
         </span>
@@ -133,7 +133,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     }
     if (s === "started" || s === "reached_pickup" || s === "customer_picked_up") {
       return (
-        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 uppercase">
+        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-500/40 uppercase">
           <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
           {s.replaceAll("_", " ")}
         </span>
@@ -141,14 +141,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     }
     if (s === "completed") {
       return (
-        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
-          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+        <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 uppercase">
+          <CheckCircle2 className="w-3 h-3 text-emerald-700 dark:text-emerald-400" />
           COMPLETED
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 uppercase">
+      <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-foreground border border-border uppercase">
         {s.replaceAll("_", " ")}
       </span>
     );
@@ -157,13 +157,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Top Welcome Header & Primary Booking CTA */}
-      <div className="bg-gradient-to-r from-amber-950/40 via-zinc-900 to-zinc-900/90 p-4 sm:p-7 rounded-2xl border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-950/40 via-card to-card/90 p-4 sm:p-7 rounded-2xl border border-amber-300 dark:border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
         <div className="space-y-1 z-10">
-          <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 uppercase tracking-widest bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+          <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest bg-amber-100 dark:bg-amber-400/10 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-400/20">
             <Sparkles className="w-3 h-3" /> NG TRAVELS COMMAND DESK
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-zinc-100 tracking-tight">Good Morning, Operations Owner</h1>
-          <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">Good Morning, Operations Owner</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl">
             Real-time fleet operations, central fare calculations, driver dispatching, and audited revenue ledgers.
           </p>
         </div>
@@ -179,11 +179,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* QUICK ACCESS ACTION CARDS (12-Card Mobile Grid) */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-amber-400" />
+          <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-amber-700 dark:text-amber-400" />
             Quick Access Command Hub
           </h2>
-          <span className="text-[10px] sm:text-[11px] text-zinc-500 font-mono">12 Modules</span>
+          <span className="text-[10px] sm:text-[11px] text-muted-foreground font-mono">12 Modules</span>
         </div>
 
         <div className="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3">
@@ -206,14 +206,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             }
             return (
               <Link key={idx} href={card.href}>
-                <div className="bg-zinc-900/80 hover:bg-zinc-900 p-3 sm:p-4 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all text-left flex flex-col justify-between min-h-[85px] sm:min-h-[90px] cursor-pointer group shadow-sm">
+                <div className="bg-card/80 hover:bg-card p-3 sm:p-4 rounded-xl border border-border hover:border-border transition-all text-left flex flex-col justify-between min-h-[85px] sm:min-h-[90px] cursor-pointer group shadow-sm">
                   <div className="flex justify-between items-start">
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${card.color || "text-zinc-400"} group-hover:scale-110 transition-transform`} />
-                    <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-600 group-hover:text-zinc-300 transition-colors" />
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${card.color || "text-muted-foreground"} group-hover:scale-110 transition-transform`} />
+                    <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </div>
                   <div>
-                    <div className="text-xs sm:text-xs font-bold text-zinc-200 group-hover:text-amber-400 transition-colors truncate">{card.title}</div>
-                    <div className="text-[10px] sm:text-[11px] text-zinc-500 truncate">{card.desc}</div>
+                    <div className="text-xs sm:text-xs font-bold text-foreground group-hover:text-amber-700 group-hover:dark:text-amber-400 transition-colors truncate">{card.title}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground truncate">{card.desc}</div>
                   </div>
                 </div>
               </Link>
@@ -225,17 +225,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* OPERATIONS & FINANCIAL PERFORMANCE SUMMARY */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-            <CircleDollarSign className="w-4 h-4 text-emerald-400" />
+          <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CircleDollarSign className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
             {isAllTime ? "All-Time Financial & Operational Performance" : "Today's Dispatch & Revenue Performance"}
           </h2>
-          <div className="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs">
+          <div className="inline-flex rounded-lg bg-card p-0.5 border border-border text-xs">
             <button
               onClick={() => setPerfViewMode("all_time")}
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 isAllTime
                   ? "bg-amber-400 text-zinc-950 font-bold shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               All-Time Business
@@ -245,7 +245,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 !isAllTime
                   ? "bg-amber-400 text-zinc-950 font-bold shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Today's Dispatch
@@ -255,66 +255,66 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 sm:gap-3">
           {/* Trips Count */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-border transition-colors">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold block">
               {isAllTime ? "Total Booked Trips" : "Today's Trips"}
             </span>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 mt-0.5">{displayTrips}</div>
-            <span className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 block font-medium">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{displayTrips}</div>
+            <span className="text-[9px] sm:text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium">
               {displayCompleted} completed
             </span>
           </div>
 
           {/* Revenue */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-border transition-colors">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold block">
               {isAllTime ? "Total Booked Revenue" : "Today's Revenue"}
             </span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5">
+            <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-400 mt-0.5">
               {formatINR(displayRevenue)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Gross Fare Volume</span>
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 block font-medium">Gross Fare Volume</span>
           </div>
 
           {/* Collection */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-border transition-colors">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold block">
               {isAllTime ? "Total Cash Collected" : "Today's Collection"}
             </span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-0.5">
+            <div className="text-lg sm:text-xl font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
               {formatINR(displayCollection)}
             </div>
             <span className="text-[9px] sm:text-[10px] text-emerald-400/80 mt-0.5 block font-medium">Cash / Bank In</span>
           </div>
 
           {/* Outstanding Balance */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">Outstanding Receivables</span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-amber-300 mt-0.5">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-border transition-colors">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold block">Outstanding Receivables</span>
+            <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
               {formatINR(totalPendingBalance)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 block font-medium">
               {pendingPaymentTrips.length} pending runs
             </span>
           </div>
 
           {/* Operating Expenses */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-zinc-700 transition-colors">
-            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold block">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-border transition-colors">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold block">
               {isAllTime ? "Operating Expenses" : "Today's Expenses"}
             </span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-rose-400 mt-0.5">
+            <div className="text-lg sm:text-xl font-bold font-mono text-rose-700 dark:text-rose-400 mt-0.5">
               {formatINR(displayExpenses)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 block font-medium">Approved Claims</span>
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 block font-medium">Approved Claims</span>
           </div>
 
           {/* Net Profit */}
-          <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 shadow-md">
-            <span className="text-[9px] sm:text-[10px] text-amber-300 uppercase font-bold block">
+          <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-950/20 shadow-md">
+            <span className="text-[9px] sm:text-[10px] text-amber-700 dark:text-amber-300 uppercase font-bold block">
               {isAllTime ? "Net Company Profit" : "Today's Profit"}
             </span>
-            <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5">
+            <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-400 mt-0.5">
               {formatINR(displayProfit)}
             </div>
             <span className="text-[9px] sm:text-[10px] text-amber-400/80 mt-0.5 block font-medium">Revenue - Expenses</span>
@@ -322,15 +322,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           {/* Active Commercial Fleet */}
           <Link href="/vehicles">
-            <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800/80 hover:border-amber-500/50 transition-colors cursor-pointer group">
+            <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border/80 hover:border-amber-300 hover:dark:border-amber-500/50 transition-colors cursor-pointer group">
               <div className="flex justify-between items-center">
-                <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold">Active Fleet</span>
-                <Car className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-semibold">Active Fleet</span>
+                <Car className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-lg sm:text-xl font-bold font-mono text-zinc-100 mt-0.5">
-                {activeVehiclesCount} <span className="text-xs text-zinc-500 font-normal">/ {vehicles.length}</span>
+              <div className="text-lg sm:text-xl font-bold font-mono text-foreground mt-0.5">
+                {activeVehiclesCount} <span className="text-xs text-muted-foreground font-normal">/ {vehicles.length}</span>
               </div>
-              <span className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 block font-medium">
+              <span className="text-[9px] sm:text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium">
                 {expiringDocCount > 0 ? `${expiringDocCount} doc alerts` : "All documents OK"}
               </span>
             </div>
@@ -343,37 +343,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Active Trips Radar */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
               <Radio className="w-4 h-4 text-rose-500 animate-pulse" />
               Active Trips Radar ({activeTrips.length})
             </h2>
-            <Link href="/trips" className="text-xs text-amber-400 hover:underline flex items-center gap-0.5">
+            <Link href="/trips" className="text-xs text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-0.5">
               All Trips <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {activeTrips.length === 0 ? (
-            <div className="bg-zinc-900/40 p-5 rounded-xl border border-zinc-800 text-center text-zinc-500 text-xs">
+            <div className="bg-card/40 p-5 rounded-xl border border-border text-center text-muted-foreground text-xs">
               No trips currently in active transit.
             </div>
           ) : (
             <div className="space-y-2.5">
-              {activeTrips.map((trip) => (
-                <div key={trip.id} className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+              {activeTrips.map((trip: any) => (
+                <div key={trip.id} className="bg-card/80 p-3.5 sm:p-4 rounded-xl border border-border hover:border-border transition-all flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-bold text-amber-400">{trip.bookingId}</span>
+                      <span className="font-mono text-xs font-bold text-amber-700 dark:text-amber-400">{trip.bookingId}</span>
                       {renderStatusBadge(trip.status)}
                     </div>
-                    <div className="font-bold text-xs sm:text-sm text-zinc-100">
+                    <div className="font-bold text-xs sm:text-sm text-foreground">
                       {getRouteText(trip)}
                     </div>
-                    <div className="text-[11px] sm:text-xs text-zinc-400">
-                      Passenger: <span className="text-zinc-300 font-medium">{getPassengerName(trip)}</span> • Driver: <strong className="text-zinc-200">{trip.driverName || "Unassigned"}</strong>
+                    <div className="text-[11px] sm:text-xs text-muted-foreground">
+                      Passenger: <span className="text-foreground font-medium">{getPassengerName(trip)}</span> • Driver: <strong className="text-foreground">{trip.driverName || "Unassigned"}</strong>
                     </div>
                   </div>
                   <Link href={`/trips/${trip.id}`} className="self-end xs:self-center">
-                    <Button size="sm" variant="outline" className="border-zinc-700 hover:border-zinc-600 text-xs h-7 sm:h-8 cursor-pointer">
+                    <Button size="sm" variant="outline" className="border-border hover:border-muted-foreground/40 text-xs h-7 sm:h-8 cursor-pointer">
                       Inspect <Eye className="w-3.5 h-3.5 ml-1" />
                     </Button>
                   </Link>
@@ -386,37 +386,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Upcoming Trips */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <Clock3 className="w-4 h-4 text-sky-400" />
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <Clock3 className="w-4 h-4 text-sky-700 dark:text-sky-400" />
               Upcoming Scheduled Trips ({upcomingTrips.length})
             </h2>
-            <Link href="/calendar" className="text-xs text-amber-400 hover:underline flex items-center gap-0.5">
+            <Link href="/calendar" className="text-xs text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-0.5">
               Calendar <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {upcomingTrips.length === 0 ? (
-            <div className="bg-zinc-900/40 p-5 rounded-xl border border-zinc-800 text-center text-zinc-500 text-xs">
+            <div className="bg-card/40 p-5 rounded-xl border border-border text-center text-muted-foreground text-xs">
               No upcoming trips scheduled.
             </div>
           ) : (
             <div className="space-y-2.5">
-              {upcomingTrips.slice(0, 4).map((trip) => (
-                <div key={trip.id} className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all flex items-center justify-between gap-3">
+              {upcomingTrips.slice(0, 4).map((trip: any) => (
+                <div key={trip.id} className="bg-card/80 p-3.5 sm:p-4 rounded-xl border border-border hover:border-border transition-all flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-xs font-bold text-zinc-300">{trip.bookingId}</span>
-                      <span className="text-[11px] text-zinc-500">• {new Date(trip.startDate).toLocaleDateString("en-IN")} {trip.startTime}</span>
+                      <span className="font-mono text-xs font-bold text-foreground">{trip.bookingId}</span>
+                      <span className="text-[11px] text-muted-foreground">• {new Date(trip.startDate).toLocaleDateString("en-IN")} {trip.startTime}</span>
                     </div>
-                    <div className="font-semibold text-xs sm:text-sm text-zinc-200 truncate max-w-[200px] xs:max-w-none">
+                    <div className="font-semibold text-xs sm:text-sm text-foreground truncate max-w-[200px] xs:max-w-none">
                       {getRouteText(trip)}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-zinc-400">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">
                       {getPassengerName(trip)} • {trip.billingKm} km ({formatINR(trip.customerTotal)})
                     </div>
                   </div>
                   <Link href={`/trips/${trip.id}`}>
-                    <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-zinc-100 text-xs h-7 sm:h-8 px-2 cursor-pointer">
+                    <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-foreground text-xs h-7 sm:h-8 px-2 cursor-pointer">
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </Link>
@@ -432,23 +432,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Pending Payments Widget */}
         <div className="lg:col-span-2 space-y-2.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400" />
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400" />
               Pending Payment Balances ({pendingPaymentTrips.length})
             </h2>
-            <Link href="/payments" className="text-xs text-amber-400 hover:underline">
+            <Link href="/payments" className="text-xs text-amber-700 dark:text-amber-400 hover:underline">
               Payments Ledger
             </Link>
           </div>
 
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl overflow-x-auto shadow-sm">
+          <div className="bg-card/80 border border-border rounded-xl overflow-x-auto shadow-sm">
             {pendingPaymentTrips.length === 0 ? (
-              <div className="p-6 text-center text-zinc-500 text-xs">
+              <div className="p-6 text-center text-muted-foreground text-xs">
                 All trip balances are settled. No outstanding payments.
               </div>
             ) : (
               <table className="w-full text-left text-xs min-w-[500px]">
-                <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                <thead className="bg-background text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border">
                   <tr>
                     <th className="py-2.5 sm:py-3 px-3 sm:px-4">Booking ID</th>
                     <th className="py-2.5 sm:py-3 px-3 sm:px-4">Customer</th>
@@ -457,21 +457,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-right">Balance Due</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/60">
-                  {pendingPaymentTrips.slice(0, 5).map((trip) => (
-                    <tr key={trip.id} className="hover:bg-zinc-800/40 transition-colors">
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-mono font-bold text-amber-400">
+                <tbody className="divide-y divide-border/60">
+                  {pendingPaymentTrips.slice(0, 5).map((trip: any) => (
+                    <tr key={trip.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-mono font-bold text-amber-700 dark:text-amber-400">
                         <Link href={`/trips/${trip.id}`} className="hover:underline">
                           {trip.bookingId}
                         </Link>
                       </td>
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                        <div className="font-semibold text-zinc-200">{trip.customerName}</div>
-                        <div className="text-[10px] sm:text-[11px] text-zinc-500">{trip.customerMobile}</div>
+                        <div className="font-semibold text-foreground">{trip.customerName}</div>
+                        <div className="text-[10px] sm:text-[11px] text-muted-foreground">{trip.customerMobile}</div>
                       </td>
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-zinc-300">{formatINR(trip.customerTotal)}</td>
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-emerald-400">{formatINR(trip.totalPaid)}</td>
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono font-bold text-amber-300">{formatINR(trip.remainingBalance)}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-foreground">{formatINR(trip.customerTotal)}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono text-emerald-700 dark:text-emerald-400">{formatINR(trip.totalPaid)}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono font-bold text-amber-700 dark:text-amber-300">{formatINR(trip.remainingBalance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -483,29 +483,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Recent Customers Widget */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <Users className="w-4 h-4 text-sky-400" />
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <Users className="w-4 h-4 text-sky-700 dark:text-sky-400" />
               Recent Customers ({customerList.length})
             </h2>
-            <Link href="/customers" className="text-xs text-amber-400 hover:underline">
+            <Link href="/customers" className="text-xs text-amber-700 dark:text-amber-400 hover:underline">
               Directory
             </Link>
           </div>
 
-          <div className="bg-zinc-900/80 p-3.5 sm:p-4 rounded-xl border border-zinc-800 space-y-2.5 shadow-sm">
+          <div className="bg-card/80 p-3.5 sm:p-4 rounded-xl border border-border space-y-2.5 shadow-sm">
             {customerList.length === 0 ? (
-              <div className="py-4 text-center text-zinc-500 text-xs">
+              <div className="py-4 text-center text-muted-foreground text-xs">
                 No customers recorded yet. Add your first customer to get started.
               </div>
             ) : (
               customerList.slice(0, 5).map((cust: any) => (
-                <div key={cust.id} className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800/60 last:border-0 last:pb-0">
+                <div key={cust.id} className="flex justify-between items-center text-xs pb-2 border-b border-border/60 last:border-0 last:pb-0">
                   <div>
-                    <div className="font-semibold text-zinc-200">{cust.name}</div>
-                    <div className="text-[10px] sm:text-[11px] text-zinc-500">{cust.mobile}</div>
+                    <div className="font-semibold text-foreground">{cust.name}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground">{cust.mobile}</div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-mono font-semibold">
+                    <span className="text-[10px] bg-muted text-foreground px-2 py-0.5 rounded font-mono font-semibold">
                       {cust.totalTrips || 0} Runs
                     </span>
                   </div>

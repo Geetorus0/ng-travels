@@ -51,10 +51,10 @@ export const TripActionLoader: React.FC<TripActionLoaderProps> = ({
       <NGTravelsLoader size="md" variant="default" text="" />
 
       <div className="space-y-1">
-        <h4 className="text-sm font-bold text-zinc-100 tracking-wide">
+        <h4 className="text-sm font-bold text-foreground tracking-wide">
           {title || defaults.title}
         </h4>
-        <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">
+        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
           {subtext || defaults.subtext}
         </p>
       </div>

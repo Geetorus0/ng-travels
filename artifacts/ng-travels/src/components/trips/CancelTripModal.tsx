@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export const CancelTripModal: React.FC<CancelTripModalProps> = ({
     if (!reason.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/trips/${trip.id}/cancel`, {
+      const res = await apiFetch(`/api/trips/${trip.id}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
@@ -47,44 +48,44 @@ export const CancelTripModal: React.FC<CancelTripModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 p-5 rounded-xl">
+      <DialogContent className="max-w-md bg-background text-foreground border-border p-5 rounded-xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-bold text-rose-400 flex items-center gap-2">
+          <DialogTitle className="text-base font-bold text-rose-700 dark:text-rose-400 flex items-center gap-2">
             <XCircle className="w-5 h-5" /> Cancel Trip Booking
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-2 text-xs">
-          <div className="bg-zinc-900/60 p-3 rounded-lg border border-zinc-800 space-y-1">
-            <div className="text-zinc-400">Booking ID: <span className="font-mono text-amber-400 font-bold">{trip.bookingId}</span></div>
-            <div className="text-zinc-200 font-semibold">{trip.pickup?.name} ➔ {trip.destination?.name}</div>
-            <div className="text-zinc-400">Customer: {trip.customerName} ({trip.customerMobile})</div>
+          <div className="bg-card/60 p-3 rounded-lg border border-border space-y-1">
+            <div className="text-muted-foreground">Booking ID: <span className="font-mono text-amber-700 dark:text-amber-400 font-bold">{trip.bookingId}</span></div>
+            <div className="text-foreground font-semibold">{trip.pickup?.name} ➔ {trip.destination?.name}</div>
+            <div className="text-muted-foreground">Customer: {trip.customerName} ({trip.customerMobile})</div>
           </div>
 
           {hasAdvance && (
-            <div className="bg-amber-950/30 border border-amber-500/40 p-3 rounded-lg text-amber-300 space-y-1">
+            <div className="bg-amber-950/30 border border-amber-300 dark:border-amber-500/40 p-3 rounded-lg text-amber-700 dark:text-amber-300 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-amber-400" /> Advance Paid: {formatINR(trip.totalPaid)}
+                <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400" /> Advance Paid: {formatINR(trip.totalPaid)}
               </div>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-muted-foreground">
                 An advance payment was recorded. Trip cancellation will flag this for refund processing in the Refunds ledger.
               </p>
             </div>
           )}
 
           <div>
-            <label className="text-xs text-zinc-300 font-semibold uppercase block mb-1">Cancellation Reason (Mandatory)</label>
+            <label className="text-xs text-foreground font-semibold uppercase block mb-1">Cancellation Reason (Mandatory)</label>
             <Textarea
               placeholder="e.g. Customer cancelled due to personal emergency / Vehicle breakdown..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="bg-zinc-900 border-zinc-800 text-xs"
+              className="bg-card border-border text-xs"
               rows={3}
             />
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 border-zinc-700 text-xs">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1 border-border text-xs">
               Keep Booking
             </Button>
             <Button

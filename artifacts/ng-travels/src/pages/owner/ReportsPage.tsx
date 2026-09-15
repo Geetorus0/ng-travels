@@ -100,11 +100,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-amber-400" />
+          <h1 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Financial Operations Reports
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Audited financial summaries, revenue ledgers, and real-time Excel (.xlsx) / PDF generation.
           </p>
         </div>
@@ -115,7 +115,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             size="sm"
             variant="outline"
             onClick={handlePrintPDF}
-            className="border-zinc-700 hover:bg-zinc-800 text-xs text-zinc-200 flex-1 sm:flex-none cursor-pointer"
+            className="border-border hover:bg-muted text-xs text-foreground flex-1 sm:flex-none cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5 mr-1" /> Print
           </Button>
@@ -130,13 +130,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       </div>
 
       {/* Range Selection Pills */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900/60 p-3 sm:p-4 rounded-xl border border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/60 p-3 sm:p-4 rounded-xl border border-border">
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <Button
             size="sm"
             variant={reportType === "daily" ? "default" : "outline"}
             onClick={() => setReportType("daily")}
-            className={reportType === "daily" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-zinc-800 text-xs h-8"}
+            className={reportType === "daily" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-border text-xs h-8"}
           >
             Daily
           </Button>
@@ -144,7 +144,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             size="sm"
             variant={reportType === "weekly" ? "default" : "outline"}
             onClick={() => setReportType("weekly")}
-            className={reportType === "weekly" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-zinc-800 text-xs h-8"}
+            className={reportType === "weekly" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-border text-xs h-8"}
           >
             Weekly
           </Button>
@@ -152,7 +152,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             size="sm"
             variant={reportType === "monthly" ? "default" : "outline"}
             onClick={() => setReportType("monthly")}
-            className={reportType === "monthly" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-zinc-800 text-xs h-8"}
+            className={reportType === "monthly" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-border text-xs h-8"}
           >
             Monthly
           </Button>
@@ -160,7 +160,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             size="sm"
             variant={reportType === "custom" ? "default" : "outline"}
             onClick={() => setReportType("custom")}
-            className={reportType === "custom" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-zinc-800 text-xs h-8"}
+            className={reportType === "custom" ? "bg-amber-400 text-zinc-950 font-bold text-xs h-8" : "border-border text-xs h-8"}
           >
             Custom
           </Button>
@@ -172,14 +172,14 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="bg-zinc-900 border-zinc-800 text-xs flex-1 sm:w-36 h-8"
+              className="bg-card border-border text-xs flex-1 sm:w-36 h-8"
             />
-            <span className="text-zinc-500">to</span>
+            <span className="text-muted-foreground">to</span>
             <Input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="bg-zinc-900 border-zinc-800 text-xs flex-1 sm:w-36 h-8"
+              className="bg-card border-border text-xs flex-1 sm:w-36 h-8"
             />
           </div>
         )}
@@ -187,42 +187,42 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
       {/* Financial Aggregation KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Total Trips</span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 mt-1">{filteredTrips.length}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Total Trips</span>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-1">{filteredTrips.length}</div>
         </div>
 
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Gross Booked Value</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-1">{formatINR(grossRevenue)}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Gross Booked Value</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-400 mt-1">{formatINR(grossRevenue)}</div>
         </div>
 
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Total Collections</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-1">{formatINR(totalCollections)}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Total Collections</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-1">{formatINR(totalCollections)}</div>
         </div>
 
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Pending Balance</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-amber-300 mt-1">{formatINR(pendingBalance)}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Pending Balance</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-1">{formatINR(pendingBalance)}</div>
         </div>
 
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-zinc-800">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Approved Expenses</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-rose-400 mt-1">{formatINR(approvedExpensesTotal)}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-border">
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Approved Expenses</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-rose-700 dark:text-rose-400 mt-1">{formatINR(approvedExpensesTotal)}</div>
         </div>
 
-        <div className="bg-zinc-900/80 p-3 sm:p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 col-span-2 sm:col-span-1">
-          <span className="text-[10px] text-amber-300 uppercase font-bold block">Operating Profit</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-1">{formatINR(netProfit)}</div>
+        <div className="bg-card/80 p-3 sm:p-4 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-950/20 col-span-2 sm:col-span-1">
+          <span className="text-[10px] text-amber-700 dark:text-amber-300 uppercase font-bold block">Operating Profit</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-amber-700 dark:text-amber-400 mt-1">{formatINR(netProfit)}</div>
         </div>
       </div>
 
       {/* Detailed Operations Report Table */}
-      <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="bg-card/70 border border-border rounded-xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[700px]">
-            <thead className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 uppercase text-[10px] tracking-wider">
+            <thead className="bg-card text-muted-foreground border-b border-border uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-4">Booking ID</th>
                 <th className="py-3 px-4">Date</th>
@@ -236,29 +236,29 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                 <th className="py-3 px-4 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-border/60">
               {filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-zinc-500">
+                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     No trips recorded in this date range.
                   </td>
                 </tr>
               ) : (
                 filteredTrips.map((trip: any) => (
-                  <tr key={trip.id} className="hover:bg-zinc-800/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-amber-400">{trip.bookingId}</td>
-                    <td className="py-3 px-4 text-zinc-300">{new Date(trip.startDate).toLocaleDateString("en-IN")}</td>
-                    <td className="py-3 px-4 font-semibold text-zinc-200">{trip.customerName || "Customer"}</td>
-                    <td className="py-3 px-4 text-zinc-300 truncate max-w-[160px]">
+                  <tr key={trip.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="py-3 px-4 font-mono font-bold text-amber-700 dark:text-amber-400">{trip.bookingId}</td>
+                    <td className="py-3 px-4 text-foreground">{new Date(trip.startDate).toLocaleDateString("en-IN")}</td>
+                    <td className="py-3 px-4 font-semibold text-foreground">{trip.customerName || "Customer"}</td>
+                    <td className="py-3 px-4 text-foreground truncate max-w-[160px]">
                       {trip.pickup?.name || trip.pickup?.address || "Pickup"} ➔ {trip.destination?.name || trip.destination?.address || "Destination"}
                     </td>
-                    <td className="py-3 px-4 font-mono text-zinc-300">{trip.billingKm} km</td>
-                    <td className="py-3 px-4 text-right font-mono text-zinc-400">{formatINR(trip.permitCharge || 0)}</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-zinc-100">{formatINR(trip.customerTotal)}</td>
-                    <td className="py-3 px-4 text-right font-mono text-emerald-400">{formatINR(trip.totalPaid)}</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-amber-300">{formatINR(trip.remainingBalance)}</td>
+                    <td className="py-3 px-4 font-mono text-foreground">{trip.billingKm} km</td>
+                    <td className="py-3 px-4 text-right font-mono text-muted-foreground">{formatINR(trip.permitCharge || 0)}</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-foreground">{formatINR(trip.customerTotal)}</td>
+                    <td className="py-3 px-4 text-right font-mono text-emerald-700 dark:text-emerald-400">{formatINR(trip.totalPaid)}</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-amber-700 dark:text-amber-300">{formatINR(trip.remainingBalance)}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 capitalize">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-foreground capitalize">
                         {trip.status?.replaceAll("_", " ")}
                       </span>
                     </td>

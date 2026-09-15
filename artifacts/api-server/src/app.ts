@@ -1,17 +1,15 @@
 import express from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware.js";
 
 const app: any = express();
+
+// This API serves dynamic, frequently-polled JSON — disable Express's default
+// weak ETag generation so responses aren't treated as cacheable and clients
+// don't get 304s for data that's meant to be re-fetched every time.
+app.set("etag", false);
 
 const httpLogger = typeof pinoHttp === "function" ? pinoHttp : (pinoHttp as any).default || pinoHttp;
 
@@ -37,18 +35,6 @@ app.use(
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-if (process.env.CLERK_SECRET_KEY) {
-  app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-  app.use(
-    clerkMiddleware((req: any) => ({
-      publishableKey: publishableKeyFromHost(
-        getClerkProxyHost(req) ?? "",
-        process.env.CLERK_PUBLISHABLE_KEY,
-      ),
-    })),
-  );
-}
 
 app.use("/api", router);
 app.use(router);

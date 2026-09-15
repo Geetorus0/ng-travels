@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,7 +12,7 @@ export const DriverVehiclePage: React.FC = () => {
   const { data: vehicle, isLoading } = useQuery({
     queryKey: ["/api/driver/vehicle"],
     queryFn: async () => {
-      const res = await fetch("/api/driver/vehicle");
+      const res = await apiFetch("/api/driver/vehicle");
       if (!res.ok) return null;
       return res.json();
     },
@@ -31,10 +32,10 @@ export const DriverVehiclePage: React.FC = () => {
 
   if (!vehicle) {
     return (
-      <div className="p-8 text-center bg-zinc-900/90 border border-zinc-800 rounded-2xl space-y-3">
-        <Car className="w-10 h-10 text-zinc-600 mx-auto" />
-        <h2 className="text-base font-bold text-zinc-200">No Vehicle Assigned</h2>
-        <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+      <div className="p-8 text-center bg-card/90 border border-border rounded-2xl space-y-3">
+        <Car className="w-10 h-10 text-muted-foreground mx-auto" />
+        <h2 className="text-base font-bold text-foreground">No Vehicle Assigned</h2>
+        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
           You currently do not have a dedicated commercial vehicle assigned. Please contact the NG Travels operations desk.
         </p>
         <a href="tel:+919842712345" className="inline-block mt-2">
@@ -49,103 +50,103 @@ export const DriverVehiclePage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Vehicle Identity Card */}
-      <div className="bg-gradient-to-r from-zinc-900 to-amber-950/30 p-5 rounded-2xl border border-amber-500/30 shadow-xl space-y-3">
+      <div className="bg-gradient-to-r from-card to-amber-950/30 p-5 rounded-2xl border border-amber-300 dark:border-amber-500/30 shadow-xl space-y-3">
         <div className="flex justify-between items-start">
           <div>
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono">
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider font-mono">
               Assigned Commercial Unit
             </span>
-            <h1 className="text-xl font-black text-zinc-100 mt-1 font-mono tracking-wide">
+            <h1 className="text-xl font-black text-foreground mt-1 font-mono tracking-wide">
               {vehicle.vehicleNumber}
             </h1>
-            <p className="text-xs text-zinc-300 mt-0.5">
+            <p className="text-xs text-foreground mt-0.5">
               {vehicle.brand} {vehicle.model} • {vehicle.capacity} Seater • {vehicle.fuelType}
             </p>
           </div>
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-            vehicle.status === "active" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-            "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+            vehicle.status === "active" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" :
+            "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30"
           }`}>
             {vehicle.status}
           </span>
         </div>
 
         {/* Current Odometer */}
-        <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 flex items-center justify-between text-xs font-mono">
-          <span className="text-zinc-400 flex items-center gap-1.5">
-            <Gauge className="w-4 h-4 text-amber-400" /> Current Odometer:
+        <div className="bg-background/80 p-3 rounded-xl border border-border/80 flex items-center justify-between text-xs font-mono">
+          <span className="text-muted-foreground flex items-center gap-1.5">
+            <Gauge className="w-4 h-4 text-amber-700 dark:text-amber-400" /> Current Odometer:
           </span>
-          <span className="text-base font-black text-amber-300">
+          <span className="text-base font-black text-amber-700 dark:text-amber-300">
             {Number(vehicle.currentOdometerKm || 0).toLocaleString()} KM
           </span>
         </div>
       </div>
 
       {/* Compliance Documents */}
-      <div className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-2xl space-y-3 shadow-lg">
+      <div className="bg-card/90 border border-border p-4 rounded-2xl space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" /> Regulatory Compliance & Certificates
+          <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-400" /> Regulatory Compliance & Certificates
           </h2>
-          <span className="text-[10px] text-zinc-500 font-mono">All-India Valid</span>
+          <span className="text-[10px] text-muted-foreground font-mono">All-India Valid</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-          <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-background/70 border border-border/80 flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">Insurance Policy</div>
-              <div className="font-semibold text-zinc-200 mt-0.5">{vehicle.insurancePolicy || "Comprehensive Commercial"}</div>
-              <div className="text-[10px] text-zinc-400 mt-0.5">Expires: {vehicle.insuranceExpiry || "N/A"}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-bold">Insurance Policy</div>
+              <div className="font-semibold text-foreground mt-0.5">{vehicle.insurancePolicy || "Comprehensive Commercial"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Expires: {vehicle.insuranceExpiry || "N/A"}</div>
             </div>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize ${
-              vehicle.insuranceStatus === "expired" ? "bg-rose-500/20 text-rose-400" :
-              vehicle.insuranceStatus === "expiring_soon" ? "bg-amber-500/20 text-amber-300" :
-              "bg-emerald-500/20 text-emerald-400"
+              vehicle.insuranceStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400" :
+              vehicle.insuranceStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300" :
+              "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
             }`}>
               {vehicle.insuranceStatus === "valid" ? "Active" : vehicle.insuranceStatus?.replace("_", " ")}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-background/70 border border-border/80 flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">Tourist Permit</div>
-              <div className="font-semibold text-zinc-200 mt-0.5">{vehicle.permitNumber || "All India Tourist Permit"}</div>
-              <div className="text-[10px] text-zinc-400 mt-0.5">Expires: {vehicle.permitExpiry || "N/A"}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-bold">Tourist Permit</div>
+              <div className="font-semibold text-foreground mt-0.5">{vehicle.permitNumber || "All India Tourist Permit"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Expires: {vehicle.permitExpiry || "N/A"}</div>
             </div>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize ${
-              vehicle.permitStatus === "expired" ? "bg-rose-500/20 text-rose-400" :
-              vehicle.permitStatus === "expiring_soon" ? "bg-amber-500/20 text-amber-300" :
-              "bg-emerald-500/20 text-emerald-400"
+              vehicle.permitStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400" :
+              vehicle.permitStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300" :
+              "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
             }`}>
               {vehicle.permitStatus === "valid" ? "Active" : vehicle.permitStatus?.replace("_", " ")}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-background/70 border border-border/80 flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">Fitness Certificate</div>
-              <div className="font-semibold text-zinc-200 mt-0.5">{vehicle.fitnessCertNumber || "RTO Fitness OK"}</div>
-              <div className="text-[10px] text-zinc-400 mt-0.5">Expires: {vehicle.fitnessExpiry || "N/A"}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-bold">Fitness Certificate</div>
+              <div className="font-semibold text-foreground mt-0.5">{vehicle.fitnessCertNumber || "RTO Fitness OK"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Expires: {vehicle.fitnessExpiry || "N/A"}</div>
             </div>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize ${
-              vehicle.fitnessStatus === "expired" ? "bg-rose-500/20 text-rose-400" :
-              vehicle.fitnessStatus === "expiring_soon" ? "bg-amber-500/20 text-amber-300" :
-              "bg-emerald-500/20 text-emerald-400"
+              vehicle.fitnessStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400" :
+              vehicle.fitnessStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300" :
+              "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
             }`}>
               {vehicle.fitnessStatus === "valid" ? "Active" : vehicle.fitnessStatus?.replace("_", " ")}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-background/70 border border-border/80 flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">Pollution (PUC)</div>
-              <div className="font-semibold text-zinc-200 mt-0.5">{vehicle.pollutionCertNumber || "PUC Valid"}</div>
-              <div className="text-[10px] text-zinc-400 mt-0.5">Expires: {vehicle.pollutionExpiry || "N/A"}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-bold">Pollution (PUC)</div>
+              <div className="font-semibold text-foreground mt-0.5">{vehicle.pollutionCertNumber || "PUC Valid"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Expires: {vehicle.pollutionExpiry || "N/A"}</div>
             </div>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize ${
-              vehicle.pollutionStatus === "expired" ? "bg-rose-500/20 text-rose-400" :
-              vehicle.pollutionStatus === "expiring_soon" ? "bg-amber-500/20 text-amber-300" :
-              "bg-emerald-500/20 text-emerald-400"
+              vehicle.pollutionStatus === "expired" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400" :
+              vehicle.pollutionStatus === "expiring_soon" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300" :
+              "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
             }`}>
               {vehicle.pollutionStatus === "valid" ? "Active" : vehicle.pollutionStatus?.replace("_", " ")}
             </span>
@@ -154,10 +155,10 @@ export const DriverVehiclePage: React.FC = () => {
       </div>
 
       {/* Emergency Assistance */}
-      <div className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-2xl flex items-center justify-between">
+      <div className="bg-card/90 border border-border p-4 rounded-2xl flex items-center justify-between">
         <div>
-          <div className="text-xs font-bold text-zinc-200">24/7 Breakdown & Fleet Support</div>
-          <div className="text-[11px] text-zinc-400 mt-0.5">Call NG Travels control room for towing or repairs</div>
+          <div className="text-xs font-bold text-foreground">24/7 Breakdown & Fleet Support</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Call NG Travels control room for towing or repairs</div>
         </div>
         <a href="tel:+919842712345">
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-10 px-4 cursor-pointer">

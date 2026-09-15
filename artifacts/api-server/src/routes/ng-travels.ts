@@ -16,15 +16,14 @@ import {
   vehiclesTable,
   driverLocationsTable,
   usersTable,
-  sessionsTable,
   type TripLocation,
   type RouteAlternative,
   type Vehicle,
   type Customer,
   type Trip,
 } from "@workspace/db";
-import { requireAuth, requireOwner, requireDriver, viewerFor, extractAuthToken } from "../middlewares/auth.js";
-import { hashPassword, verifyPassword, generateSessionToken } from "../lib/authCrypto.js";
+import { requireAuth, requireOwner, requireDriver, viewerFor } from "../middlewares/auth.js";
+import { supabaseServer } from "../lib/supabase.js";
 import {
   calculateFare,
   calculateCommercialFare,
@@ -32,20 +31,9 @@ import {
   calculateCompanyProfit,
   validateOdometer,
 } from "../lib/financialEngine.js";
-import { searchPlaces, calculateRouteJourney } from "../lib/routeService.js";
+import { searchPlaces, calculateRouteJourney, reverseGeocode, resolveLocationInput } from "../lib/routeService.js";
 import { addRealtimeClient, broadcastRealtimeEvent } from "../lib/realtime.js";
-import {
-  memDrivers,
-  memVehicles,
-  memTrips,
-  memCustomers,
-  memEnquiries,
-  memPayments,
-  memExpenses,
-  memNotifications,
-  memAuditLogs,
-  memSettings,
-} from "../lib/memoryStore.js";
+import { memTrips, memSettings } from "../lib/memoryStore.js";
 
 const router = Router();
 
@@ -318,107 +306,48 @@ function enrichVehicleWithAlerts(v: typeof vehiclesTable.$inferSelect) {
 }
 
 // =============================================================
-// AUTHENTICATION ROUTES (PRODUCTION READY WITH DATABASE VERIFICATION)
+// AUTHENTICATION ROUTES (SUPABASE AUTH)
 // =============================================================
 
+const DRIVER_AUTH_EMAIL_DOMAIN = "auth.ngtravels.internal";
+function driverAuthEmail(driverCode: string): string {
+  return `driver.${driverCode.toLowerCase()}@${DRIVER_AUTH_EMAIL_DOMAIN}`;
+}
+
 /**
- * Operations / Owner login with Email and Password
+ * Normalizes a mobile number to E.164 for the driver's Supabase Auth phone
+ * field (stored for reference only — driver sign-in is by password, not
+ * phone/SMS OTP). Assumes India (+91) when no country code is given,
+ * matching how driver mobiles are entered/stored elsewhere in this app.
  */
-router.post("/auth/login", async (req, res): Promise<void> => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    res.status(400).json({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message: "Email and password are required." },
-    });
-    return;
-  }
-
-  const cleanEmail = String(email).trim().toLowerCase();
-
-  try {
-    const users = await db
-      .select()
-      .from(usersTable)
-      .where(and(eq(usersTable.email, cleanEmail), eq(usersTable.status, "active")))
-      .limit(1);
-
-    if (users.length > 0) {
-      const user = users[0];
-
-      // Verify Password
-      if (user.passwordHash && verifyPassword(password, user.passwordHash)) {
-        // Generate Session Token
-        const token = generateSessionToken();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days validity
-
-        try {
-          await db.insert(sessionsTable).values({
-            token,
-            userId: user.id,
-            expiresAt,
-          });
-          await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
-        } catch {}
-
-        res.json({
-          success: true,
-          token,
-          user: {
-            id: user.id,
-            name: user.name,
-            fullName: user.name,
-            email: user.email,
-            phone: user.phone,
-            role: user.role,
-            driverId: user.driverId,
-          },
-        });
-        return;
-      }
-    }
-  } catch (err: any) {
-    console.warn("[auth] Database check error during login, verifying default credentials:", err?.message);
-  }
-
-  // Built-in operations admin credentials check (guarantees zero-lockout deployment on Vercel / Cloud)
-  if (cleanEmail === "admin@ngtravels.in" && password === "NGTravels@2026") {
-    const token = generateSessionToken();
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: 1,
-        name: "Operations Admin",
-        fullName: "Operations Admin",
-        email: "admin@ngtravels.in",
-        phone: "+91 98427 12345",
-        role: "owner",
-        driverId: null,
-      },
-    });
-    return;
-  }
-
-  res.status(401).json({
-    success: false,
-    error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password." },
-  });
-});
+function toE164(raw: string): string {
+  const trimmed = String(raw || "").trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (trimmed.startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return `+91${digits}`;
+  return `+${digits}`;
+}
 
 /**
- * Driver Partner login with Mobile / Driver Code and Password / PIN
+ * Owner/admin/manager authentication happens client-side via Supabase Auth
+ * directly (supabase.auth.signInWithPassword). This endpoint is intentionally
+ * not provided by the API server.
+ */
+
+/**
+ * Driver Partner login with Mobile / Driver Code and Password.
+ * Resolves the identifier to the driver's synthetic Supabase Auth email and
+ * exchanges the password for a real Supabase session via GoTrue.
  */
 router.post("/auth/driver-login", async (req, res): Promise<void> => {
-  const { identifier, mobile, driverCode, password, pin } = req.body;
-  const credential = String(password || pin || "").trim();
+  const { identifier, mobile, driverCode, password } = req.body;
+  const credential = String(password || "").trim();
   const rawId = String(identifier || driverCode || mobile || "").trim();
 
   if (!rawId || !credential) {
     res.status(400).json({
       success: false,
-      error: { code: "VALIDATION_ERROR", message: "Mobile/Driver Code and Password/PIN are required." },
+      error: { code: "VALIDATION_ERROR", message: "Mobile/Driver Code and password are required." },
     });
     return;
   }
@@ -426,9 +355,7 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
   const cleanMobile = rawId.replace(/\D/g, "");
   const cleanCode = rawId.toUpperCase();
 
-
   try {
-    // 1. Locate driver record
     const allDrivers = await db.select().from(driversTable);
     const driver = allDrivers.find(
       (d) =>
@@ -444,57 +371,29 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
       return;
     }
 
-    // 2. Locate driver user account
-    let users = await db
-      .select()
-      .from(usersTable)
-      .where(and(eq(usersTable.driverId, driver.id), eq(usersTable.status, "active")))
-      .limit(1);
-
-    if (users.length === 0) {
-      // Auto-provision driver user account if driver exists in fleet
-      const [newUser] = await db
-        .insert(usersTable)
-        .values({
-          name: driver.name,
-          email: driver.email,
-          phone: driver.mobile,
-          passwordHash: hashPassword(credential),
-          role: "driver",
-          driverId: driver.id,
-          status: "active",
-        })
-        .returning();
-      users = [newUser];
-    } else {
-      const user = users[0];
-      if (user.passwordHash && !verifyPassword(credential, user.passwordHash)) {
-        res.status(401).json({
-          success: false,
-          error: { code: "INVALID_CREDENTIALS", message: "Invalid driver PIN or password." },
-        });
-        return;
-      }
-    }
-
-    const user = users[0];
-    const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await db.insert(sessionsTable).values({
-      token,
-      userId: user.id,
-      expiresAt,
+    const { data, error } = await supabaseServer.auth.signInWithPassword({
+      email: driverAuthEmail(driver.driverCode),
+      password: credential,
     });
 
-    await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
+    if (error || !data?.session) {
+      res.status(401).json({
+        success: false,
+        error: { code: "INVALID_CREDENTIALS", message: "Invalid driver password." },
+      });
+      return;
+    }
+
+    await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.driverId, driver.id));
 
     res.json({
       success: true,
-      token,
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
       user: {
-        id: user.id,
-        name: driver.name,
         fullName: driver.name,
         mobile: driver.mobile,
         driverCode: driver.driverCode,
@@ -502,34 +401,231 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
         driverId: driver.id,
       },
     });
-    return;
   } catch (err: any) {
-    console.warn("[auth] Driver login DB check notice, verifying default credentials:", err?.message);
+    console.error("[auth] Driver login error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to process driver login right now." },
+    });
   }
+});
 
-  // Built-in default driver PIN check (guarantees zero-lockout deployment on Vercel / Cloud)
-  if ((cleanCode === "DRV-101" || cleanMobile.includes("9845011223")) && credential === "123456") {
-    const token = generateSessionToken();
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: 2,
-        name: "Suresh K (Pilot)",
-        fullName: "Suresh K",
-        mobile: "+91 98450 11223",
-        driverCode: "DRV-101",
-        role: "driver",
-        driverId: 1,
-      },
+/**
+ * Driver password reset request. Passwords are admin-managed (not self-service), so this
+ * just raises an owner-audience notification for the operations desk to act
+ * on; it always returns success to avoid leaking whether an identifier matched.
+ */
+router.post("/auth/driver-password-reset-request", async (req, res): Promise<void> => {
+  const { identifier, note } = req.body;
+  const rawId = String(identifier || "").trim();
+
+  if (!rawId) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Driver Code or Mobile number is required." },
     });
     return;
   }
 
-  res.status(401).json({
-    success: false,
-    error: { code: "INVALID_CREDENTIALS", message: "Invalid driver credentials or PIN." },
-  });
+  try {
+    const cleanMobile = rawId.replace(/\D/g, "");
+    const cleanCode = rawId.toUpperCase();
+    const allDrivers = await db.select().from(driversTable);
+    const driver = allDrivers.find(
+      (d) =>
+        (cleanMobile.length >= 7 && d.mobile.replace(/\D/g, "").includes(cleanMobile)) ||
+        (cleanCode && d.driverCode.toUpperCase() === cleanCode)
+    );
+
+    if (driver) {
+      const trimmedNote = String(note || "").trim();
+      await notify(
+        "Driver Password Reset Requested",
+        `${driver.name} (${driver.driverCode}) requested a password reset.${trimmedNote ? ` Note: ${trimmedNote}` : ""}`,
+        "password_reset_request",
+        undefined,
+        "owner",
+        driver.id,
+      );
+    }
+
+    // Always respond success — don't reveal whether the identifier matched a driver.
+    res.json({ success: true, message: "If a matching driver account was found, operations has been notified." });
+  } catch (err: any) {
+    console.error("[auth] Driver password reset request error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to submit the request right now." },
+    });
+  }
+});
+
+/**
+ * ADMIN DRIVER MANAGEMENT ROUTES
+ * =============================================================
+ */
+
+/**
+ * Create a new driver account with email and initial password
+ * Admin-only endpoint
+ */
+router.post("/admin/drivers", requireOwner, async (req, res): Promise<void> => {
+  const { name, driverCode, mobile, email, licenseNumber, licenseExpiry, emergencyContact, initialPassword } = req.body;
+
+  if (!name || !driverCode || !mobile || !email || !initialPassword) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Name, driver code, mobile, email, and initial password are required." },
+    });
+    return;
+  }
+
+  try {
+    // Driver sign-in (see /auth/driver-login) always looks the account up by
+    // the synthetic driver.<code>@auth.ngtravels.internal address, not the
+    // driver's real contact email — the real email is stored on the driver
+    // record for reference/notifications, not used as the auth identity.
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+      email: driverAuthEmail(driverCode.toUpperCase()),
+      phone: toE164(mobile),
+      password: initialPassword,
+      email_confirm: true,
+      phone_confirm: true,
+      user_metadata: {
+        full_name: name,
+        role: "driver",
+      },
+    });
+
+    if (authError || !authData?.user) {
+      res.status(400).json({
+        success: false,
+        error: { code: "AUTH_ERROR", message: authError?.message || "Failed to create auth account." },
+      });
+      return;
+    }
+
+    // Create driver record in database
+    const [driver] = await db
+      .insert(driversTable)
+      .values({
+        name,
+        driverCode: driverCode.toUpperCase(),
+        mobile,
+        email: email.toLowerCase().trim(),
+        licenseNumber: licenseNumber || null,
+        licenseExpiry: licenseExpiry || null,
+        emergencyContact: emergencyContact || null,
+        status: "active",
+      })
+      .returning();
+
+    // The handle_new_user() trigger already inserted a bare public.users row
+    // for this auth identity; link it to the driver record just created.
+    await db
+      .update(usersTable)
+      .set({
+        name,
+        email: email.toLowerCase().trim(),
+        phone: mobile,
+        role: "driver",
+        driverId: driver.id,
+        status: "active",
+      })
+      .where(eq(usersTable.authUserId, authData.user.id));
+
+    res.json({
+      success: true,
+      message: "Driver account created successfully.",
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        driverCode: driver.driverCode,
+        mobile: driver.mobile,
+        email: driver.email,
+      },
+    });
+  } catch (err: any) {
+    console.error("[admin] Create driver error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to create driver account." },
+    });
+  }
+});
+
+/**
+ * Reset a driver's password
+ * Admin-only endpoint
+ */
+router.post("/admin/drivers/:driverId/reset-password", requireOwner, async (req, res): Promise<void> => {
+  const { driverId } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "New password must be at least 6 characters." },
+    });
+    return;
+  }
+
+  try {
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, parseInt(String(driverId))));
+
+    if (!driver) {
+      res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Driver not found." },
+      });
+      return;
+    }
+
+    // Get the user record to find the auth user ID
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.driverId, parseInt(String(driverId))));
+
+    if (!user?.authUserId) {
+      res.status(400).json({
+        success: false,
+        error: { code: "NO_AUTH_USER", message: "Driver does not have an auth account." },
+      });
+      return;
+    }
+
+    // Update password in Supabase Auth
+    const { error: updateError } = await supabaseServer.auth.admin.updateUserById(user.authUserId, {
+      password: newPassword,
+    });
+
+    if (updateError) {
+      res.status(400).json({
+        success: false,
+        error: { code: "AUTH_ERROR", message: updateError.message || "Failed to reset password." },
+      });
+      return;
+    }
+
+    // Notify driver about password reset
+    await notify(
+      "Password Reset by Admin",
+      `Your driver password has been reset by the operations team. Please use your new password to login.`,
+      "password_reset",
+      user.id,
+      "driver",
+      driver.id,
+    );
+
+    res.json({
+      success: true,
+      message: `Password reset for driver ${driver.name} (${driver.driverCode})`,
+    });
+  } catch (err: any) {
+    console.error("[admin] Reset driver password error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to reset driver password." },
+    });
+  }
 });
 
 /**
@@ -550,15 +646,8 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     try {
       const [d] = await db.select().from(driversTable).where(eq(driversTable.id, viewer.driverId));
       driverDetails = d || null;
-    } catch {
-      driverDetails = {
-        id: 1,
-        driverCode: "DRV-101",
-        name: "Suresh K",
-        mobile: "+91 98450 11223",
-        status: "active",
-        availability: "available",
-      };
+    } catch (err) {
+      console.error("[auth] Failed to load driver details:", err);
     }
   }
 
@@ -572,17 +661,11 @@ router.get("/auth/me", async (req, res): Promise<void> => {
 });
 
 /**
- * Sign out and invalidate session token
+ * Sign out. Supabase Auth sessions are invalidated client-side via
+ * supabase.auth.signOut(); this endpoint is kept as a no-op for API
+ * compatibility.
  */
-router.post("/auth/logout", async (req, res): Promise<void> => {
-  const token = extractAuthToken(req);
-  if (token) {
-    try {
-      await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
-    } catch (err) {
-      console.error("[auth] Logout error:", err);
-    }
-  }
+router.post("/auth/logout", async (_req, res): Promise<void> => {
   res.json({ success: true, message: "Logged out successfully" });
 });
 
@@ -666,55 +749,8 @@ router.get("/dashboard", requireOwner, async (_req, res): Promise<void> => {
       })),
     });
   } catch (err: any) {
-    console.warn("[dashboard] Database query fallback to memory store:", err?.message);
-    const todayTrps = memTrips.filter((t) => t.startDate === currentDay);
-    const activeTrips = memTrips.filter((t) => ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status));
-    const rev = todayTrps.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
-    const exp = memExpenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const col = todayTrps.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
-
-    res.json({
-      date: new Date(`${currentDay}T00:00:00Z`),
-      metrics: {
-        totalTrips: memTrips.length,
-        todaysTrips: todayTrps.length,
-        upcomingTrips: todayTrps.filter((t) => ["upcoming", "confirmed", "ready"].includes(t.status)).length,
-        started: todayTrps.filter((t) => t.status === "started").length,
-        inProgress: activeTrips.length,
-        completedToday: todayTrps.filter((t) => t.status === "completed").length,
-        paymentPending: memTrips.filter((t) => Number(t.remainingBalance || 0) > 0).length,
-        todaysRevenue: rev,
-        todaysCollection: col,
-        todaysExpenses: exp,
-        todaysProfit: rev - exp,
-        weeklyRevenue: rev,
-        weeklyExpenses: exp,
-        weeklyProfit: rev - exp,
-        monthlyRevenue: rev,
-        monthlyExpenses: exp,
-        monthlyProfit: rev - exp,
-        availableDrivers: memDrivers.filter((d) => d.availability === "available").length,
-        driversOnTrip: memDrivers.filter((d) => d.availability === "on_trip").length,
-        availableVehicles: memVehicles.filter((v) => v.status === "active").length,
-        vehiclesOnTrip: memVehicles.filter((v) => v.status === "active" && v.assignedDriverId).length,
-      },
-      schedule: todayTrps.map((t) => ({
-        id: t.id,
-        bookingId: t.bookingId,
-        time: t.startTime,
-        pickup: (t.pickup as any)?.name || "Pickup",
-        destination: (t.destination as any)?.name || "Destination",
-        customerName: "Corporate Customer",
-        driverName: t.driverName ?? "Unassigned",
-        status: t.status,
-      })),
-      recentActivity: memAuditLogs.slice(0, 10).map((a) => ({
-        id: a.id,
-        title: a.action,
-        detail: `${a.entity} ${a.entityId}`,
-        timestamp: a.createdAt,
-      })),
-    });
+    console.error("[dashboard] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load dashboard data. Please try again." } });
   }
 });
 
@@ -726,8 +762,8 @@ router.get("/drivers", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(driversTable).orderBy(asc(driversTable.name));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[drivers] DB fallback to memory store:", err?.message);
-    res.json(memDrivers);
+    console.error("[drivers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load drivers. Please try again." } });
   }
 });
 
@@ -754,17 +790,31 @@ router.post("/drivers", requireOwner, async (req, res): Promise<void> => {
       })
       .returning();
 
-    // Auto-create user login for driver
+    // Provision a Supabase Auth identity for the driver (mobile/code + PIN login)
     const defaultPin = body.pin || "123456";
-    await db.insert(usersTable).values({
-      name: row.name,
-      email: row.email,
-      phone: row.mobile,
-      passwordHash: hashPassword(defaultPin),
-      role: "driver",
-      driverId: row.id,
-      status: "active",
-    });
+    try {
+      const { data: authUser, error: authError } = await supabaseServer.auth.admin.createUser({
+        email: driverAuthEmail(row.driverCode),
+        phone: toE164(row.mobile),
+        password: defaultPin,
+        email_confirm: true,
+        phone_confirm: true,
+        user_metadata: { role: "driver", full_name: row.name, driver_id: row.id },
+      });
+
+      if (authError || !authUser?.user) {
+        throw authError || new Error("Supabase did not return a user");
+      }
+
+      // The handle_new_user() trigger already inserted a bare public.users row
+      // for this auth identity; link it to the driver record just created.
+      await db
+        .update(usersTable)
+        .set({ driverId: row.id, name: row.name, phone: row.mobile, role: "driver", status: "active" })
+        .where(eq(usersTable.authUserId, authUser.user.id));
+    } catch (authErr: any) {
+      console.error("[drivers] Failed to provision Supabase Auth login for driver:", authErr);
+    }
 
     await writeAudit(req, "Created driver", "driver", row.id, null, row);
     broadcastRealtimeEvent("DRIVER_STATUS_CHANGED", row);
@@ -846,8 +896,8 @@ router.get("/vehicles", async (_req, res): Promise<void> => {
     const rows = await db.select().from(vehiclesTable).orderBy(asc(vehiclesTable.vehicleNumber));
     res.json(rows.map(enrichVehicleWithAlerts));
   } catch (err: any) {
-    console.warn("[vehicles] DB fallback to memory store:", err?.message);
-    res.json((memVehicles as any).map(enrichVehicleWithAlerts));
+    console.error("[vehicles] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load vehicles. Please try again." } });
   }
 });
 
@@ -978,8 +1028,8 @@ router.get("/customers", requireOwner, async (req, res): Promise<void> => {
     const views = await Promise.all(rows.map(customerView));
     res.json({ items: views, total: views.length });
   } catch (err: any) {
-    console.warn("[customers] DB fallback to memory store:", err?.message);
-    res.json({ items: memCustomers, total: memCustomers.length });
+    console.error("[customers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load customers. Please try again." } });
   }
 });
 
@@ -1071,8 +1121,8 @@ router.get("/enquiries", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(enquiriesTable).orderBy(desc(enquiriesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[enquiries] DB fallback to memory store:", err?.message);
-    res.json(memEnquiries);
+    console.error("[enquiries] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load enquiries. Please try again." } });
   }
 });
 
@@ -1148,6 +1198,75 @@ router.get("/maps/places/autocomplete", async (req, res): Promise<void> => {
   }
 });
 
+/**
+ * Reverse geocode a map pin (or any lat/lng) into a human-readable place.
+ */
+router.get("/maps/reverse-geocode", async (req, res): Promise<void> => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    res.status(400).json({ error: "Valid lat and lng query parameters are required" });
+    return;
+  }
+
+  try {
+    const place = await reverseGeocode(lat, lng);
+    res.json(
+      place || {
+        placeId: `geo_${lat}_${lng}`,
+        name: "Pinned Location",
+        formattedAddress: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        latitude: lat,
+        longitude: lng,
+        lat,
+        lng,
+      },
+    );
+  } catch (err: any) {
+    console.error("[maps/reverse-geocode] Error:", err);
+    res.status(500).json({ error: "Unable to reverse geocode this location." });
+  }
+});
+
+/**
+ * Resolve a pasted Google Maps URL (including shortened links) or a plain
+ * "latitude, longitude" string into a usable place — for the pickup/drop
+ * "Map / URL / Coordinates" location entry option.
+ */
+router.post("/maps/resolve-location", async (req, res): Promise<void> => {
+  const input = String(req.body?.input || "").trim();
+  if (!input) {
+    res.status(400).json({ error: "input (a Google Maps URL or 'latitude, longitude') is required" });
+    return;
+  }
+
+  try {
+    const coords = await resolveLocationInput(input);
+    if (!coords) {
+      res.status(400).json({
+        error: "Could not find coordinates in that text. Paste a Google Maps link or 'latitude, longitude'.",
+      });
+      return;
+    }
+
+    const place = await reverseGeocode(coords.lat, coords.lng);
+    res.json(
+      place || {
+        placeId: `geo_${coords.lat}_${coords.lng}`,
+        name: "Pinned Location",
+        formattedAddress: `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        lat: coords.lat,
+        lng: coords.lng,
+      },
+    );
+  } catch (err: any) {
+    console.error("[maps/resolve-location] Error:", err);
+    res.status(500).json({ error: "Unable to resolve that location." });
+  }
+});
+
 router.post("/maps/routes", async (req, res): Promise<void> => {
   try {
     const { pickup, destination, stops = [], tripType = "single_trip", options = {} } = req.body;
@@ -1158,9 +1277,12 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
 
     const journey = await calculateRouteJourney(pickup, destination, stops, tripType, options);
 
-    const tollStatus = journey.tollAvailable && journey.estimatedToll != null
-      ? "Estimated from Routes API"
-      : "Unavailable / At Actuals";
+    const tollStatus =
+      journey.tollSource === "google_routes"
+        ? "Estimated from Routes API"
+        : journey.tollSource === "nhai_open_dataset"
+          ? "Estimated from NHAI toll-plaza open data"
+          : "Unavailable / At Actuals";
 
     res.json({
       provider: journey.provider,
@@ -1180,6 +1302,8 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
       apiEstimatedToll: journey.estimatedToll || 0,
       tollAvailable: journey.tollAvailable,
       tollStatus,
+      tollSource: journey.tollSource,
+      tollPlazas: journey.tollPlazas,
       routes: journey.alternatives,
       outbound: journey.outbound,
       return: journey.return,
@@ -1245,8 +1369,8 @@ router.get("/trips", async (req, res): Promise<void> => {
 
     res.json({ items: filtered, total: filtered.length });
   } catch (err: any) {
-    console.warn("[trips] DB fallback to memory store:", err?.message);
-    res.json({ items: memTrips, total: memTrips.length });
+    console.error("[trips] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load trips. Please try again." } });
   }
 });
 
@@ -1715,7 +1839,9 @@ router.get("/driver/current-trip", async (req, res): Promise<void> => {
       .limit(1);
 
     if (trips.length === 0) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
+      // No active trip is a normal, expected state (not an error) — the
+      // driver simply has nothing in progress right now.
+      res.json(null);
       return;
     }
 
@@ -1724,11 +1850,7 @@ router.get("/driver/current-trip", async (req, res): Promise<void> => {
   } catch (err: any) {
     console.warn("[driver/current-trip] DB fallback:", err?.message);
     const active = memTrips.find((t) => ["started", "in_progress", "reached_pickup", "customer_picked_up"].includes(t.status)) || memTrips[0] || null;
-    if (!active) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
-      return;
-    }
-    res.json(active);
+    res.json(active || null);
   }
 });
 
@@ -1751,7 +1873,9 @@ router.get("/driver/vehicle", async (req, res): Promise<void> => {
     }
 
     if (!vehicle) {
-      res.status(404).json({ success: false, message: "No vehicle assigned" });
+      // No vehicle assigned is a normal, expected state — the driver just
+      // hasn't been assigned one yet, not a routing/lookup error.
+      res.json(null);
       return;
     }
 
@@ -2072,6 +2196,37 @@ router.post("/driver/trips/:id/location", async (req, res): Promise<void> => {
   }
 });
 
+/**
+ * Most recent GPS telemetry point for a trip, polled by the fleet map.
+ */
+router.get("/trips/:id/live-location", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  try {
+    const [latest] = await db
+      .select()
+      .from(driverLocationsTable)
+      .where(eq(driverLocationsTable.tripId, id))
+      .orderBy(desc(driverLocationsTable.timestamp))
+      .limit(1);
+
+    if (!latest) {
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "No location telemetry recorded yet" } });
+      return;
+    }
+
+    res.json({
+      latitude: Number(latest.latitude),
+      longitude: Number(latest.longitude),
+      speed: latest.speed != null ? Number(latest.speed) : null,
+      heading: latest.heading != null ? Number(latest.heading) : null,
+      accuracy: latest.accuracy != null ? Number(latest.accuracy) : null,
+      timestamp: latest.timestamp,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+  }
+});
+
 // =============================================================
 // PAYMENTS & EXPENSES LEDGER
 // =============================================================
@@ -2080,8 +2235,8 @@ router.get("/payments", async (_req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[payments] DB fallback to memory store:", err?.message);
-    res.json(memPayments);
+    console.error("[payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 
@@ -2091,8 +2246,8 @@ router.get("/trips/:id/payments", async (req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.tripId, id)).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[trips/:id/payments] DB fallback:", err?.message);
-    res.json(memPayments.filter((p) => p.tripId === id));
+    console.error("[trips/:id/payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 
@@ -2166,8 +2321,8 @@ router.get("/expenses", async (_req, res): Promise<void> => {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[expenses] DB fallback to memory store:", err?.message);
-    res.json(memExpenses);
+    console.error("[expenses] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load expenses. Please try again." } });
   }
 });
 
@@ -2327,8 +2482,8 @@ router.get("/notifications", async (req, res): Promise<void> => {
 
     res.json(rows);
   } catch (err: any) {
-    console.warn("[notifications] DB fallback to memory store:", err?.message);
-    res.json(memNotifications);
+    console.error("[notifications] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load notifications. Please try again." } });
   }
 });
 
@@ -2358,8 +2513,8 @@ router.get("/audit-logs", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(100);
     res.json(rows);
   } catch (err: any) {
-    console.warn("[audit-logs] DB fallback to memory store:", err?.message);
-    res.json(memAuditLogs);
+    console.error("[audit-logs] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load audit logs. Please try again." } });
   }
 });
 

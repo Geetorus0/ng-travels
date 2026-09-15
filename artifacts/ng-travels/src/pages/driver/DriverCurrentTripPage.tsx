@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiFetch";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Navigation, Phone, MapPin, Gauge, CheckCircle2, Clock, Map,
@@ -24,6 +25,7 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
   onUpdateMilestone,
 }) => {
   const [updating, setUpdating] = useState(false);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
   const [gpsTelemetry, setGpsTelemetry] = useState<{
     lat: number;
     lng: number;
@@ -57,7 +59,7 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
       });
 
       try {
-        await fetch(`/api/driver/trips/${trip.id}/location`, {
+        await apiFetch(`/api/driver/trips/${trip.id}/location`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -104,8 +106,8 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
 
   if (!trip) {
     return (
-      <div className="bg-zinc-900/60 p-8 rounded-2xl border border-zinc-800 text-center text-zinc-500 text-xs space-y-2">
-        <Navigation className="w-8 h-8 text-zinc-600 mx-auto" />
+      <div className="bg-card/60 p-8 rounded-2xl border border-border text-center text-muted-foreground text-xs space-y-2">
+        <Navigation className="w-8 h-8 text-muted-foreground mx-auto" />
         <p>No active trip currently in progress.</p>
       </div>
     );
@@ -121,8 +123,11 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
 
   const handleMilestone = async (status: string, note: string) => {
     setUpdating(true);
+    setMilestoneError(null);
     try {
       await onUpdateMilestone(trip.id, status, note);
+    } catch (err: any) {
+      setMilestoneError(err?.message || "Failed to update trip status. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -131,20 +136,20 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
   return (
     <div className="space-y-4">
       {/* HUD Active Header */}
-      <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-3 shadow-xl">
+      <div className="bg-card border border-border p-4 rounded-2xl space-y-3 shadow-xl">
         <div className="flex justify-between items-start">
           <div>
-            <span className="font-mono text-[10px] text-amber-400 font-bold">{trip.bookingId}</span>
-            <h1 className="text-base font-extrabold text-zinc-100 mt-0.5">
+            <span className="font-mono text-[10px] text-amber-700 dark:text-amber-400 font-bold">{trip.bookingId}</span>
+            <h1 className="text-base font-extrabold text-foreground mt-0.5">
               {trip.pickup?.name || trip.pickup?.address || "Pickup"} ➔ {trip.destination?.name || trip.destination?.address || "Destination"}
             </h1>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30 uppercase animate-pulse">
+            <span className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-500/30 uppercase animate-pulse">
               {status.replaceAll("_", " ")}
             </span>
             {isTracking && (
-              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-mono font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+              <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-mono font-bold px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> GPS Live Sync
               </span>
             )}
@@ -165,11 +170,11 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
         </div>
 
         {/* Passenger Info & Call */}
-        <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 flex items-center justify-between text-xs">
+        <div className="bg-background/80 p-3 rounded-xl border border-border flex items-center justify-between text-xs">
           <div>
-            <div className="text-zinc-400 text-[11px]">Passenger:</div>
-            <div className="font-bold text-zinc-100 text-sm">{trip.customerName}</div>
-            <div className="text-zinc-400 font-mono text-[11px]">{trip.customerMobile}</div>
+            <div className="text-muted-foreground text-[11px]">Passenger:</div>
+            <div className="font-bold text-foreground text-sm">{trip.customerName}</div>
+            <div className="text-muted-foreground font-mono text-[11px]">{trip.customerMobile}</div>
           </div>
           <a href={`tel:${trip.customerMobile}`} className="block">
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-10 px-4 cursor-pointer">
@@ -182,24 +187,24 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
       {/* Navigation Buttons (Google Maps Deep Links) */}
       <div className="grid grid-cols-2 gap-2">
         <a href={navigateToPickupUrl} target="_blank" rel="noreferrer" className="block">
-          <Button variant="outline" className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 font-bold text-xs py-5 cursor-pointer">
-            <ExternalLink className="w-4 h-4 mr-1 text-emerald-400" /> Nav to Pickup
+          <Button variant="outline" className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer">
+            <ExternalLink className="w-4 h-4 mr-1 text-emerald-700 dark:text-emerald-400" /> Nav to Pickup
           </Button>
         </a>
         <a href={navigateToDestUrl} target="_blank" rel="noreferrer" className="block">
-          <Button variant="outline" className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 font-bold text-xs py-5 cursor-pointer">
-            <ExternalLink className="w-4 h-4 mr-1 text-amber-400" /> Nav to Dest
+          <Button variant="outline" className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer">
+            <ExternalLink className="w-4 h-4 mr-1 text-amber-700 dark:text-amber-400" /> Nav to Dest
           </Button>
         </a>
       </div>
 
       {/* Journey Milestone Stepper Buttons */}
-      <div className="bg-zinc-900/80 border border-zinc-800 p-4 rounded-2xl space-y-3">
-        <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center justify-between">
+      <div className="bg-card/80 border border-border p-4 rounded-2xl space-y-3">
+        <div className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center justify-between">
           <span>Journey Progression</span>
           {isTracking && (
-            <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" /> Live Telemetry
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono flex items-center gap-1">
+              <Radio className="w-3 h-3 text-emerald-700 dark:text-emerald-400 animate-pulse" /> Live Telemetry
             </span>
           )}
         </div>
@@ -270,26 +275,33 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
           )}
 
           {status === "completed" && (
-            <div className="bg-emerald-950/30 border border-emerald-500/40 p-3 rounded-xl text-center text-emerald-400 font-bold text-xs">
+            <div className="bg-emerald-950/30 border border-emerald-300 dark:border-emerald-500/40 p-3 rounded-xl text-center text-emerald-700 dark:text-emerald-400 font-bold text-xs">
               ✓ Trip Completed & Meter Verified
+            </div>
+          )}
+
+          {milestoneError && (
+            <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 rounded-xl p-3 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{milestoneError}</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Odometer KM Summary */}
-      <div className="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800 text-xs grid grid-cols-3 gap-2 text-center">
+      <div className="bg-card/60 p-4 rounded-2xl border border-border text-xs grid grid-cols-3 gap-2 text-center">
         <div>
-          <span className="text-zinc-500 text-[10px] block">Start KM</span>
-          <span className="font-mono font-bold text-zinc-200">{trip.startingKm ? `${trip.startingKm} km` : "-"}</span>
+          <span className="text-muted-foreground text-[10px] block">Start KM</span>
+          <span className="font-mono font-bold text-foreground">{trip.startingKm ? `${trip.startingKm} km` : "-"}</span>
         </div>
         <div>
-          <span className="text-zinc-500 text-[10px] block">End KM</span>
-          <span className="font-mono font-bold text-zinc-200">{trip.endingKm ? `${trip.endingKm} km` : "-"}</span>
+          <span className="text-muted-foreground text-[10px] block">End KM</span>
+          <span className="font-mono font-bold text-foreground">{trip.endingKm ? `${trip.endingKm} km` : "-"}</span>
         </div>
         <div>
-          <span className="text-zinc-500 text-[10px] block">Actual KM</span>
-          <span className="font-mono font-bold text-emerald-400">{trip.actualKm ? `${trip.actualKm} km` : "In run"}</span>
+          <span className="text-muted-foreground text-[10px] block">Actual KM</span>
+          <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{trip.actualKm ? `${trip.actualKm} km` : "In run"}</span>
         </div>
       </div>
     </div>

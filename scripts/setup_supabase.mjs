@@ -8,29 +8,35 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   console.log("=================================================");
-  console.log("NG Travels — Fresh Supabase Database Setup");
-  console.log("Supabase Project: ddysnnfnzlhiidxkuvmh.supabase.co");
+  console.log("NG Travels — Supabase Database Migration Runner");
   console.log("=================================================\n");
 
-  const migrationPath = path.resolve(__dirname, "../supabase/migrations/20260904_production_schema.sql");
-  if (!fs.existsSync(migrationPath)) {
-    console.error("Migration file not found at:", migrationPath);
+  const migrationsDir = path.resolve(__dirname, "../supabase/migrations");
+  if (!fs.existsSync(migrationsDir)) {
+    console.error("Migrations directory not found at:", migrationsDir);
     process.exit(1);
   }
 
-  const sql = fs.readFileSync(migrationPath, "utf8");
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
 
-  // Check for DB connection string
+  if (files.length === 0) {
+    console.error("No .sql migration files found in:", migrationsDir);
+    process.exit(1);
+  }
+
   const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
   if (!dbUrl || dbUrl.includes("localhost")) {
-    console.log("ℹ️  To automatically execute this migration from CLI:");
+    console.log("ℹ️  To automatically execute these migrations from CLI:");
     console.log("   Set your Supabase PostgreSQL connection string:");
-    console.log("   $env:DATABASE_URL=\"postgresql://postgres:[YOUR-PASSWORD]@db.ddysnnfnzlhiidxkuvmh.supabase.co:5432/postgres\"\n");
-    console.log("ℹ️  Alternatively, execute directly via Supabase Web Dashboard (Recommended):");
-    console.log("   1. Open: https://supabase.com/dashboard/project/ddysnnfnzlhiidxkuvmh/sql/new");
-    console.log("   2. Copy and paste the contents of: supabase/migrations/20260904_production_schema.sql");
-    console.log("   3. Click 'Run' to establish all tables, RLS policies, triggers, and Realtime publications.\n");
+    console.log("   $env:DATABASE_URL=\"postgresql://postgres:[YOUR-PASSWORD]@db.<project-ref>.supabase.co:5432/postgres\"\n");
+    console.log("ℹ️  Alternatively, run them via the Supabase CLI:");
+    console.log("   supabase db push\n");
+    console.log("ℹ️  Or execute directly via the Supabase Web Dashboard SQL editor, in order:");
+    for (const f of files) console.log("   -", f);
     return;
   }
 
@@ -43,11 +49,19 @@ async function main() {
 
   try {
     await client.connect();
-    console.log("Connected to Supabase PostgreSQL! Executing schema migration...");
-    await client.query(sql);
-    console.log("✓ Schema migration executed successfully!");
+    console.log("Connected. Applying migrations in order:\n");
+
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+      console.log(`→ ${file}`);
+      await client.query(sql);
+      console.log(`✓ ${file} applied\n`);
+    }
+
+    console.log("✓ All migrations applied successfully!");
   } catch (err) {
     console.error("Migration error:", err.message);
+    process.exitCode = 1;
   } finally {
     await client.end();
   }
