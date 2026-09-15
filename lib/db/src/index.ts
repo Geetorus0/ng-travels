@@ -15,6 +15,13 @@ export const pool = new Pool({
   connectionString,
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   connectionTimeoutMillis: 5000,
+  keepAlive: true,
+  idleTimeoutMillis: 30000,
+});
+// Idle pooled connections dropped by the upstream (e.g. Supabase's pgbouncer)
+// otherwise surface as an unhandled 'error' event and can crash the process.
+pool.on("error", (err) => {
+  console.error("[db] Unexpected error on idle client:", err.message);
 });
 export const db = drizzle(pool, { schema });
 

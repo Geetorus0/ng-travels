@@ -33,18 +33,7 @@ import {
 } from "../lib/financialEngine.js";
 import { searchPlaces, calculateRouteJourney, reverseGeocode, resolveLocationInput } from "../lib/routeService.js";
 import { addRealtimeClient, broadcastRealtimeEvent } from "../lib/realtime.js";
-import {
-  memDrivers,
-  memVehicles,
-  memTrips,
-  memCustomers,
-  memEnquiries,
-  memPayments,
-  memExpenses,
-  memNotifications,
-  memAuditLogs,
-  memSettings,
-} from "../lib/memoryStore.js";
+import { memTrips, memSettings } from "../lib/memoryStore.js";
 
 const router = Router();
 
@@ -760,55 +749,8 @@ router.get("/dashboard", requireOwner, async (_req, res): Promise<void> => {
       })),
     });
   } catch (err: any) {
-    console.warn("[dashboard] Database query fallback to memory store:", err?.message);
-    const todayTrps = memTrips.filter((t) => t.startDate === currentDay);
-    const activeTrips = memTrips.filter((t) => ["started", "reached_pickup", "customer_picked_up", "in_progress"].includes(t.status));
-    const rev = todayTrps.reduce((sum, t) => sum + Number(t.customerTotal || 0), 0);
-    const exp = memExpenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const col = todayTrps.reduce((sum, t) => sum + Number(t.totalPaid || 0), 0);
-
-    res.json({
-      date: new Date(`${currentDay}T00:00:00Z`),
-      metrics: {
-        totalTrips: memTrips.length,
-        todaysTrips: todayTrps.length,
-        upcomingTrips: todayTrps.filter((t) => ["upcoming", "confirmed", "ready"].includes(t.status)).length,
-        started: todayTrps.filter((t) => t.status === "started").length,
-        inProgress: activeTrips.length,
-        completedToday: todayTrps.filter((t) => t.status === "completed").length,
-        paymentPending: memTrips.filter((t) => Number(t.remainingBalance || 0) > 0).length,
-        todaysRevenue: rev,
-        todaysCollection: col,
-        todaysExpenses: exp,
-        todaysProfit: rev - exp,
-        weeklyRevenue: rev,
-        weeklyExpenses: exp,
-        weeklyProfit: rev - exp,
-        monthlyRevenue: rev,
-        monthlyExpenses: exp,
-        monthlyProfit: rev - exp,
-        availableDrivers: memDrivers.filter((d) => d.availability === "available").length,
-        driversOnTrip: memDrivers.filter((d) => d.availability === "on_trip").length,
-        availableVehicles: memVehicles.filter((v) => v.status === "active").length,
-        vehiclesOnTrip: memVehicles.filter((v) => v.status === "active" && v.assignedDriverId).length,
-      },
-      schedule: todayTrps.map((t) => ({
-        id: t.id,
-        bookingId: t.bookingId,
-        time: t.startTime,
-        pickup: (t.pickup as any)?.name || "Pickup",
-        destination: (t.destination as any)?.name || "Destination",
-        customerName: "Corporate Customer",
-        driverName: t.driverName ?? "Unassigned",
-        status: t.status,
-      })),
-      recentActivity: memAuditLogs.slice(0, 10).map((a) => ({
-        id: a.id,
-        title: a.action,
-        detail: `${a.entity} ${a.entityId}`,
-        timestamp: a.createdAt,
-      })),
-    });
+    console.error("[dashboard] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load dashboard data. Please try again." } });
   }
 });
 
@@ -820,8 +762,8 @@ router.get("/drivers", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(driversTable).orderBy(asc(driversTable.name));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[drivers] DB fallback to memory store:", err?.message);
-    res.json(memDrivers);
+    console.error("[drivers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load drivers. Please try again." } });
   }
 });
 
@@ -954,8 +896,8 @@ router.get("/vehicles", async (_req, res): Promise<void> => {
     const rows = await db.select().from(vehiclesTable).orderBy(asc(vehiclesTable.vehicleNumber));
     res.json(rows.map(enrichVehicleWithAlerts));
   } catch (err: any) {
-    console.warn("[vehicles] DB fallback to memory store:", err?.message);
-    res.json((memVehicles as any).map(enrichVehicleWithAlerts));
+    console.error("[vehicles] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load vehicles. Please try again." } });
   }
 });
 
@@ -1086,8 +1028,8 @@ router.get("/customers", requireOwner, async (req, res): Promise<void> => {
     const views = await Promise.all(rows.map(customerView));
     res.json({ items: views, total: views.length });
   } catch (err: any) {
-    console.warn("[customers] DB fallback to memory store:", err?.message);
-    res.json({ items: memCustomers, total: memCustomers.length });
+    console.error("[customers] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load customers. Please try again." } });
   }
 });
 
@@ -1179,8 +1121,8 @@ router.get("/enquiries", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(enquiriesTable).orderBy(desc(enquiriesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[enquiries] DB fallback to memory store:", err?.message);
-    res.json(memEnquiries);
+    console.error("[enquiries] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load enquiries. Please try again." } });
   }
 });
 
@@ -1427,8 +1369,8 @@ router.get("/trips", async (req, res): Promise<void> => {
 
     res.json({ items: filtered, total: filtered.length });
   } catch (err: any) {
-    console.warn("[trips] DB fallback to memory store:", err?.message);
-    res.json({ items: memTrips, total: memTrips.length });
+    console.error("[trips] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load trips. Please try again." } });
   }
 });
 
@@ -1897,7 +1839,9 @@ router.get("/driver/current-trip", async (req, res): Promise<void> => {
       .limit(1);
 
     if (trips.length === 0) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
+      // No active trip is a normal, expected state (not an error) — the
+      // driver simply has nothing in progress right now.
+      res.json(null);
       return;
     }
 
@@ -1906,11 +1850,7 @@ router.get("/driver/current-trip", async (req, res): Promise<void> => {
   } catch (err: any) {
     console.warn("[driver/current-trip] DB fallback:", err?.message);
     const active = memTrips.find((t) => ["started", "in_progress", "reached_pickup", "customer_picked_up"].includes(t.status)) || memTrips[0] || null;
-    if (!active) {
-      res.status(404).json({ success: false, message: "No active trip in progress" });
-      return;
-    }
-    res.json(active);
+    res.json(active || null);
   }
 });
 
@@ -1933,7 +1873,9 @@ router.get("/driver/vehicle", async (req, res): Promise<void> => {
     }
 
     if (!vehicle) {
-      res.status(404).json({ success: false, message: "No vehicle assigned" });
+      // No vehicle assigned is a normal, expected state — the driver just
+      // hasn't been assigned one yet, not a routing/lookup error.
+      res.json(null);
       return;
     }
 
@@ -2254,6 +2196,37 @@ router.post("/driver/trips/:id/location", async (req, res): Promise<void> => {
   }
 });
 
+/**
+ * Most recent GPS telemetry point for a trip, polled by the fleet map.
+ */
+router.get("/trips/:id/live-location", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  try {
+    const [latest] = await db
+      .select()
+      .from(driverLocationsTable)
+      .where(eq(driverLocationsTable.tripId, id))
+      .orderBy(desc(driverLocationsTable.timestamp))
+      .limit(1);
+
+    if (!latest) {
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "No location telemetry recorded yet" } });
+      return;
+    }
+
+    res.json({
+      latitude: Number(latest.latitude),
+      longitude: Number(latest.longitude),
+      speed: latest.speed != null ? Number(latest.speed) : null,
+      heading: latest.heading != null ? Number(latest.heading) : null,
+      accuracy: latest.accuracy != null ? Number(latest.accuracy) : null,
+      timestamp: latest.timestamp,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err.message } });
+  }
+});
+
 // =============================================================
 // PAYMENTS & EXPENSES LEDGER
 // =============================================================
@@ -2262,8 +2235,8 @@ router.get("/payments", async (_req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[payments] DB fallback to memory store:", err?.message);
-    res.json(memPayments);
+    console.error("[payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 
@@ -2273,8 +2246,8 @@ router.get("/trips/:id/payments", async (req, res): Promise<void> => {
     const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.tripId, id)).orderBy(desc(paymentsTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[trips/:id/payments] DB fallback:", err?.message);
-    res.json(memPayments.filter((p) => p.tripId === id));
+    console.error("[trips/:id/payments] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load payments. Please try again." } });
   }
 });
 
@@ -2348,8 +2321,8 @@ router.get("/expenses", async (_req, res): Promise<void> => {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
     res.json(rows);
   } catch (err: any) {
-    console.warn("[expenses] DB fallback to memory store:", err?.message);
-    res.json(memExpenses);
+    console.error("[expenses] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load expenses. Please try again." } });
   }
 });
 
@@ -2509,8 +2482,8 @@ router.get("/notifications", async (req, res): Promise<void> => {
 
     res.json(rows);
   } catch (err: any) {
-    console.warn("[notifications] DB fallback to memory store:", err?.message);
-    res.json(memNotifications);
+    console.error("[notifications] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load notifications. Please try again." } });
   }
 });
 
@@ -2540,8 +2513,8 @@ router.get("/audit-logs", requireOwner, async (_req, res): Promise<void> => {
     const rows = await db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(100);
     res.json(rows);
   } catch (err: any) {
-    console.warn("[audit-logs] DB fallback to memory store:", err?.message);
-    res.json(memAuditLogs);
+    console.error("[audit-logs] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load audit logs. Please try again." } });
   }
 });
 

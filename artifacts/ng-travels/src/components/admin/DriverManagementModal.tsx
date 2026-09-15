@@ -183,16 +183,16 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <Key className="w-5 h-5 text-amber-400" />
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Key className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Driver Account Management
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -201,13 +201,13 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-zinc-800">
+          <div className="flex gap-2 border-b border-border">
             <button
               onClick={() => setActiveTab("create")}
               className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
                 activeTab === "create"
-                  ? "text-amber-400 border-amber-400"
-                  : "text-zinc-400 border-transparent hover:text-zinc-200"
+                  ? "text-amber-700 dark:text-amber-400 border-amber-400"
+                  : "text-muted-foreground border-transparent hover:text-foreground"
               }`}
             >
               <Plus className="w-4 h-4 inline mr-2" />
@@ -217,8 +217,8 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
               onClick={() => setActiveTab("reset")}
               className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
                 activeTab === "reset"
-                  ? "text-amber-400 border-amber-400"
-                  : "text-zinc-400 border-transparent hover:text-zinc-200"
+                  ? "text-amber-700 dark:text-amber-400 border-amber-400"
+                  : "text-muted-foreground border-transparent hover:text-foreground"
               }`}
             >
               <Key className="w-4 h-4 inline mr-2" />
@@ -231,8 +231,8 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
             <div
               className={`p-4 rounded-xl flex items-start gap-3 ${
                 message.type === "success"
-                  ? "bg-emerald-950/40 border border-emerald-500/40 text-emerald-300"
-                  : "bg-rose-950/40 border border-rose-500/40 text-rose-300"
+                  ? "bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                  : "bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300"
               }`}
             >
               {message.type === "success" ? (
@@ -249,11 +249,11 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Driver Name *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                    <User className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                     <Input
                       type="text"
                       required
@@ -268,7 +268,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Driver Code *
                   </label>
                   <Input
@@ -287,11 +287,11 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Mobile Number *
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                     <Input
                       type="tel"
                       required
@@ -306,11 +306,11 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Email Address *
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                     <Input
                       type="email"
                       required
@@ -325,7 +325,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     License Number
                   </label>
                   <Input
@@ -342,7 +342,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     License Expiry
                   </label>
                   <Input
@@ -358,7 +358,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Emergency Contact
                   </label>
                   <Input
@@ -375,7 +375,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Initial Password *
                   </label>
                   <Input
@@ -393,7 +393,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                  <label className="block text-xs font-semibold text-foreground mb-2">
                     Confirm Password *
                   </label>
                   <Input
@@ -430,7 +430,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
           {activeTab === "reset" && (
             <form onSubmit={handleResetSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                <label className="block text-xs font-semibold text-foreground mb-2">
                   Select Driver *
                 </label>
                 <select
@@ -439,7 +439,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
                   onChange={(e) =>
                     setResetForm({ ...resetForm, driverId: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="w-full px-3 py-2 bg-background border border-border text-foreground rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
                 >
                   <option value="">-- Select a driver --</option>
                   {drivers.map((driver) => (
@@ -451,7 +451,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                <label className="block text-xs font-semibold text-foreground mb-2">
                   New Password *
                 </label>
                 <Input
@@ -466,7 +466,7 @@ export const DriverManagementModal: React.FC<DriverManagementModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                <label className="block text-xs font-semibold text-foreground mb-2">
                   Confirm Password *
                 </label>
                 <Input

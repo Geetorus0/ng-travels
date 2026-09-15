@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import {
   Car,
   Phone,
@@ -10,8 +11,10 @@ import {
   ShieldCheck,
   Plus,
   Key,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NGTravelsLoader } from "@/components/loading";
 import {
   DriverManagementModal,
   CreateDriverData,
@@ -19,17 +22,28 @@ import {
 
 interface DriversPageProps {
   drivers: any[];
-  onUpdateAvailability?: (driverId: number, availability: string) => void;
-  authToken?: string;
+  isLoading?: boolean;
+  onUpdateAvailability?: (driverId: number, availability: string) => void | Promise<void>;
 }
 
 export const DriversPage: React.FC<DriversPageProps> = ({
   drivers = [],
+  isLoading = false,
   onUpdateAvailability,
-  authToken,
 }) => {
   const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<{ id: number; availability: string } | null>(null);
+
+  const handleAvailabilityClick = async (driverId: number, availability: string) => {
+    if (!onUpdateAvailability || pendingUpdate) return;
+    setPendingUpdate({ id: driverId, availability });
+    try {
+      await onUpdateAvailability(driverId, availability);
+    } finally {
+      setPendingUpdate(null);
+    }
+  };
   const driverList = Array.isArray(drivers)
     ? drivers
     : Array.isArray((drivers as any)?.items)
@@ -39,12 +53,9 @@ export const DriversPage: React.FC<DriversPageProps> = ({
   const handleCreateDriver = async (data: CreateDriverData) => {
     setModalLoading(true);
     try {
-      const response = await fetch("/api/admin/drivers", {
+      const response = await apiFetch("/api/admin/drivers", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
@@ -67,14 +78,11 @@ export const DriversPage: React.FC<DriversPageProps> = ({
   const handleResetPassword = async (driverId: number, newPassword: string) => {
     setModalLoading(true);
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/drivers/${driverId}/reset-password`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ newPassword }),
         },
       );
@@ -99,11 +107,11 @@ export const DriversPage: React.FC<DriversPageProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <Car className="w-5 h-5 text-amber-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Car className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Driver Partner Roster & Availability Board
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Fleet operators, commercial license credentials, active duty
             statuses, and performance ratings.
           </p>
@@ -125,13 +133,17 @@ export const DriversPage: React.FC<DriversPageProps> = ({
         drivers={driverList}
       />
 
-      {driverList.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 text-zinc-400 space-y-3">
-          <Car className="w-12 h-12 text-zinc-600 mx-auto" />
-          <div className="text-sm font-semibold text-zinc-300">
+      {isLoading && driverList.length === 0 ? (
+        <div className="p-12 flex justify-center bg-card/50 rounded-2xl border border-border">
+          <NGTravelsLoader size="sm" text="Loading driver roster..." />
+        </div>
+      ) : driverList.length === 0 ? (
+        <div className="p-12 text-center bg-card/50 rounded-2xl border border-border text-muted-foreground space-y-3">
+          <Car className="w-12 h-12 text-muted-foreground mx-auto" />
+          <div className="text-sm font-semibold text-foreground">
             No driver partners registered yet
           </div>
-          <div className="text-xs text-zinc-500 max-w-sm mx-auto">
+          <div className="text-xs text-muted-foreground max-w-sm mx-auto">
             Once drivers join your fleet or are added, their roster, duty
             statuses, and vehicle assignments will appear here.
           </div>
@@ -141,18 +153,18 @@ export const DriversPage: React.FC<DriversPageProps> = ({
           {driverList.map((drv: any) => (
             <div
               key={drv.id}
-              className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-5 space-y-4 hover:border-zinc-700 transition-all shadow-md"
+              className="bg-card/70 border border-border rounded-xl p-5 space-y-4 hover:border-border transition-all shadow-md"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 font-bold flex items-center justify-center text-sm">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-400/20 border border-amber-300 dark:border-amber-400/40 text-amber-700 dark:text-amber-300 font-bold flex items-center justify-center text-sm">
                     {drv.name?.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-zinc-100">
+                    <h3 className="font-bold text-sm text-foreground">
                       {drv.name}
                     </h3>
-                    <span className="font-mono text-[11px] text-zinc-400">
+                    <span className="font-mono text-[11px] text-muted-foreground">
                       {drv.driverCode}
                     </span>
                   </div>
@@ -161,47 +173,47 @@ export const DriversPage: React.FC<DriversPageProps> = ({
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
                     drv.availability === "available"
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30"
                       : drv.availability === "on_trip"
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                        ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 animate-pulse"
                         : drv.availability === "on_leave"
-                          ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                          : "bg-zinc-800 text-zinc-400"
+                          ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30"
+                          : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {drv.availability?.replaceAll("_", " ")}
                 </span>
               </div>
 
-              <div className="space-y-1.5 text-xs text-zinc-400 bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80">
+              <div className="space-y-1.5 text-xs text-muted-foreground bg-background/60 p-3 rounded-lg border border-border/80">
                 <div className="flex justify-between">
                   <span>Phone:</span>
-                  <span className="text-zinc-200 font-medium">
+                  <span className="text-foreground font-medium">
                     {drv.mobile}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Driving License:</span>
-                  <span className="font-mono text-zinc-300">
+                  <span className="font-mono text-foreground">
                     {drv.licenseNumber || "DL-KA01-PENDING"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Rating:</span>
-                  <span className="text-amber-400 font-bold">
+                  <span className="text-amber-700 dark:text-amber-400 font-bold">
                     ★ {drv.rating || "4.8"} / 5.0
                   </span>
                 </div>
               </div>
 
               {drv.notes && (
-                <p className="text-[11px] text-zinc-400 italic">{drv.notes}</p>
+                <p className="text-[11px] text-muted-foreground italic">{drv.notes}</p>
               )}
 
               {/* Quick Availability Action */}
               {onUpdateAvailability && (
-                <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-xs">
-                  <span className="text-zinc-500 text-[10px] uppercase">
+                <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground text-[10px] uppercase">
                     Set Status:
                   </span>
                   <div className="flex gap-1">
@@ -210,28 +222,38 @@ export const DriversPage: React.FC<DriversPageProps> = ({
                       variant={
                         drv.availability === "available" ? "default" : "outline"
                       }
-                      onClick={() => onUpdateAvailability(drv.id, "available")}
+                      onClick={() => handleAvailabilityClick(drv.id, "available")}
+                      disabled={Boolean(pendingUpdate)}
                       className={`h-6 text-[10px] px-2 ${
                         drv.availability === "available"
                           ? "bg-emerald-600 text-white font-bold"
-                          : "border-zinc-800 text-zinc-400"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
-                      Available
+                      {pendingUpdate && pendingUpdate.id === drv.id && pendingUpdate.availability === "available" ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        "Available"
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant={
                         drv.availability === "on_leave" ? "default" : "outline"
                       }
-                      onClick={() => onUpdateAvailability(drv.id, "on_leave")}
+                      onClick={() => handleAvailabilityClick(drv.id, "on_leave")}
+                      disabled={Boolean(pendingUpdate)}
                       className={`h-6 text-[10px] px-2 ${
                         drv.availability === "on_leave"
                           ? "bg-rose-600 text-white font-bold"
-                          : "border-zinc-800 text-zinc-400"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
-                      On Leave
+                      {pendingUpdate && pendingUpdate.id === drv.id && pendingUpdate.availability === "on_leave" ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        "On Leave"
+                      )}
                     </Button>
                   </div>
                 </div>

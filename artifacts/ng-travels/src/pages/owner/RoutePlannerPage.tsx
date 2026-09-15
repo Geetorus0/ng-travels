@@ -145,11 +145,11 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-zinc-100 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-amber-400" />
+          <h1 className="text-xl font-black text-foreground flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Google Maps Route Intelligence & Live GPS Planner
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Real driving highway routing, independent outbound & return legs, authentic road coordinates, and verified commercial mileage.
           </p>
         </div>
@@ -176,23 +176,23 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
       </div>
 
       {errorMessage && (
-        <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 p-3.5 rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+        <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 p-3.5 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-700 dark:text-rose-400" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Form: Route Parameters */}
-        <div className="lg:col-span-4 space-y-4 bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800 shadow-xl">
+        <div className="lg:col-span-4 space-y-4 bg-card/80 p-5 rounded-2xl border border-border shadow-xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Itinerary Configuration</h2>
-            <div className="flex bg-zinc-950 p-0.5 rounded-lg border border-zinc-800">
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">Itinerary Configuration</h2>
+            <div className="flex bg-background p-0.5 rounded-lg border border-border">
               <button
                 type="button"
                 onClick={() => setTripType("single")}
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                  tripType === "single" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                  tripType === "single" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 One Way
@@ -201,7 +201,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                 type="button"
                 onClick={() => setTripType("round")}
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                  tripType === "round" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                  tripType === "round" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Round Trip
@@ -222,7 +222,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
             onSelect={handleSelectPickup}
           />
           {selectedPickup && (
-            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
+            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
               <CheckCircle2 className="w-3 h-3" />
               <span>Verified: {selectedPickup.lat.toFixed(4)}, {selectedPickup.lng.toFixed(4)}</span>
             </div>
@@ -231,10 +231,10 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
           {/* Intermediate Stops */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-[11px] text-purple-400 font-bold uppercase flex items-center gap-1">
+              <label className="text-[11px] text-purple-700 dark:text-purple-400 font-bold uppercase flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-purple-400" /> Intermediate Waypoints
               </label>
-              <Button size="sm" variant="ghost" onClick={() => setStops([...stops, ""])} className="text-xs text-amber-400 h-6 px-2 hover:bg-amber-950/20">
+              <Button size="sm" variant="ghost" onClick={() => setStops([...stops, ""])} className="text-xs text-amber-700 dark:text-amber-400 h-6 px-2 hover:bg-amber-950/20">
                 <Plus className="w-3.5 h-3.5 mr-1" /> Add Stop
               </Button>
             </div>
@@ -248,9 +248,9 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                     setStops(next);
                   }}
                   placeholder={`Waypoint ${idx + 1} (e.g. Mandya, Maddur, Mysore Road)...`}
-                  className="bg-zinc-950 border-zinc-800 text-xs h-9 flex-1"
+                  className="bg-background border-border text-xs h-9 flex-1"
                 />
-                <Button size="sm" variant="ghost" onClick={() => setStops(stops.filter((_, i) => i !== idx))} className="text-rose-400 hover:bg-rose-950/20 h-8 w-8 p-0">
+                <Button size="sm" variant="ghost" onClick={() => setStops(stops.filter((_, i) => i !== idx))} className="text-rose-700 dark:text-rose-400 hover:bg-rose-950/20 h-8 w-8 p-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -270,7 +270,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
             onSelect={handleSelectDest}
           />
           {selectedDest && (
-            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-amber-400 font-mono">
+            <div className="-mt-2 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 font-mono">
               <CheckCircle2 className="w-3 h-3" />
               <span>Verified: {selectedDest.lat.toFixed(4)}, {selectedDest.lng.toFixed(4)}</span>
             </div>
@@ -293,43 +293,43 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
 
           {/* Round Trip Distance Card (Section 9) */}
           {tripType === "round" && totalMapKm > 0 && (
-            <div className="bg-zinc-950 p-4 rounded-xl border border-amber-500/30 space-y-3">
+            <div className="bg-background p-4 rounded-xl border border-amber-300 dark:border-amber-500/30 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold uppercase text-amber-400 flex items-center gap-1">
+                <span className="text-[10px] font-mono font-bold uppercase text-amber-700 dark:text-amber-400 flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> ROUND TRIP BREAKDOWN
                 </span>
-                <span className="text-[10px] font-mono bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                <span className="text-[10px] font-mono bg-amber-100 dark:bg-amber-400/10 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-500/30">
                   REAL ROAD LEGS
                 </span>
               </div>
 
               <div className="space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between items-center text-zinc-300">
-                  <span className="text-zinc-400">Outbound Leg</span>
-                  <span className="font-bold text-sky-400">{outboundMapKm} km</span>
+                <div className="flex justify-between items-center text-foreground">
+                  <span className="text-muted-foreground">Outbound Leg</span>
+                  <span className="font-bold text-sky-700 dark:text-sky-400">{outboundMapKm} km</span>
                 </div>
-                <div className="flex justify-between items-center text-zinc-300">
-                  <span className="text-zinc-400">Return Leg</span>
-                  <span className="font-bold text-purple-400">{returnMapKm} km</span>
+                <div className="flex justify-between items-center text-foreground">
+                  <span className="text-muted-foreground">Return Leg</span>
+                  <span className="font-bold text-purple-700 dark:text-purple-400">{returnMapKm} km</span>
                 </div>
-                <div className="border-t border-zinc-800 pt-1.5 flex justify-between items-center font-bold text-zinc-100">
+                <div className="border-t border-border pt-1.5 flex justify-between items-center font-bold text-foreground">
                   <span>Total Billable Distance</span>
-                  <span className="text-amber-400 text-sm">{totalMapKm} km</span>
+                  <span className="text-amber-700 dark:text-amber-400 text-sm">{totalMapKm} km</span>
                 </div>
               </div>
 
-              <div className="border-t border-zinc-850 pt-2 text-[11px] font-mono text-zinc-400 space-y-1">
+              <div className="border-t border-border pt-2 text-[11px] font-mono text-muted-foreground space-y-1">
                 <div className="flex justify-between">
                   <span>Outbound Time:</span>
-                  <span className="text-zinc-200">~{Math.floor(outboundDurationMinutes / 60)}h {outboundDurationMinutes % 60}m</span>
+                  <span className="text-foreground">~{Math.floor(outboundDurationMinutes / 60)}h {outboundDurationMinutes % 60}m</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Return Time:</span>
-                  <span className="text-zinc-200">~{Math.floor(returnDurationMinutes / 60)}h {returnDurationMinutes % 60}m</span>
+                  <span className="text-foreground">~{Math.floor(returnDurationMinutes / 60)}h {returnDurationMinutes % 60}m</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Highway Toll:</span>
-                  <span className="text-emerald-400 font-bold">
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">
                     {estimatedToll > 0 ? formatINR(estimatedToll) : tollStatus}
                   </span>
                 </div>
@@ -340,7 +340,7 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
           {/* Route Options Selector */}
           {routes.length > 0 && (
             <div className="pt-2 space-y-2.5">
-              <div className="text-[11px] font-bold text-zinc-400 uppercase">Available Route Options ({routes.length})</div>
+              <div className="text-[11px] font-bold text-muted-foreground uppercase">Available Route Options ({routes.length})</div>
               {routes.map((opt, idx) => (
                 <div
                   key={idx}
@@ -348,28 +348,28 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all space-y-2 ${
                     selectedRouteIdx === idx
                       ? "bg-amber-950/30 border-amber-400 ring-1 ring-amber-400/50"
-                      : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+                      : "bg-background border-border hover:border-border"
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <span className="font-bold text-xs text-zinc-200">{opt.summary}</span>
-                    <span className="text-[9px] bg-zinc-900 text-amber-300 px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap">
+                    <span className="font-bold text-xs text-foreground">{opt.summary}</span>
+                    <span className="text-[9px] bg-card text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap">
                       {opt.via}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-xs font-mono pt-1">
                     <div>
-                      <span className="text-[9px] text-zinc-500 block uppercase">Distance</span>
-                      <span className="font-bold text-zinc-100">{opt.distanceKm} KM</span>
+                      <span className="text-[9px] text-muted-foreground block uppercase">Distance</span>
+                      <span className="font-bold text-foreground">{opt.distanceKm} KM</span>
                     </div>
                     <div>
-                      <span className="text-[9px] text-zinc-500 block uppercase">Travel Time</span>
-                      <span className="font-bold text-sky-300">~{Math.floor(opt.durationMinutes / 60)}h {opt.durationMinutes % 60}m</span>
+                      <span className="text-[9px] text-muted-foreground block uppercase">Travel Time</span>
+                      <span className="font-bold text-sky-700 dark:text-sky-300">~{Math.floor(opt.durationMinutes / 60)}h {opt.durationMinutes % 60}m</span>
                     </div>
                     <div>
-                      <span className="text-[9px] text-zinc-500 block uppercase">Toll Fee</span>
-                      <span className="font-bold text-emerald-400">
+                      <span className="text-[9px] text-muted-foreground block uppercase">Toll Fee</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
                         {opt.estimatedToll > 0 ? formatINR(opt.estimatedToll) : (opt.tollStatus || "At Actuals")}
                       </span>
                     </div>
@@ -401,6 +401,8 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
             outboundMapKm={outboundMapKm}
             returnMapKm={returnMapKm}
             totalMapKm={totalMapKm}
+            outboundDurationMinutes={outboundDurationMinutes}
+            returnDurationMinutes={returnDurationMinutes}
             tripType={tripType === "round" ? "round_trip" : "single_trip"}
             outboundCoordinates={outboundCoordinates}
             returnCoordinates={returnCoordinates}
@@ -411,16 +413,16 @@ export const RoutePlannerPage: React.FC<RoutePlannerPageProps> = ({ onOpenTripWi
 
           {/* Quick Route Summary Card */}
           {selected && (
-            <div className="bg-gradient-to-r from-amber-950/30 via-zinc-900 to-zinc-900/90 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+            <div className="bg-gradient-to-r from-amber-950/30 via-card to-card/90 border border-amber-300 dark:border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
               <div className="space-y-1">
-                <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider font-mono">
+                <div className="text-[10px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider font-mono">
                   {tripType === "round" ? "ROUND TRIP REAL ROAD ROUTE" : "ONE WAY REAL ROAD ROUTE"}
                 </div>
-                <h3 className="font-black text-zinc-100 text-sm sm:text-base">
+                <h3 className="font-black text-foreground text-sm sm:text-base">
                   {pickupInput.split(",")[0]} {tripType === "round" ? "⇄" : "➔"} {destInput.split(",")[0]} ({totalMapKm || selected.distanceKm} km)
                 </h3>
-                <p className="text-xs text-zinc-400">
-                  Highway Time: ~{Math.floor((outboundDurationMinutes + returnDurationMinutes || selected.durationMinutes) / 60)}h {(outboundDurationMinutes + returnDurationMinutes || selected.durationMinutes) % 60}m • Toll: <strong className="text-emerald-400">{estimatedToll > 0 ? formatINR(estimatedToll) : tollStatus}</strong>
+                <p className="text-xs text-muted-foreground">
+                  Highway Time: ~{Math.floor((outboundDurationMinutes + returnDurationMinutes || selected.durationMinutes) / 60)}h {(outboundDurationMinutes + returnDurationMinutes || selected.durationMinutes) % 60}m • Toll: <strong className="text-emerald-700 dark:text-emerald-400">{estimatedToll > 0 ? formatINR(estimatedToll) : tollStatus}</strong>
                 </p>
               </div>
 

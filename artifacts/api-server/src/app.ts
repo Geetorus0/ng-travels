@@ -6,6 +6,11 @@ import { logger } from "./lib/logger.js";
 
 const app: any = express();
 
+// This API serves dynamic, frequently-polled JSON — disable Express's default
+// weak ETag generation so responses aren't treated as cacheable and clients
+// don't get 304s for data that's meant to be re-fetched every time.
+app.set("etag", false);
+
 const httpLogger = typeof pinoHttp === "function" ? pinoHttp : (pinoHttp as any).default || pinoHttp;
 
 app.use(

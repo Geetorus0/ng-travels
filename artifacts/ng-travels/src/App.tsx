@@ -130,6 +130,12 @@ export interface AuthUser {
   firstName?: string;
   username?: string;
   role: "owner" | "admin" | "driver";
+  // The account's actual server-side role, from the Supabase session — unlike
+  // `role`, this is never overwritten by the cosmetic switchRole() preview
+  // toggle, so it can be used to tell whether owner-only actions will really
+  // succeed (a driver account previewing the Admin UI still can't approve
+  // expenses etc. — the backend checks this same underlying role, not the UI).
+  realRole: "owner" | "admin" | "driver";
   driverId?: number | null;
   phone?: string | null;
   email?: string | null;
@@ -200,6 +206,7 @@ function authUserFromSession(session: Session): AuthUser {
     fullName,
     firstName: fullName.split(" ")[0],
     role,
+    realRole: role,
     driverId: session.user.user_metadata?.driver_id || null,
     phone: session.user.phone,
     email: session.user.email,
@@ -620,24 +627,24 @@ function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 text-zinc-100 selection:bg-amber-400 selection:text-zinc-950">
-      <div className="w-full max-w-md bg-zinc-900/95 border border-zinc-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-foreground selection:bg-amber-400 selection:text-zinc-950">
+      <div className="w-full max-w-md bg-card/95 border border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             <img
               src="/logo.png"
               alt="NG Travels - Travel with Comfort & Safety"
-              className="w-24 h-24 rounded-2xl object-contain bg-black p-1.5 border border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
+              className="w-24 h-24 rounded-2xl object-contain bg-black p-1.5 border border-amber-300 dark:border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
             />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-zinc-100 tracking-tight">
+            <h1 className="text-2xl font-black text-foreground tracking-tight">
               NG TRAVELS
             </h1>
-            <p className="text-xs text-amber-400 font-semibold tracking-wide mt-0.5">
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold tracking-wide mt-0.5">
               Travel with Comfort & Safety
             </p>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
               Operations Command & Dispatch Platform
             </p>
           </div>
@@ -648,7 +655,7 @@ function SignInPage() {
           (activeTab === "admin" && adminView !== "password") ||
           (activeTab === "driver" && driverView !== "password")
         ) && (
-          <div className="grid grid-cols-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800 text-xs font-bold">
+          <div className="grid grid-cols-2 p-1 bg-background rounded-xl border border-border text-xs font-bold">
             <button
               type="button"
               onClick={() => {
@@ -659,7 +666,7 @@ function SignInPage() {
               className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === "admin"
                   ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <ShieldCheck className="w-4 h-4" /> Operations Admin
@@ -674,7 +681,7 @@ function SignInPage() {
               className={`py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === "driver"
                   ? "bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Car className="w-4 h-4" /> Driver Pilot
@@ -684,8 +691,8 @@ function SignInPage() {
 
         {/* Error Alert Message */}
         {errorMessage && (
-          <div className="bg-rose-950/40 border border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">{errorMessage}</div>
           </div>
         )}
@@ -696,24 +703,24 @@ function SignInPage() {
             {adminView === "password" && (
               <form onSubmit={handleAdminSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                     <span>Operations Email</span>
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                     <Input
                       type="email"
                       required
                       placeholder="admin@ngtravels.in"
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
-                      className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                      className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                     <span>Password</span>
                     <button
                       type="button"
@@ -722,25 +729,25 @@ function SignInPage() {
                         setForgotSent(false);
                         setAdminView("forgot");
                       }}
-                      className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 cursor-pointer"
+                      className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-700 hover:dark:text-amber-300 cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                     <Input
                       type={showAdminPassword ? "text" : "password"}
                       required
                       placeholder="Enter your operations password"
                       value={adminPassword}
                       onChange={(e) => setAdminPassword(e.target.value)}
-                      className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                      className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                     />
                     <button
                       type="button"
                       onClick={() => setShowAdminPassword(!showAdminPassword)}
-                      className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                      className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       {showAdminPassword ? (
                         <EyeOff className="w-4 h-4" />
@@ -773,13 +780,13 @@ function SignInPage() {
                 <button
                   type="button"
                   onClick={resetAdminViewState}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to password sign-in
                 </button>
                 {forgotSent ? (
-                  <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
                       If an account exists for{" "}
                       <span className="font-semibold">{adminEmail}</span>, a
@@ -791,23 +798,23 @@ function SignInPage() {
                     onSubmit={handleForgotPasswordSubmit}
                     className="space-y-4"
                   >
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Enter your operations email and we'll send a link to reset
                       your password.
                     </p>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">
+                      <label className="text-xs font-semibold text-foreground">
                         Operations Email
                       </label>
                       <div className="relative">
-                        <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                        <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                         <Input
                           type="email"
                           required
                           placeholder="admin@ngtravels.in"
                           value={adminEmail}
                           onChange={(e) => setAdminEmail(e.target.value)}
-                          className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                         />
                       </div>
                     </div>
@@ -833,24 +840,24 @@ function SignInPage() {
             {driverView === "password" && (
               <form onSubmit={handleDriverSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                     <span>Driver Code or Mobile</span>
                   </label>
                   <div className="relative">
-                    <Car className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                    <Car className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                     <Input
                       type="text"
                       required
                       placeholder="e.g. DRV-101 or 9845011223"
                       value={driverIdentifier}
                       onChange={(e) => setDriverIdentifier(e.target.value)}
-                      className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono"
+                      className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400 font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                     <span>Driver Password</span>
                     <button
                       type="button"
@@ -860,25 +867,25 @@ function SignInPage() {
                         setPasswordResetIdentifier(driverIdentifier);
                         setDriverView("forgot");
                       }}
-                      className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 cursor-pointer"
+                      className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-700 hover:dark:text-amber-300 cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                     <Input
                       type={showDriverPassword ? "text" : "password"}
                       required
                       placeholder="Enter your driver password"
                       value={driverPassword}
                       onChange={(e) => setDriverPassword(e.target.value)}
-                      className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                      className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                     />
                     <button
                       type="button"
                       onClick={() => setShowDriverPassword(!showDriverPassword)}
-                      className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                      className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       {showDriverPassword ? (
                         <EyeOff className="w-4 h-4" />
@@ -910,13 +917,13 @@ function SignInPage() {
                 <button
                   type="button"
                   onClick={resetDriverViewState}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to password sign-in
                 </button>
                 {passwordResetSent ? (
-                  <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
                       If a driver account exists for{" "}
                       <span className="font-semibold">
@@ -931,16 +938,16 @@ function SignInPage() {
                     onSubmit={handleDriverPasswordResetSubmit}
                     className="space-y-4"
                   >
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Enter your driver code or registered mobile number. The
                       operations desk will assist you with password reset.
                     </p>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">
+                      <label className="text-xs font-semibold text-foreground">
                         Driver Code or Mobile
                       </label>
                       <div className="relative">
-                        <Car className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                        <Car className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                         <Input
                           type="text"
                           required
@@ -949,22 +956,22 @@ function SignInPage() {
                           onChange={(e) =>
                             setPasswordResetIdentifier(e.target.value)
                           }
-                          className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400 font-mono"
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400 font-mono"
                         />
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-300">
+                      <label className="text-xs font-semibold text-foreground">
                         Note (Optional)
                       </label>
                       <div className="relative">
-                        <FileText className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                        <FileText className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                         <Input
                           type="text"
                           placeholder="Brief description of your issue"
                           value={passwordResetNote}
                           onChange={(e) => setPasswordResetNote(e.target.value)}
-                          className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                          className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                         />
                       </div>
                     </div>
@@ -986,7 +993,7 @@ function SignInPage() {
           </>
         )}
 
-        <div className="text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/80 text-center font-mono">
+        <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/80 text-center font-mono">
           Secured by Supabase Auth
         </div>
       </div>
@@ -1032,37 +1039,37 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 text-zinc-100 selection:bg-amber-400 selection:text-zinc-950">
-      <div className="w-full max-w-md bg-zinc-900/95 border border-zinc-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-foreground selection:bg-amber-400 selection:text-zinc-950">
+      <div className="w-full max-w-md bg-card/95 border border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl relative">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             <img
               src="/logo.png"
               alt="NG Travels - Travel with Comfort & Safety"
-              className="w-20 h-20 rounded-2xl object-contain bg-black p-1.5 border border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
+              className="w-20 h-20 rounded-2xl object-contain bg-black p-1.5 border border-amber-300 dark:border-amber-500/40 shadow-xl shadow-amber-500/15 mx-auto"
             />
           </div>
           <div>
-            <h1 className="text-xl font-black text-zinc-100 tracking-tight">
+            <h1 className="text-xl font-black text-foreground tracking-tight">
               Reset Your Password
             </h1>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
               Operations Command & Dispatch Platform
             </p>
           </div>
         </div>
 
         {errorMessage && (
-          <div className="bg-rose-950/40 border border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-4 h-4 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">{errorMessage}</div>
           </div>
         )}
 
         {done ? (
           <div className="space-y-4">
-            <div className="bg-emerald-950/40 border border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 p-3.5 rounded-xl flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
               <div className="leading-relaxed">
                 Your password has been updated.
               </div>
@@ -1078,11 +1085,11 @@ function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">
+              <label className="text-xs font-semibold text-foreground">
                 New Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                 <Input
                   type={showPassword ? "text" : "password"}
                   required
@@ -1090,12 +1097,12 @@ function ResetPasswordPage() {
                   placeholder="At least 8 characters"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="pl-9 pr-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                  className="pl-9 pr-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   {showPassword ? (
                     <EyeOff className="w-4 h-4" />
@@ -1106,11 +1113,11 @@ function ResetPasswordPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">
+              <label className="text-xs font-semibold text-foreground">
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+                <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
                 <Input
                   type={showPassword ? "text" : "password"}
                   required
@@ -1118,7 +1125,7 @@ function ResetPasswordPage() {
                   placeholder="Re-enter your new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-9 bg-zinc-950 border-zinc-800 text-zinc-100 text-xs h-11 focus-visible:ring-amber-400"
+                  className="pl-9 bg-background border-border text-foreground text-xs h-11 focus-visible:ring-amber-400"
                 />
               </div>
             </div>
@@ -1139,7 +1146,7 @@ function ResetPasswordPage() {
                 await signOut();
                 setLocation("/");
               }}
-              className="w-full text-center text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 cursor-pointer"
+              className="w-full text-center text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
             >
               Cancel and return to sign-in
             </button>
@@ -1151,6 +1158,7 @@ function ResetPasswordPage() {
 }
 
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 
 function MainApp() {
   const {
@@ -1167,6 +1175,7 @@ function MainApp() {
 
   // Connect Real-Time Server-Sent Events Sync
   const { status: realtimeStatus } = useRealtimeSync();
+  const { theme, toggleTheme } = useTheme();
 
   // Modal States
   const [createTripOpen, setCreateTripOpen] = useState(false);
@@ -1207,6 +1216,7 @@ function MainApp() {
   // Queries
   const { data: dashboardData = {}, isLoading: dashboardLoading } = useQuery({
     queryKey: ["/api/dashboard"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/dashboard", {
@@ -1222,8 +1232,9 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: tripsData = [] } = useQuery({
+  const { data: tripsData = [], isLoading: tripsLoading } = useQuery({
     queryKey: ["/api/trips"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/trips?limit=100", {
@@ -1237,8 +1248,9 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: customersData = [] } = useQuery({
+  const { data: customersData = [], isLoading: customersLoading } = useQuery({
     queryKey: ["/api/customers"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/customers?limit=100", {
@@ -1251,8 +1263,9 @@ function MainApp() {
     },
   });
 
-  const { data: driversData = [] } = useQuery({
+  const { data: driversData = [], isLoading: driversLoading } = useQuery({
     queryKey: ["/api/drivers"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/drivers", {
@@ -1265,8 +1278,9 @@ function MainApp() {
     },
   });
 
-  const { data: rawVehicles = [] } = useQuery({
+  const { data: rawVehicles = [], isLoading: vehiclesLoading } = useQuery({
     queryKey: ["/api/vehicles"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/vehicles", {
@@ -1279,8 +1293,9 @@ function MainApp() {
     },
   });
 
-  const { data: enquiriesData = [] } = useQuery({
+  const { data: enquiriesData = [], isLoading: enquiriesLoading } = useQuery({
     queryKey: ["/api/enquiries"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/enquiries", {
@@ -1293,8 +1308,9 @@ function MainApp() {
     },
   });
 
-  const { data: paymentsData = [] } = useQuery({
+  const { data: paymentsData = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/payments"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/payments", {
@@ -1307,8 +1323,9 @@ function MainApp() {
     },
   });
 
-  const { data: expensesData = [] } = useQuery({
+  const { data: expensesData = [], isLoading: expensesLoading } = useQuery({
     queryKey: ["/api/expenses"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/expenses", {
@@ -1321,8 +1338,9 @@ function MainApp() {
     },
   });
 
-  const { data: notificationsData = [] } = useQuery({
+  const { data: notificationsData = [], isLoading: notificationsLoading } = useQuery({
     queryKey: ["/api/notifications"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/notifications", {
@@ -1336,8 +1354,9 @@ function MainApp() {
     refetchInterval: 15000,
   });
 
-  const { data: auditLogsData = [] } = useQuery({
+  const { data: auditLogsData = [], isLoading: auditLogsLoading } = useQuery({
     queryKey: ["/api/audit-logs"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/audit-logs", {
@@ -1352,6 +1371,7 @@ function MainApp() {
 
   const { data: settingsData = {} } = useQuery({
     queryKey: ["/api/settings"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/settings", {
@@ -1367,8 +1387,9 @@ function MainApp() {
   });
 
   // Dedicated Driver Queries
-  const { data: driverTodayTrips = [] } = useQuery({
+  const { data: driverTodayTrips = [], isLoading: driverTodayLoading } = useQuery({
     queryKey: ["/api/driver/today"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/driver/today", {
@@ -1387,6 +1408,7 @@ function MainApp() {
   // rather than by searching the (inaccessible) fleet-wide driver list.
   const { data: driverMe = null } = useQuery({
     queryKey: ["/api/driver/me"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/driver/me", {
@@ -1403,6 +1425,7 @@ function MainApp() {
 
   const { data: driverCurrentTrip } = useQuery({
     queryKey: ["/api/driver/current-trip"],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch("/api/driver/current-trip", {
@@ -1509,6 +1532,8 @@ function MainApp() {
       body: JSON.stringify({ availability }),
     });
     qc.invalidateQueries({ queryKey: ["/api/drivers"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/me"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
   };
 
   const handleSaveSettings = async (updated: any) => {
@@ -1541,15 +1566,28 @@ function MainApp() {
     status: string,
     note?: string,
   ) => {
-    await apiFetch(`/api/trips/${tripId}/status`, {
-      method: "PATCH",
+    const endpoint =
+      status === "accepted"
+        ? `/api/driver/trips/${tripId}/accept`
+        : status === "driver_arrived"
+          ? `/api/driver/trips/${tripId}/arrived`
+          : `/api/driver/trips/${tripId}/milestone`;
+
+    const res = await apiFetch(endpoint, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note, changedBy: "Driver Suresh" }),
+      body: JSON.stringify({ status, note }),
     });
-    qc.invalidateQueries({ queryKey: ["trips"] });
-    qc.invalidateQueries({ queryKey: ["driver-today"] });
-    qc.invalidateQueries({ queryKey: ["driver-current"] });
-    qc.invalidateQueries({ queryKey: ["dashboard"] });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.error?.message || "Failed to update trip status.");
+    }
+
+    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
+    qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
+    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
   };
 
   const nativeRole = (window as any).NG_APP_ROLE;
@@ -1560,7 +1598,13 @@ function MainApp() {
       ? true
       : nativeRole === "owner"
         ? false
-        : isDriverPath || user?.role === "driver";
+        // A genuine driver account can never render the owner workspace —
+        // regardless of path or the cosmetic switchRole() preview state —
+        // since owner-only actions there would just 403 against the real
+        // server-side role anyway.
+        : user?.realRole === "driver"
+          ? true
+          : isDriverPath || user?.role === "driver";
 
   // Force route alignment if native APK
   useEffect(() => {
@@ -1607,11 +1651,14 @@ function MainApp() {
               availability: "available",
             }
           }
+          canSwitchToAdmin={user?.realRole === "owner" || user?.realRole === "admin"}
           onSignOut={signOut}
           onSwitchRole={(role) => {
             switchRole(role);
             if (role === "admin") setLocation("/dashboard");
           }}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         >
           <Switch>
             <Route path="/driver">
@@ -1619,6 +1666,7 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
+                isLoading={driverTodayLoading}
                 onOpenStartKmModal={(trip) =>
                   setDriverKmTrip({ trip, mode: "start" })
                 }
@@ -1633,6 +1681,7 @@ function MainApp() {
                 todayTrips={driverTodayTripList}
                 currentTrip={driverCurrentTrip}
                 driver={currentDriver}
+                isLoading={driverTodayLoading}
                 onOpenStartKmModal={(trip) =>
                   setDriverKmTrip({ trip, mode: "start" })
                 }
@@ -1645,6 +1694,7 @@ function MainApp() {
             <Route path="/driver/today">
               <DriverTodayPage
                 todayTrips={driverTodayTripList}
+                isLoading={driverTodayLoading}
                 onOpenStartKmModal={(trip) =>
                   setDriverKmTrip({ trip, mode: "start" })
                 }
@@ -1676,6 +1726,7 @@ function MainApp() {
                       )
                     : []
                 }
+                isLoading={expensesLoading}
                 onOpenExpenseModal={() =>
                   setDriverExpenseTripId(driverCurrentTrip?.id || null)
                 }
@@ -1709,6 +1760,8 @@ function MainApp() {
             switchRole(role);
             if (role === "driver") setLocation("/driver");
           }}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           unreadNotificationCount={
             notificationList.filter(
               (n: any) => !n.isRead && n.audience === "owner",
@@ -1721,7 +1774,7 @@ function MainApp() {
             </Route>
             <Route path="/dashboard">
               <DashboardPage
-                isLoading={dashboardLoading && !dashboardData}
+                isLoading={dashboardLoading}
                 metrics={dashboardData?.metrics}
                 schedule={dashboardData?.schedule || []}
                 recentActivity={dashboardData?.recentActivity || []}
@@ -1740,7 +1793,7 @@ function MainApp() {
               />
             </Route>
             <Route path="/live-trips">
-              <LiveTripsPage trips={tripList} />
+              <LiveTripsPage trips={tripList} isLoading={tripsLoading} />
             </Route>
             <Route path="/calendar">
               <CalendarPage trips={tripList} />
@@ -1770,6 +1823,7 @@ function MainApp() {
             <Route path="/trips">
               <TripsPage
                 trips={tripList}
+                isLoading={tripsLoading}
                 onOpenCreateTrip={() => {
                   setInitialEnquiryForTrip(null);
                   setCreateTripOpen(true);
@@ -1807,11 +1861,12 @@ function MainApp() {
               <VehiclesPage />
             </Route>
             <Route path="/customers">
-              <CustomersPage customers={customerList} />
+              <CustomersPage customers={customerList} isLoading={customersLoading} />
             </Route>
             <Route path="/enquiries">
               <EnquiriesPage
                 enquiries={enquiryList}
+                isLoading={enquiriesLoading}
                 onOpenCreateEnquiry={() => setCreateEnquiryOpen(true)}
                 onConvertToTrip={(enq) => {
                   setInitialEnquiryForTrip(enq);
@@ -1822,21 +1877,22 @@ function MainApp() {
             <Route path="/drivers">
               <DriversPage
                 drivers={driverList}
+                isLoading={driversLoading}
                 onUpdateAvailability={handleUpdateAvailability}
-                authToken={accessToken || undefined}
               />
             </Route>
             <Route path="/driver-availability">
               <DriversPage
                 drivers={driverList}
+                isLoading={driversLoading}
                 onUpdateAvailability={handleUpdateAvailability}
-                authToken={accessToken || undefined}
               />
             </Route>
             <Route path="/payments">
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
+                isLoading={paymentsLoading}
                 onOpenReceipt={(payment, trip) =>
                   setReceiptPayment({ payment, trip })
                 }
@@ -1846,6 +1902,7 @@ function MainApp() {
               <PaymentsPage
                 payments={paymentList}
                 trips={tripList}
+                isLoading={paymentsLoading}
                 onOpenReceipt={(payment, trip) =>
                   setReceiptPayment({ payment, trip })
                 }
@@ -1855,6 +1912,7 @@ function MainApp() {
               <ExpensesPage
                 expenses={expenseList}
                 trips={tripList}
+                isLoading={expensesLoading}
                 onApprove={handleApproveExpense}
                 onReject={handleRejectExpense}
               />
@@ -1878,12 +1936,13 @@ function MainApp() {
                 notifications={notificationList.filter(
                   (n: any) => n.audience === "owner",
                 )}
+                isLoading={notificationsLoading}
                 onMarkRead={handleMarkNotificationRead}
                 onMarkAllRead={handleMarkAllNotificationsRead}
               />
             </Route>
             <Route path="/audit-logs">
-              <AuditLogsPage logs={auditLogList} />
+              <AuditLogsPage logs={auditLogList} isLoading={auditLogsLoading} />
             </Route>
             <Route path="/settings">
               <SettingsPage
@@ -1934,8 +1993,8 @@ function MainApp() {
         onClose={() => setCancelTrip(null)}
         trip={cancelTrip}
         onTripCancelled={() => {
-          qc.invalidateQueries({ queryKey: ["trips"] });
-          qc.invalidateQueries({ queryKey: ["dashboard"] });
+          qc.invalidateQueries({ queryKey: ["/api/trips"] });
+          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
         }}
       />
 
@@ -1944,9 +2003,9 @@ function MainApp() {
         onClose={() => setPaymentRecordTrip(null)}
         trip={paymentRecordTrip}
         onPaymentRecorded={() => {
-          qc.invalidateQueries({ queryKey: ["trips"] });
-          qc.invalidateQueries({ queryKey: ["payments"] });
-          qc.invalidateQueries({ queryKey: ["dashboard"] });
+          qc.invalidateQueries({ queryKey: ["/api/trips"] });
+          qc.invalidateQueries({ queryKey: ["/api/payments"] });
+          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
         }}
       />
 
@@ -1957,10 +2016,11 @@ function MainApp() {
           trip={driverKmTrip.trip}
           mode={driverKmTrip.mode}
           onSuccess={() => {
-            qc.invalidateQueries({ queryKey: ["trips"] });
-            qc.invalidateQueries({ queryKey: ["driver-today"] });
-            qc.invalidateQueries({ queryKey: ["driver-current"] });
-            qc.invalidateQueries({ queryKey: ["dashboard"] });
+            qc.invalidateQueries({ queryKey: ["/api/trips"] });
+            qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
+            qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
+            qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+            qc.invalidateQueries({ queryKey: ["/api/drivers"] });
           }}
         />
       )}
@@ -1971,7 +2031,7 @@ function MainApp() {
           onClose={() => setDriverExpenseTripId(null)}
           tripId={driverExpenseTripId}
           onExpenseAdded={() => {
-            qc.invalidateQueries({ queryKey: ["expenses"] });
+            qc.invalidateQueries({ queryKey: ["/api/expenses"] });
           }}
         />
       )}
@@ -1982,16 +2042,18 @@ function MainApp() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <LocalAuthProvider>
-            <Router base={basePath}>
-              <MainApp />
-            </Router>
-          </LocalAuthProvider>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <LocalAuthProvider>
+              <Router base={basePath}>
+                <MainApp />
+              </Router>
+            </LocalAuthProvider>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

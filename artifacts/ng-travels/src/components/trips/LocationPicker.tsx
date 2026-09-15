@@ -30,8 +30,8 @@ interface LocationPickerProps {
 }
 
 const ACCENT = {
-  emerald: { text: "text-emerald-400", ring: "focus-visible:ring-emerald-400", tabActive: "bg-emerald-400 text-zinc-950", border: "border-emerald-500/40" },
-  amber: { text: "text-amber-400", ring: "focus-visible:ring-amber-400", tabActive: "bg-amber-400 text-zinc-950", border: "border-amber-500/40" },
+  emerald: { text: "text-emerald-700 dark:text-emerald-400", ring: "focus-visible:ring-emerald-400", tabActive: "bg-emerald-400 text-zinc-950", border: "border-emerald-300 dark:border-emerald-500/40" },
+  amber: { text: "text-amber-700 dark:text-amber-400", ring: "focus-visible:ring-amber-400", tabActive: "bg-amber-400 text-zinc-950", border: "border-amber-300 dark:border-amber-500/40" },
 } as const;
 
 type Mode = "search" | "map" | "coords";
@@ -146,6 +146,49 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   const [mapResolving, setMapResolving] = useState(false);
   const [pinCoords, setPinCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+  // --- In-map search state (find a place, then drop/move the pin on it) ---
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [mapSuggestions, setMapSuggestions] = useState<any[]>([]);
+  const [mapSearching, setMapSearching] = useState(false);
+  const mapSearchBoxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mode !== "map") return;
+    if (!mapSearchQuery || mapSearchQuery.length < 2) {
+      setMapSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setMapSearching(true);
+      try {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(mapSearchQuery)}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        setMapSuggestions(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        if (err.name !== "AbortError") setMapSuggestions([]);
+      } finally {
+        setMapSearching(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [mapSearchQuery, mode]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mapSearchBoxRef.current && !mapSearchBoxRef.current.contains(e.target as Node)) {
+        setMapSuggestions([]);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const reverseGeocodePin = async (lat: number, lng: number) => {
     setMapResolving(true);
     try {
@@ -182,6 +225,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         reverseGeocodePin(pos.lat, pos.lng);
       });
     }
+    // The map container can be resized/repositioned by surrounding layout (e.g. a
+    // multi-step wizard dialog) after Leaflet first measured it — refresh its cached
+    // size before panning, or setView can silently compute the wrong pixel offset
+    // and the view will look like it never moved.
+    mapInstanceRef.current.invalidateSize();
     mapInstanceRef.current.setView([lat, lng], Math.max(mapInstanceRef.current.getZoom(), 13));
   };
 
@@ -189,7 +237,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     if (mode !== "map" || !mapContainerRef.current || mapInstanceRef.current) return;
     const startLat = 12.9716, startLng = 77.5946; // Bengaluru default center
     const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: false }).setView([startLat, startLng], 11);
-    L.tileLayer(`https://maps.geoapify.com/v1/tile/dark-matter-purple-roads/{z}/{x}/{y}.png?apiKey=fccc330705934d6abd2be56e77dff380`, {
+    L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=fccc330705934d6abd2be56e77dff380`, {
       maxZoom: 20,
     }).addTo(map);
     map.on("click", (e: L.LeafletMouseEvent) => {
@@ -198,13 +246,28 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     });
     mapInstanceRef.current = map;
 
+    // Re-measure once the surrounding layout (dialog animation, wizard step
+    // transition) has settled, so Leaflet doesn't cache a stale container size.
+    const resizeTimer = setTimeout(() => map.invalidateSize(), 250);
+
     return () => {
+      clearTimeout(resizeTimer);
       map.remove();
       mapInstanceRef.current = null;
       markerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  const pickMapSuggestion = (place: any) => {
+    setMapSearchQuery("");
+    setMapSuggestions([]);
+    if (typeof place.lat === "number" && typeof place.lng === "number") {
+      placeMarker(place.lat, place.lng);
+    }
+    onInputChange(place.formattedAddress || place.name);
+    onSelect(place);
+  };
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
@@ -231,17 +294,17 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   return (
     <div className="space-y-1.5 relative" ref={boxRef}>
       <div className="flex items-center justify-between gap-2">
-        <label className={`text-xs font-semibold text-zinc-300 flex items-center gap-1.5`}>
+        <label className={`text-xs font-semibold text-foreground flex items-center gap-1.5`}>
           <MapPin className={`w-3.5 h-3.5 ${colors.text}`} /> {label}
         </label>
-        <div className="flex gap-0.5 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+        <div className="flex gap-0.5 bg-background border border-border rounded-lg p-0.5">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setMode(t.id)}
               className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
-                mode === t.id ? colors.tabActive : "text-zinc-500 hover:text-zinc-300"
+                mode === t.id ? colors.tabActive : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t.icon}
@@ -259,19 +322,19 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             onChange={(e) => {
               onInputChange(e.target.value);
             }}
-            className={`bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500 ${colors.ring}`}
+            className={`bg-card border-border text-xs h-10 placeholder:text-muted-foreground ${colors.ring}`}
           />
-          {searching && <span className="text-[10px] text-zinc-500 absolute right-3 top-3">Searching...</span>}
+          {searching && <span className="text-[10px] text-muted-foreground absolute right-3 top-3">Searching...</span>}
           {suggestions.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 top-11 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 top-11 bg-card border border-border rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
               {suggestions.map((place, idx) => (
                 <div
                   key={idx}
                   onClick={() => pickSuggestion(place)}
-                  className="p-2.5 hover:bg-zinc-800 text-xs text-zinc-200 cursor-pointer border-b border-zinc-800/60 last:border-0"
+                  className="p-2.5 hover:bg-muted text-xs text-foreground cursor-pointer border-b border-border/60 last:border-0"
                 >
                   <div className="font-semibold">{place.name}</div>
-                  <div className="text-[10px] text-zinc-400 truncate">{place.formattedAddress}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">{place.formattedAddress}</div>
                 </div>
               ))}
             </div>
@@ -287,24 +350,24 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               value={coordsInput}
               onChange={(e) => setCoordsInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleResolveLocation()}
-              className={`bg-zinc-900 border-zinc-800 text-xs h-10 placeholder:text-zinc-500 ${colors.ring}`}
+              className={`bg-card border-border text-xs h-10 placeholder:text-muted-foreground ${colors.ring}`}
             />
             <Button
               type="button"
               onClick={handleResolveLocation}
               disabled={resolving || !coordsInput.trim()}
-              className="h-10 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 shrink-0"
+              className="h-10 px-3 bg-muted hover:bg-muted text-foreground shrink-0"
             >
               {resolving ? <Loader className="w-3.5 h-3.5 animate-spin" /> : "Locate"}
             </Button>
           </div>
           {resolveError && (
-            <div className="text-[10px] text-rose-400 flex items-center gap-1">
+            <div className="text-[10px] text-rose-700 dark:text-rose-400 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" /> {resolveError}
             </div>
           )}
           {value && !resolveError && (
-            <div className="text-[10px] text-zinc-400 truncate">Current: {value}</div>
+            <div className="text-[10px] text-muted-foreground truncate">Current: {value}</div>
           )}
         </div>
       )}
@@ -312,24 +375,54 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       {mode === "map" && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-zinc-500">Click or drag the pin to set the exact spot</span>
+            <span className="text-[10px] text-muted-foreground">Type &amp; press Enter, pick a result, click, or drag the pin</span>
             <Button
               type="button"
               size="sm"
               variant="outline"
               onClick={useMyLocation}
-              className="h-6 px-2 text-[10px] border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              className="h-6 px-2 text-[10px] border-border text-foreground hover:bg-muted"
             >
               <LocateFixed className="w-3 h-3 mr-1" /> My Location
             </Button>
           </div>
+          <div className="relative" ref={mapSearchBoxRef}>
+            <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${colors.text}`} strokeWidth={2.5} />
+            <Input
+              placeholder="Find a place on the map (e.g. a city, landmark, or address)..."
+              value={mapSearchQuery}
+              onChange={(e) => setMapSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && mapSuggestions.length > 0) {
+                  e.preventDefault();
+                  pickMapSuggestion(mapSuggestions[0]);
+                }
+              }}
+              className={`bg-card border-border text-xs h-9 pl-9 placeholder:text-muted-foreground ${colors.ring}`}
+            />
+            {mapSearching && <span className="text-[10px] text-muted-foreground absolute right-3 top-2.5">Searching...</span>}
+            {mapSuggestions.length > 0 && (
+              <div className="absolute z-30 left-0 right-0 top-10 bg-card border border-border rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
+                {mapSuggestions.map((place, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => pickMapSuggestion(place)}
+                    className="p-2.5 hover:bg-muted text-xs text-foreground cursor-pointer border-b border-border/60 last:border-0"
+                  >
+                    <div className="font-semibold">{place.name}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{place.formattedAddress}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div
             ref={mapContainerRef}
-            className={`w-full h-48 rounded-xl border ${colors.border} overflow-hidden bg-zinc-900`}
+            className={`relative isolate z-0 w-full h-48 rounded-xl border ${colors.border} overflow-hidden bg-card`}
           />
-          {mapResolving && <div className="text-[10px] text-zinc-500">Resolving address...</div>}
+          {mapResolving && <div className="text-[10px] text-muted-foreground">Resolving address...</div>}
           {pinCoords && !mapResolving && (
-            <div className="text-[10px] text-zinc-400 truncate">
+            <div className="text-[10px] text-muted-foreground truncate">
               {value || `${pinCoords.lat.toFixed(5)}, ${pinCoords.lng.toFixed(5)}`}
             </div>
           )}

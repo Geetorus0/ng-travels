@@ -3,15 +3,18 @@ import { FileQuestion, Plus, Search, Phone, Mail, MapPin, Calendar, ArrowRight, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/fareEngine";
+import { NGTravelsLoader } from "@/components/loading";
 
 interface EnquiriesPageProps {
   enquiries: any[];
+  isLoading?: boolean;
   onOpenCreateEnquiry?: () => void;
   onConvertToTrip?: (enquiry: any) => void;
 }
 
 export const EnquiriesPage: React.FC<EnquiriesPageProps> = ({
   enquiries = [],
+  isLoading = false,
   onOpenCreateEnquiry,
   onConvertToTrip,
 }) => {
@@ -35,11 +38,11 @@ export const EnquiriesPage: React.FC<EnquiriesPageProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <FileQuestion className="w-5 h-5 text-amber-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <FileQuestion className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Customer Enquiries & Quotations Pipeline
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Track prospective client quotes, travel requirements, and convert enquiries directly into confirmed bookings.
           </p>
         </div>
@@ -54,52 +57,61 @@ export const EnquiriesPage: React.FC<EnquiriesPageProps> = ({
         )}
       </div>
 
-      <div className="relative bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
-        <Search className="w-4 h-4 text-zinc-500 absolute left-7 top-6.5" />
+      <div className="relative bg-card/60 p-4 rounded-xl border border-border">
+        <Search className="w-4 h-4 text-muted-foreground absolute left-7 top-6.5" />
         <Input
           placeholder="Search enquiries by client name, mobile, destination or quote ID..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="bg-zinc-900 border-zinc-800 pl-10 text-xs"
+          className="bg-card border-border pl-10 text-xs"
         />
       </div>
 
+      {isLoading && enquiryList.length === 0 ? (
+        <div className="p-12 flex justify-center bg-card/50 rounded-2xl border border-border">
+          <NGTravelsLoader size="sm" text="Loading enquiries..." />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-12 text-center bg-card/50 rounded-2xl border border-border text-muted-foreground text-xs">
+          {enquiryList.length === 0 ? "No enquiries recorded yet." : "No enquiries match your search."}
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filtered.map((enq: any) => (
           <div
             key={enq.id}
-            className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-5 space-y-4 hover:border-zinc-700 transition-all shadow-md"
+            className="bg-card/70 border border-border rounded-xl p-5 space-y-4 hover:border-border transition-all shadow-md"
           >
             <div className="flex justify-between items-start">
               <div>
-                <span className="font-mono text-[11px] text-amber-400 font-bold">{enq.enquiryCode}</span>
-                <h3 className="font-bold text-base text-zinc-100 mt-0.5">{enq.customerName}</h3>
-                <span className="text-xs text-zinc-400">{enq.customerMobile}</span>
+                <span className="font-mono text-[11px] text-amber-700 dark:text-amber-400 font-bold">{enq.enquiryCode}</span>
+                <h3 className="font-bold text-base text-foreground mt-0.5">{enq.customerName}</h3>
+                <span className="text-xs text-muted-foreground">{enq.customerMobile}</span>
               </div>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
-                enq.status === "converted" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                enq.status === "quoted" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                enq.status === "lost" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" :
-                "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                enq.status === "converted" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" :
+                enq.status === "quoted" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30" :
+                enq.status === "lost" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30" :
+                "bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-500/30"
               }`}>
                 {enq.status}
               </span>
             </div>
 
-            <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 space-y-1.5 text-xs">
-              <div className="text-zinc-300 font-medium">
+            <div className="bg-background/60 p-3 rounded-lg border border-border/80 space-y-1.5 text-xs">
+              <div className="text-foreground font-medium">
                 Route: {enq.pickup} ➔ {enq.destination}
               </div>
-              <div className="text-zinc-500">
+              <div className="text-muted-foreground">
                 Date: {enq.startDate} • {enq.passengerCount} Pax • {(enq.tripType || "").replaceAll("_", " ")}
               </div>
-              {enq.notes && <div className="text-zinc-400 italic pt-1 text-[11px]">Note: {enq.notes}</div>}
+              {enq.notes && <div className="text-muted-foreground italic pt-1 text-[11px]">Note: {enq.notes}</div>}
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-zinc-800 text-xs">
+            <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
               <div>
-                <span className="text-zinc-500 text-[10px] block">Quoted Fare</span>
-                <span className="font-mono font-bold text-emerald-400 text-base">
+                <span className="text-muted-foreground text-[10px] block">Quoted Fare</span>
+                <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-base">
                   {enq.quotedFare ? formatINR(enq.quotedFare) : "Pending Quote"}
                 </span>
               </div>
@@ -117,6 +129,7 @@ export const EnquiriesPage: React.FC<EnquiriesPageProps> = ({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };

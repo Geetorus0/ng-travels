@@ -87,28 +87,28 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
       )}
 
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-sm bg-zinc-950 text-zinc-100 border-zinc-800 p-5 rounded-xl">
+        <DialogContent className="max-w-sm bg-background text-foreground border-border p-5 rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-zinc-100 flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-amber-400" />
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-amber-700 dark:text-amber-400" />
               {mode === "start" ? "Enter Starting Odometer KM" : "Enter Ending Odometer KM"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-2 text-xs">
-            <div className="bg-zinc-900/60 p-3 rounded-lg border border-zinc-800 space-y-1">
-              <div className="text-zinc-400">Booking: <span className="font-mono text-amber-400 font-bold">{trip.bookingId}</span></div>
-              <div className="text-zinc-300 font-medium">{trip.pickup?.name} ➔ {trip.destination?.name}</div>
+            <div className="bg-card/60 p-3 rounded-lg border border-border space-y-1">
+              <div className="text-muted-foreground">Booking: <span className="font-mono text-amber-700 dark:text-amber-400 font-bold">{trip.bookingId}</span></div>
+              <div className="text-foreground font-medium">{trip.pickup?.name} ➔ {trip.destination?.name}</div>
               {mode === "end" && (
-                <div className="text-zinc-400 pt-1 border-t border-zinc-800 flex justify-between">
+                <div className="text-muted-foreground pt-1 border-t border-border flex justify-between">
                   <span>Recorded Starting KM:</span>
-                  <span className="font-mono font-bold text-zinc-200">{startKm} km</span>
+                  <span className="font-mono font-bold text-foreground">{startKm} km</span>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="text-xs text-amber-400 font-semibold uppercase block mb-1.5">
+              <label className="text-xs text-amber-700 dark:text-amber-400 font-semibold uppercase block mb-1.5">
                 {mode === "start" ? "Starting Odometer Reading (KM)" : "Ending Odometer Reading (KM)"}
               </label>
               <Input
@@ -116,21 +116,21 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
                 value={kmValue}
                 onChange={(e) => setKmValue(e.target.value)}
                 placeholder="e.g. 82450"
-                className="bg-zinc-900 border-amber-500/50 text-xl font-mono font-bold text-amber-400 text-center py-6"
+                className="bg-card border-amber-300 dark:border-amber-500/50 text-xl font-mono font-bold text-amber-700 dark:text-amber-400 text-center py-6"
               />
             </div>
 
             {mode === "end" && (
-              <div className="bg-amber-950/20 border border-amber-500/30 rounded-lg p-3 flex justify-between items-center text-xs">
-                <span className="text-zinc-400">Calculated Actual KM:</span>
-                <span className="text-lg font-mono font-bold text-emerald-400">
+              <div className="bg-amber-950/20 border border-amber-300 dark:border-amber-500/30 rounded-lg p-3 flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Calculated Actual KM:</span>
+                <span className="text-lg font-mono font-bold text-emerald-700 dark:text-emerald-400">
                   {calculatedActual} km
                 </span>
               </div>
             )}
 
             {error && (
-              <div className="bg-rose-950/40 border border-rose-500/40 rounded p-2.5 text-xs text-rose-300 flex items-center gap-2">
+              <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 rounded p-2.5 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>

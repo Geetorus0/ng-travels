@@ -1,45 +1,80 @@
-import React from "react";
-import { Bell, CheckCheck, Clock, CheckCircle2, Navigation, CircleDollarSign, Fuel } from "lucide-react";
+import React, { useState } from "react";
+import { Bell, CheckCheck, Clock, CheckCircle2, Navigation, CircleDollarSign, Fuel, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NGTravelsLoader } from "@/components/loading";
 
 interface NotificationsPageProps {
   notifications: any[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  isLoading?: boolean;
+  onMarkRead: (id: number) => void | Promise<void>;
+  onMarkAllRead: () => void | Promise<void>;
 }
 
 export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   notifications = [],
+  isLoading = false,
   onMarkRead,
   onMarkAllRead,
 }) => {
   const notifList = Array.isArray(notifications) ? notifications : (Array.isArray((notifications as any)?.items) ? (notifications as any).items : []);
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
+
+  const handleMarkRead = async (id: number) => {
+    if (pendingId) return;
+    setPendingId(id);
+    try {
+      await onMarkRead(id);
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      await onMarkAllRead();
+    } finally {
+      setMarkingAll(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-amber-400" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Bell className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             Operations Alerts & Notifications
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Real-time feed of driver milestone updates, new booking confirmations, and expense submissions.
           </p>
         </div>
         <Button
           size="sm"
           variant="outline"
-          onClick={onMarkAllRead}
-          className="border-zinc-800 text-xs text-zinc-300 hover:bg-zinc-800"
+          onClick={handleMarkAllRead}
+          disabled={markingAll}
+          className="border-border text-xs text-foreground hover:bg-muted"
         >
-          <CheckCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" /> Mark All as Read
+          {markingAll ? (
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <CheckCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-700 dark:text-emerald-400" />
+          )}
+          Mark All as Read
         </Button>
       </div>
 
       <div className="space-y-3">
-        {notifList.length === 0 ? (
-          <div className="bg-zinc-900/60 p-12 text-center text-zinc-500 rounded-xl border border-zinc-800 text-xs">
+        {isLoading && notifList.length === 0 ? (
+          <div className="bg-card/60 p-12 flex justify-center rounded-xl border border-border">
+            <NGTravelsLoader size="sm" text="Loading notifications..." />
+          </div>
+        ) : notifList.length === 0 ? (
+          <div className="bg-card/60 p-12 text-center text-muted-foreground rounded-xl border border-border text-xs">
             No notifications in your inbox.
           </div>
         ) : (
@@ -58,13 +93,13 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                 key={notif.id}
                 className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all ${
                   notif.isRead
-                    ? "bg-zinc-900/40 border-zinc-800/80 text-zinc-400"
-                    : "bg-zinc-900/90 border-amber-500/40 text-zinc-100 shadow-md ring-1 ring-amber-500/20"
+                    ? "bg-card/40 border-border/80 text-muted-foreground"
+                    : "bg-card/90 border-amber-300 dark:border-amber-500/40 text-foreground shadow-md ring-1 ring-amber-500/20"
                 }`}
               >
                 <div className="flex items-center gap-3.5">
                   <div className={`p-2.5 rounded-xl ${
-                    notif.isRead ? "bg-zinc-800 text-zinc-500" : "bg-amber-400 text-zinc-950 font-bold"
+                    notif.isRead ? "bg-muted text-muted-foreground" : "bg-amber-400 text-zinc-950 font-bold"
                   }`}>
                     {notif.kind?.includes("payment") ? (
                       <CircleDollarSign className="w-5 h-5" />
@@ -75,9 +110,9 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                     )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-zinc-100">{notif.title}</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">{notif.message}</p>
-                    <span className="text-[10px] text-zinc-500 font-mono mt-1 block">
+                    <h3 className="font-bold text-sm text-foreground">{notif.title}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">{notif.message}</p>
+                    <span className="text-[10px] text-muted-foreground font-mono mt-1 block">
                       {dateStr} at {timeStr}
                     </span>
                   </div>
@@ -87,10 +122,15 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => onMarkRead(notif.id)}
-                    className="text-xs text-amber-400 hover:bg-amber-950/30"
+                    onClick={() => handleMarkRead(notif.id)}
+                    disabled={pendingId === notif.id}
+                    className="text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-950/30"
                   >
-                    Mark read
+                    {pendingId === notif.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      "Mark read"
+                    )}
                   </Button>
                 )}
               </div>
