@@ -17,7 +17,7 @@ import {
 import {
   User, Calendar, Navigation, IndianRupee, ShieldCheck, CheckCircle2,
   Plus, Trash2, ArrowRight, ArrowLeft, Sparkles, AlertTriangle,
-  Clock, Car, Search, Calculator, Receipt, CreditCard
+  Clock, Car, Search, Calculator, Receipt, CreditCard, MapPin
 } from "lucide-react";
 import { TripActionLoader, ButtonLoader } from "@/components/loading";
 
@@ -30,6 +30,10 @@ export interface CreateTripModalProps {
   defaultRate?: number;
   defaultBillingDayPolicy?: "CALENDAR_DAYS" | "24_HOUR_PERIODS";
   initialEnquiry?: any;
+  // Present -> the wizard edits this existing trip (PATCH) instead of
+  // creating a new one (POST). Only meant to be passed for a trip that
+  // hasn't started yet — the caller is responsible for that check.
+  editingTrip?: any;
 }
 
 const WIZARD_STEPS = [
@@ -49,7 +53,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   defaultRate = 18,
   defaultBillingDayPolicy = "CALENDAR_DAYS",
   initialEnquiry,
+  editingTrip,
 }) => {
+  const isEditing = Boolean(editingTrip);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -78,8 +84,11 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const [destInput, setDestInput] = useState("");
   const [destLocation, setDestLocation] = useState<any>(null);
 
-  const [stops, setStops] = useState<{ name: string; address: string }[]>([]);
+  const [stops, setStops] = useState<any[]>([]);
   const [stopInput, setStopInput] = useState("");
+  const [stopSuggestions, setStopSuggestions] = useState<any[]>([]);
+  const [stopSearching, setStopSearching] = useState(false);
+  const stopSearchBoxRef = React.useRef<HTMLDivElement>(null);
 
   // Real-time Road Distance in KM (Directly editable & optional auto-estimate)
   const [distanceKm, setDistanceKm] = useState<number>(0);
@@ -95,10 +104,16 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const [returnDurationMinutes, setReturnDurationMinutes] = useState(0);
   const [estimatedToll, setEstimatedToll] = useState(0);
   const [tollStatus, setTollStatus] = useState("");
+  const [tollRateMode, setTollRateMode] = useState<"single" | "round_trip_same_day" | "round_trip_multi_day" | null>(null);
+  const [routeOptions, setRouteOptions] = useState<any[]>([]);
+  const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
+  // Toll plazas matched along the primary (with-toll) route only — the
+  // toll-free alternative has none, so this isn't re-fetched per option,
+  // just hidden when that option is selected (see `displayedTollPlazas`).
+  const [primaryTollPlazas, setPrimaryTollPlazas] = useState<any[]>([]);
 
   // Step 4: Commercial Pricing Parameters
   const [ratePerKm, setRatePerKm] = useState(defaultRate);
-  const [nightBata, setNightBata] = useState(0);
   const [finalToll, setFinalToll] = useState(0);
   const [parking, setParking] = useState(0);
   const [permitCharge, setPermitCharge] = useState(0);
@@ -135,12 +150,12 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     ? (rawVehicles as any).items
     : [];
 
-  // Optional: Auto-Estimate Distance from Driving Network in background
-  const handleAutoEstimateDistance = async () => {
-    if (!pickupInput.trim() || !destInput.trim()) {
-      alert("Please enter both pickup and destination places to estimate distance.");
-      return;
-    }
+  // Core route (re)calculation — silent, no alerts, safe to call automatically
+  // whenever the pins on the map change (pickup/destination picked, or a
+  // stop added/removed). handleAutoEstimateDistance below is the explicit
+  // button click, which validates first and shows an alert if incomplete.
+  const recalcRoute = async () => {
+    if (!pickupInput.trim() || !destInput.trim()) return;
     setCalculatingDistance(true);
     try {
       const pLoc = pickupLocation || { name: pickupInput, address: pickupInput };
@@ -153,6 +168,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           destination: dLoc,
           stops,
           tripType,
+          startDate,
+          startTime,
+          returnDate: tripType.toLowerCase().includes("round") ? returnDate : null,
+          returnTime: tripType.toLowerCase().includes("round") ? returnTime : null,
         }),
       });
       if (res.ok) {
@@ -164,10 +183,12 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           setDistanceKm(totKm);
           setOutboundKm(outKm || totKm);
           setReturnKm(retKm || 0);
-          if (data.estimatedToll && finalToll === 0) {
-            setFinalToll(data.estimatedToll);
-          }
         }
+        // A fresh estimate always replaces the toll figure from whatever
+        // pickup/drop combination was estimated before — otherwise changing
+        // the locations and re-estimating silently keeps stale toll from
+        // the previous route.
+        setFinalToll(Number(data.estimatedToll || 0));
         setRouteCoordinates(data.routeCoordinates || []);
         setOutboundCoordinates(data.outboundCoordinates || []);
         setReturnCoordinates(data.returnCoordinates || []);
@@ -175,12 +196,81 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         setReturnDurationMinutes(Number(data.returnDurationMinutes || 0));
         setEstimatedToll(Number(data.estimatedToll || 0));
         setTollStatus(data.tollStatus || "");
+        setTollRateMode(data.tollRateMode || null);
+        setRouteOptions(Array.isArray(data.routes) ? data.routes : []);
+        setSelectedRouteIdx(0);
+        setPrimaryTollPlazas(Array.isArray(data.tollPlazas) ? data.tollPlazas : []);
+
+        // The map preview needs real coordinates to place pins correctly.
+        // If the user typed a place without picking a specific autocomplete
+        // suggestion, pickupLocation/destLocation stay null — but the server
+        // still geocodes the typed text to compute the route, so pick up
+        // those resolved coordinates here rather than let the map guess.
+        if (!pickupLocation && data.resolvedPickup?.lat && data.resolvedPickup?.lng) {
+          setPickupLocation({
+            name: data.resolvedPickup.name || pickupInput,
+            formattedAddress: data.resolvedPickup.formattedAddress || pickupInput,
+            lat: data.resolvedPickup.lat,
+            lng: data.resolvedPickup.lng,
+            latitude: data.resolvedPickup.lat,
+            longitude: data.resolvedPickup.lng,
+          });
+        }
+        if (!destLocation && data.resolvedDestination?.lat && data.resolvedDestination?.lng) {
+          setDestLocation({
+            name: data.resolvedDestination.name || destInput,
+            formattedAddress: data.resolvedDestination.formattedAddress || destInput,
+            lat: data.resolvedDestination.lat,
+            lng: data.resolvedDestination.lng,
+            latitude: data.resolvedDestination.lat,
+            longitude: data.resolvedDestination.lng,
+          });
+        }
       }
     } catch (err) {
       console.warn("Background distance calculation unavailable, enter KM manually:", err);
     } finally {
       setCalculatingDistance(false);
     }
+  };
+
+  const handleAutoEstimateDistance = async () => {
+    if (!pickupInput.trim() || !destInput.trim()) {
+      alert("Please enter both pickup and destination places to estimate distance.");
+      return;
+    }
+    await recalcRoute();
+  };
+
+  // Re-run route calculation automatically whenever the stops actually
+  // pinned on the map change — adding/removing a waypoint should redraw the
+  // route through it immediately, not wait for a manual re-estimate click.
+  // A stop typed free-text with no coordinates can't be routed through, so
+  // it doesn't trigger this (recalcRoute would just retrace the same road).
+  const stopsRouteKey = stops
+    .filter((s) => s.lat || s.latitude)
+    .map((s) => `${s.lat ?? s.latitude},${s.lng ?? s.longitude}`)
+    .join("|");
+  useEffect(() => {
+    recalcRoute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopsRouteKey]);
+
+  // Switch between the fastest (toll) route and the toll-free alternative,
+  // updating billed distance, toll charge and the map preview to match.
+  const handleSelectRouteOption = (idx: number) => {
+    const opt = routeOptions[idx];
+    if (!opt) return;
+    setSelectedRouteIdx(idx);
+    setDistanceKm(Math.round(opt.distanceKm));
+    setOutboundKm(0);
+    setReturnKm(0);
+    setFinalToll(opt.estimatedToll || 0);
+    setEstimatedToll(opt.estimatedToll || 0);
+    setOutboundCoordinates(opt.polylineCoordinates || []);
+    setReturnCoordinates([]);
+    setOutboundDurationMinutes(opt.durationMinutes || 0);
+    setReturnDurationMinutes(0);
   };
 
   // Sync enquiry data if provided
@@ -203,18 +293,186 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     }
   }, [initialEnquiry]);
 
-  // Reset defaults on modal open
+  // Populate the wizard from an existing trip when editing, or reset it to a
+  // blank slate for a brand-new booking — the modal stays mounted between
+  // opens (its `isOpen` prop just toggles visibility), so without this,
+  // whatever was last typed (or the trip last edited) would still be sitting
+  // in state the next time it opens.
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    setStep(1);
+
+    if (editingTrip) {
+      const toDateStr = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+      const toLocation = (loc: any) =>
+        loc
+          ? {
+              name: loc.name,
+              address: loc.address,
+              formattedAddress: loc.address,
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              lat: loc.latitude,
+              lng: loc.longitude,
+              placeId: loc.placeId,
+            }
+          : null;
+
+      setSelectedCustomerId(editingTrip.customerId ?? null);
+      setIsCreatingNewCustomer(false);
+
+      setTripType(editingTrip.tripType || "single_trip");
+      setStartDate(toDateStr(editingTrip.startDate) || new Date().toISOString().slice(0, 10));
+      setStartTime(editingTrip.startTime || "08:00");
+      setReturnDate(toDateStr(editingTrip.returnDate) || new Date().toISOString().slice(0, 10));
+      setReturnTime(editingTrip.returnTime || "20:00");
+      setPassengerCount(editingTrip.passengerCount || 1);
+      setNotes(editingTrip.notes || "");
+      setSpecialInstructions(editingTrip.specialInstructions || "");
+
+      setPickupInput(editingTrip.pickup?.address || editingTrip.pickup?.name || "");
+      setPickupLocation(toLocation(editingTrip.pickup));
+      setDestInput(editingTrip.destination?.address || editingTrip.destination?.name || "");
+      setDestLocation(toLocation(editingTrip.destination));
+      setStops(
+        Array.isArray(editingTrip.stops)
+          ? editingTrip.stops.map((s: any) => toLocation(s) || { name: s.name, address: s.address })
+          : [],
+      );
+
+      setDistanceKm(Number(editingTrip.totalMapKm || editingTrip.mapDistanceKm || 0));
+      setOutboundKm(Number(editingTrip.outboundMapKm || 0));
+      setReturnKm(Number(editingTrip.returnMapKm || 0));
+      setOutboundDurationMinutes(Number(editingTrip.outboundDurationMinutes || 0));
+      setReturnDurationMinutes(Number(editingTrip.returnDurationMinutes || 0));
+
+      setRatePerKm(Number(editingTrip.ratePerKm || defaultRate));
+      setFinalToll(Number(editingTrip.finalToll || editingTrip.toll || 0));
+      setParking(Number(editingTrip.parking || 0));
+      setPermitCharge(Number(editingTrip.permitCharge || 0));
+      setWaitingCharge(Number(editingTrip.waitingCharge || 0));
+      setNightCharge(Number(editingTrip.nightCharge || 0));
+      setDiscount(Number(editingTrip.discount || 0));
+      setTaxPercent(Number(editingTrip.taxPercent || 0));
+      setBillingDayPolicy(editingTrip.billingDayPolicy || defaultBillingDayPolicy);
+
+      setSelectedDriverId(editingTrip.driverId ?? null);
+      setSelectedVehicleId(editingTrip.vehicleId ?? null);
+      // Advance/payment collection is handled by the dedicated Record Payment
+      // flow, not re-run here — editing a trip must never silently log a
+      // second advance payment.
+      setAdvanceAmount(0);
+    } else {
+      setSelectedCustomerId(null);
+      setNewCustomerName("");
+      setNewCustomerMobile("");
+      setNewCustomerWhatsapp("");
+      setNewCustomerAddress("");
+      setIsCreatingNewCustomer(false);
+      setCustomerSearch("");
+
+      setTripType("single_trip");
+      setStartDate(new Date().toISOString().slice(0, 10));
+      setStartTime("08:00");
+      setReturnDate(new Date().toISOString().slice(0, 10));
+      setReturnTime("20:00");
+      setPassengerCount(1);
+      setNotes("");
+      setSpecialInstructions("");
+
+      setPickupInput("");
+      setPickupLocation(null);
+      setDestInput("");
+      setDestLocation(null);
+      setStops([]);
+
+      setDistanceKm(0);
+      setOutboundKm(0);
+      setReturnKm(0);
+      setRouteCoordinates([]);
+      setOutboundCoordinates([]);
+      setReturnCoordinates([]);
+      setOutboundDurationMinutes(0);
+      setReturnDurationMinutes(0);
+      setEstimatedToll(0);
+      setTollStatus("");
+      setTollRateMode(null);
+      setRouteOptions([]);
+      setSelectedRouteIdx(0);
+      setPrimaryTollPlazas([]);
+
       setRatePerKm(defaultRate);
+      setFinalToll(0);
+      setParking(0);
+      setPermitCharge(0);
+      setWaitingCharge(0);
+      setNightCharge(0);
+      setDiscount(0);
+      setTaxPercent(0);
       setBillingDayPolicy(defaultBillingDayPolicy);
+
+      setSelectedDriverId(null);
+      setSelectedVehicleId(null);
+      setAdvanceAmount(0);
+      setPaymentMethod("UPI");
+      setPaymentReference("");
     }
-  }, [isOpen, defaultRate, defaultBillingDayPolicy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingTrip]);
+
+  // Waypoint search: live autocomplete for the "Add Stop" field, same
+  // endpoint the Pickup/Destination pickers use — previously this field
+  // took whatever text was typed with no geocoding, so a stop had no real
+  // coordinates and could never be routed through correctly or placed
+  // accurately on the map.
+  useEffect(() => {
+    if (!stopInput || stopInput.length < 2) {
+      setStopSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setStopSearching(true);
+      try {
+        const res = await apiFetch(`/api/maps/places/autocomplete?input=${encodeURIComponent(stopInput)}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        setStopSuggestions(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        if (err.name !== "AbortError") setStopSuggestions([]);
+      } finally {
+        setStopSearching(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [stopInput]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (stopSearchBoxRef.current && !stopSearchBoxRef.current.contains(e.target as Node)) {
+        setStopSuggestions([]);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // The toll-free alternative (routeOptions[1]) has no toll plazas by definition
+  const displayedTollPlazas = selectedRouteIdx === 0 ? primaryTollPlazas : [];
 
   // 100% Dynamic, Authoritative Commercial Fare Calculation
   const isRound = tripType.toLowerCase().includes("round");
   const effectiveOutboundKm = outboundKm > 0 ? outboundKm : (isRound ? Math.round(distanceKm / 2) : distanceKm);
   const effectiveReturnKm = returnKm > 0 ? returnKm : (isRound ? Math.round(distanceKm / 2) : 0);
+  // Editing never collects a new advance here (that's the separate Record
+  // Payment flow) — the running balance instead has to reflect whatever was
+  // already actually paid on this trip so it doesn't look like a fresh,
+  // fully-unpaid booking.
+  const totalPaidForCalc = isEditing ? Number(editingTrip?.totalPaid || 0) : advanceAmount;
 
   const commercialFare = calculateCommercialFare({
     tripType,
@@ -229,7 +487,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     billingDayPolicy,
     minimumKmPerDay: 0,
     driverBataPerDay: 0,
-    nightBata,
     permitCharge,
     toll: finalToll,
     tollAvailable: finalToll > 0,
@@ -238,7 +495,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     nightCharges: nightCharge,
     discount,
     taxPercent,
-    totalPaid: advanceAmount,
+    totalPaid: totalPaidForCalc,
   });
 
   const baseFare = commercialFare.distanceFare;
@@ -274,11 +531,34 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     setStep((prev) => Math.max(prev - 1, 1));
   };
 
+  // Adds whatever the user typed as a plain-text waypoint (no coordinates) —
+  // used only as a fallback when they type-and-Enter without picking a
+  // suggestion. Picking a suggestion instead goes through
+  // handleSelectStopSuggestion, which carries real lat/lng so the stop can
+  // actually be routed through and pinned on the map.
   const handleAddStop = () => {
     if (stopInput.trim()) {
       setStops([...stops, { name: stopInput.trim(), address: stopInput.trim() }]);
       setStopInput("");
+      setStopSuggestions([]);
     }
+  };
+
+  const handleSelectStopSuggestion = (place: any) => {
+    setStops([
+      ...stops,
+      {
+        name: place.name,
+        address: place.formattedAddress || place.name,
+        lat: place.lat ?? place.latitude,
+        lng: place.lng ?? place.longitude,
+        latitude: place.latitude ?? place.lat,
+        longitude: place.longitude ?? place.lng,
+        placeId: place.placeId,
+      },
+    ]);
+    setStopInput("");
+    setStopSuggestions([]);
   };
 
   const handleRemoveStop = (idx: number) => {
@@ -311,65 +591,129 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         return;
       }
 
-      const payload = {
-        customerId,
-        tripType,
-        pickup: pickupLocation || { name: pickupInput, address: pickupInput },
-        destination: destLocation || { name: destInput, address: destInput },
-        stops,
-        startDate,
-        startTime,
-        returnDate: isRound ? returnDate : null,
-        returnTime: isRound ? returnTime : null,
-        passengerCount,
-        notes,
-        specialInstructions,
-        outboundMapKm: effectiveOutboundKm,
-        returnMapKm: effectiveReturnKm,
-        totalMapKm: distanceKm,
-        routeDurationMinutes: 0,
-        outboundDurationMinutes: 0,
-        returnDurationMinutes: 0,
-        routeSummary: `${pickupInput} ➔ ${destInput}`,
-        selectedRouteSummary: `${pickupInput} ➔ ${destInput}`,
-        routeOptions: [],
-        estimatedToll: finalToll,
-        billingKm: commercialFare.totalBillableDistance,
-        ratePerKm,
-        minimumKmPerDay: 0,
-        driverBataPerDay: 0,
-        nightBata,
-        billingDayPolicy,
-        finalToll,
-        parking,
-        permitCharge,
-        waitingCharge,
-        nightCharge,
-        discount,
-        taxPercent,
-        driverId: selectedDriverId,
-        vehicleId: selectedVehicleId,
-        advance: advanceAmount,
-        paymentMethod,
-        paymentReference,
-      };
+      let res: Response;
 
-      const res = await apiFetch("/api/trips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (isEditing) {
+        // PATCH /trips/:id just merges whatever fields it's given onto the
+        // row — unlike POST it does NOT recompute the fare, so the full,
+        // already-computed commercialFare breakdown has to be sent
+        // explicitly here rather than the raw inputs the create flow sends.
+        const selectedDriver = drivers.find((d: any) => d.id === selectedDriverId);
+        const selectedVehicle = vehicles.find((v: any) => v.id === selectedVehicleId);
+
+        const patchPayload = {
+          customerId,
+          tripType,
+          pickup: pickupLocation || { name: pickupInput, address: pickupInput },
+          destination: destLocation || { name: destInput, address: destInput },
+          stops,
+          startDate,
+          startTime,
+          returnDate: isRound ? returnDate : null,
+          returnTime: isRound ? returnTime : null,
+          passengerCount,
+          notes,
+          specialInstructions,
+          mapDistanceKm: String(commercialFare.totalRoadDistanceKm),
+          outboundMapKm: String(commercialFare.outboundDistanceKm),
+          returnMapKm: String(commercialFare.returnDistanceKm),
+          totalMapKm: String(commercialFare.totalRoadDistanceKm),
+          routeDurationMinutes: outboundDurationMinutes + returnDurationMinutes,
+          outboundDurationMinutes,
+          returnDurationMinutes,
+          routeSummary: `${pickupInput} ➔ ${destInput}`,
+          selectedRouteSummary: routeOptions[selectedRouteIdx]?.summary || `${pickupInput} ➔ ${destInput}`,
+          routeOptions,
+          apiEstimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
+          estimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
+          billingKm: String(commercialFare.totalBillableDistance),
+          ratePerKm: String(commercialFare.ratePerKm),
+          baseFare: String(commercialFare.distanceFare),
+          finalToll: String(commercialFare.toll),
+          toll: String(commercialFare.toll),
+          parking: String(commercialFare.parking),
+          permitCharge: String(commercialFare.permitCharge),
+          waitingCharge: String(commercialFare.waiting),
+          nightCharge: String(commercialFare.nightCharges),
+          discount: String(commercialFare.discount),
+          tax: String(commercialFare.tax),
+          billingDayPolicy,
+          customerTotal: String(commercialFare.customerTotal),
+          remainingBalance: String(commercialFare.remainingBalance),
+          credit: String(commercialFare.credit),
+          driverId: selectedDriverId,
+          driverName: selectedDriver?.name || null,
+          driverMobile: selectedDriver?.mobile || null,
+          vehicleId: selectedVehicleId,
+          vehicleNumber: selectedVehicle?.vehicleNumber || null,
+          status: selectedDriverId ? "assigned" : "upcoming",
+        };
+
+        res = await apiFetch(`/api/trips/${editingTrip.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload),
+        });
+      } else {
+        const payload = {
+          customerId,
+          tripType,
+          pickup: pickupLocation || { name: pickupInput, address: pickupInput },
+          destination: destLocation || { name: destInput, address: destInput },
+          stops,
+          startDate,
+          startTime,
+          returnDate: isRound ? returnDate : null,
+          returnTime: isRound ? returnTime : null,
+          passengerCount,
+          notes,
+          specialInstructions,
+          outboundMapKm: effectiveOutboundKm,
+          returnMapKm: effectiveReturnKm,
+          totalMapKm: distanceKm,
+          routeDurationMinutes: outboundDurationMinutes + returnDurationMinutes,
+          outboundDurationMinutes,
+          returnDurationMinutes,
+          routeSummary: `${pickupInput} ➔ ${destInput}`,
+          selectedRouteSummary: routeOptions[selectedRouteIdx]?.summary || `${pickupInput} ➔ ${destInput}`,
+          routeOptions,
+          estimatedToll: finalToll,
+          billingKm: commercialFare.totalBillableDistance,
+          ratePerKm,
+          minimumKmPerDay: 0,
+          driverBataPerDay: 0,
+          billingDayPolicy,
+          finalToll,
+          parking,
+          permitCharge,
+          waitingCharge,
+          nightCharge,
+          discount,
+          taxPercent,
+          driverId: selectedDriverId,
+          vehicleId: selectedVehicleId,
+          advance: advanceAmount,
+          paymentMethod,
+          paymentReference,
+        };
+
+        res = await apiFetch("/api/trips", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || errJson.error || "Failed to create trip");
+        throw new Error(errJson.error?.message || errJson.error || `Failed to ${isEditing ? "update" : "create"} trip`);
       }
 
-      const createdTrip = await res.json();
-      onTripCreated(createdTrip);
+      const savedTrip = await res.json();
+      onTripCreated(savedTrip);
       onClose();
     } catch (err: any) {
-      alert(err.message || "Failed to create trip");
+      alert(err.message || `Failed to ${isEditing ? "update" : "create"} trip`);
     } finally {
       setLoading(false);
     }
@@ -393,12 +737,12 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       {loading && <TripActionLoader action="create" />}
 
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[96vw] max-w-3xl bg-background border-border text-foreground max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-2xl">
+        <DialogContent className="w-[96vw] max-w-5xl bg-background border-border text-foreground max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-2xl">
           <DialogHeader className="border-b border-border/80 pb-3 sm:pb-4">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-base sm:text-xl font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5 sm:gap-2">
                 <Navigation className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-400" />
-                CREATE TRIP & DISPATCH
+                {isEditing ? `EDIT TRIP — ${editingTrip.bookingId || ""}` : "CREATE TRIP & DISPATCH"}
               </DialogTitle>
               <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 sm:py-1 rounded bg-card border border-border text-muted-foreground">
                 STEP {step}/5
@@ -630,7 +974,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         type="number"
                         min={1}
                         max={50}
-                        value={passengerCount}
+                        value={passengerCount || ""}
                         onChange={(e) => setPassengerCount(Number(e.target.value))}
                         className="bg-card border-border text-xs h-9 font-mono"
                       />
@@ -652,26 +996,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             {/* STEP 3: ROUTE & DIRECT DISTANCE (Map preview + 100% Dynamic & Editable) */}
             {step === 3 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Route & Driving Distance</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">Enter pickup, destination, stops, and specify the road distance in KM.</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleAutoEstimateDistance}
-                    disabled={calculatingDistance}
-                    className="border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs h-8 flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 hover:dark:bg-amber-400/10"
-                  >
-                    {calculatingDistance ? (
-                      <ButtonLoader label="Calculating..." />
-                    ) : (
-                      <>
-                        <Calculator className="w-3.5 h-3.5" /> Auto-Estimate Distance
-                      </>
-                    )}
-                  </Button>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Route & Driving Distance</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Enter pickup, destination, stops, and specify the road distance in KM.</p>
                 </div>
 
                 {/* Pickup & Destination Inputs (Zero autofill) */}
@@ -708,29 +1035,62 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 {/* Intermediate Stops */}
                 <div className="space-y-2 bg-card/40 p-4 rounded-xl border border-border">
                   <label className="text-xs font-semibold text-foreground block">Waypoints & Intermediate Stops (Optional)</label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add intermediate stop (e.g. Mandya, Maddur Tiffany's, Channapatna Toys)..."
-                      value={stopInput}
-                      onChange={(e) => setStopInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddStop())}
-                      className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
-                    />
-                    <Button
-                      size="sm"
-                      type="button"
-                      onClick={handleAddStop}
-                      className="bg-muted hover:bg-muted text-foreground text-xs h-9 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Add
-                    </Button>
+                  <div className="relative" ref={stopSearchBoxRef}>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Search a place (e.g. Mandya, Maddur Tiffany's, Channapatna Toys)..."
+                        value={stopInput}
+                        onChange={(e) => setStopInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          if (stopSuggestions.length > 0) {
+                            handleSelectStopSuggestion(stopSuggestions[0]);
+                          } else {
+                            handleAddStop();
+                          }
+                        }}
+                        className="bg-card border-border text-xs h-9 placeholder:text-muted-foreground"
+                      />
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={handleAddStop}
+                        className="bg-muted hover:bg-muted text-foreground text-xs h-9 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add
+                      </Button>
+                    </div>
+                    {stopSearching && (
+                      <span className="text-[10px] text-muted-foreground absolute right-20 top-2.5">Searching...</span>
+                    )}
+                    {stopSuggestions.length > 0 && (
+                      <div className="absolute z-20 left-0 right-18.5 top-10 bg-card border border-border rounded-xl overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
+                        {stopSuggestions.map((place, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => handleSelectStopSuggestion(place)}
+                            className="p-2.5 hover:bg-muted text-xs text-foreground cursor-pointer border-b border-border/60 last:border-0"
+                          >
+                            <div className="font-semibold">{place.name}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">{place.formattedAddress}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Pick a search result to route through and pin it accurately on the map — typing free text with no result selected won't appear on the map.
+                  </p>
 
                   {stops.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-2">
                       {stops.map((stop, idx) => (
                         <div key={idx} className="flex items-center gap-1.5 bg-muted/90 text-foreground px-2.5 py-1 rounded-lg text-xs border border-border">
                           <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono">#{idx + 1}</span>
+                          {(stop.lat || stop.latitude) && (
+                            <MapPin className="w-3 h-3 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                          )}
                           <span>{stop.name}</span>
                           <button
                             type="button"
@@ -766,7 +1126,118 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                     outboundCoordinates={outboundCoordinates}
                     returnCoordinates={returnCoordinates}
                     estimatedToll={estimatedToll || finalToll}
+                    tollPlazas={displayedTollPlazas}
                   />
+                )}
+
+                {/* Auto-Estimate Distance & Toll (recalculates from the map above) */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAutoEstimateDistance}
+                  disabled={calculatingDistance}
+                  className="w-full border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs h-9 flex items-center justify-center gap-1.5 cursor-pointer hover:bg-amber-100 hover:dark:bg-amber-400/10"
+                >
+                  {calculatingDistance ? (
+                    <ButtonLoader label="Calculating..." />
+                  ) : (
+                    <>
+                      <Calculator className="w-3.5 h-3.5" /> Auto-Estimate Distance & Toll
+                    </>
+                  )}
+                </Button>
+
+                {/* With-Toll vs Toll-Free Route Choice */}
+                {routeOptions.length > 1 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-foreground block">Route Options — Toll vs Toll-Free</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {routeOptions.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => handleSelectRouteOption(idx)}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all space-y-1.5 ${
+                            selectedRouteIdx === idx
+                              ? "bg-amber-950/20 border-amber-400 ring-1 ring-amber-400/50"
+                              : "bg-card/40 border-border hover:border-amber-300 dark:hover:border-amber-500/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-foreground">
+                              {idx === 0 ? "Fastest Route (via Toll)" : "Toll-Free Route"}
+                            </span>
+                            {selectedRouteIdx === idx && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                            )}
+                          </div>
+                          {idx === 1 && opt.extraKm != null && (
+                            <div className="text-[10px] text-muted-foreground">
+                              +{opt.extraKm} km local detour to bypass toll — mostly overlaps the main route on the map
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                            <div>
+                              <span className="text-[9px] text-muted-foreground block uppercase">Distance</span>
+                              <span className="font-bold text-foreground">{opt.distanceKm} KM</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-muted-foreground block uppercase">Time</span>
+                              <span className="font-bold text-sky-700 dark:text-sky-300">
+                                {Math.floor(opt.durationMinutes / 60)}h {opt.durationMinutes % 60}m
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-muted-foreground block uppercase">Toll</span>
+                              <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                                {opt.estimatedToll > 0 ? formatINR(opt.estimatedToll) : "Toll Free"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Toll Plaza Breakdown — plazas along the route in the order the vehicle reaches them */}
+                {displayedTollPlazas.length > 0 && (
+                  <div className="bg-card/60 p-3 rounded-xl border border-border space-y-2">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                      Toll Plazas on Route ({displayedTollPlazas.length})
+                    </label>
+                    {selectedRouteIdx === 0 && tollRateMode && tollRateMode !== "single" && (
+                      <div className="text-[10px] text-muted-foreground -mt-1">
+                        {tollRateMode === "round_trip_same_day"
+                          ? "Return within 24 hrs → NHAI same-day return rate applied (≈ 1.5× one-way, not 2×)."
+                          : "Return after 24 hrs → 24-hr concession doesn't apply; both crossings billed at full one-way rate."}
+                      </div>
+                    )}
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {displayedTollPlazas.map((plaza: any, idx: number) => (
+                        <div
+                          key={plaza.id ?? idx}
+                          className="flex items-center justify-between gap-2 text-[11px] bg-background/60 border border-border rounded-lg px-2.5 py-1.5"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground truncate">{plaza.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">
+                              {plaza.distanceAlongRouteKm != null ? `${plaza.distanceAlongRouteKm} km into route` : plaza.state || ""}
+                            </div>
+                          </div>
+                          <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
+                            {formatINR(plaza.rate)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border">
+                      <span className="text-muted-foreground">Total Toll (NHAI estimate)</span>
+                      <span className="font-mono font-bold text-foreground">
+                        {formatINR(displayedTollPlazas.reduce((sum: number, p: any) => sum + (p.rate || 0), 0))}
+                      </span>
+                    </div>
+                  </div>
                 )}
 
                 {/* Direct Editable Road Distance & Billing KM */}
@@ -842,27 +1313,14 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                       Commercial Rate Parameters
                     </span>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-foreground block mb-1">Rate Per KM (₹) *</label>
-                        <Input
-                          type="number"
-                          value={ratePerKm}
-                          onChange={(e) => setRatePerKm(Number(e.target.value))}
-                          className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400"
-                        />
-                      </div>
-                      {isRound && (
-                        <div>
-                          <label className="text-[11px] text-foreground block mb-1">Night Bata (₹)</label>
-                          <Input
-                            type="number"
-                            value={nightBata}
-                            onChange={(e) => setNightBata(Number(e.target.value))}
-                            className="bg-card border-border text-xs h-9 font-mono"
-                          />
-                        </div>
-                      )}
+                    <div>
+                      <label className="text-[11px] text-foreground block mb-1">Rate Per KM (₹) *</label>
+                      <Input
+                        type="number"
+                        value={ratePerKm || ""}
+                        onChange={(e) => setRatePerKm(Number(e.target.value))}
+                        className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -870,7 +1328,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <label className="text-[11px] text-foreground block mb-1">State Permit (₹)</label>
                         <Input
                           type="number"
-                          value={permitCharge}
+                          value={permitCharge || ""}
                           onChange={(e) => setPermitCharge(Number(e.target.value))}
                           className="bg-card border-border text-xs h-9 font-mono"
                         />
@@ -879,7 +1337,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <label className="text-[11px] text-foreground block mb-1">Final Toll (₹)</label>
                         <Input
                           type="number"
-                          value={finalToll}
+                          value={finalToll || ""}
                           onChange={(e) => setFinalToll(Number(e.target.value))}
                           className="bg-card border-border text-xs h-9 font-mono"
                         />
@@ -891,7 +1349,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <label className="text-[10px] text-muted-foreground block mb-1">Parking (₹)</label>
                         <Input
                           type="number"
-                          value={parking}
+                          value={parking || ""}
                           onChange={(e) => setParking(Number(e.target.value))}
                           className="bg-card border-border text-xs h-8 font-mono"
                         />
@@ -900,7 +1358,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <label className="text-[10px] text-muted-foreground block mb-1">Waiting (₹)</label>
                         <Input
                           type="number"
-                          value={waitingCharge}
+                          value={waitingCharge || ""}
                           onChange={(e) => setWaitingCharge(Number(e.target.value))}
                           className="bg-card border-border text-xs h-8 font-mono"
                         />
@@ -909,7 +1367,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <label className="text-[10px] text-muted-foreground block mb-1">Discount (₹)</label>
                         <Input
                           type="number"
-                          value={discount}
+                          value={discount || ""}
                           onChange={(e) => setDiscount(Number(e.target.value))}
                           className="bg-card border-border text-xs h-8 font-mono text-rose-700 dark:text-rose-400"
                         />
@@ -930,12 +1388,6 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <span>Base Distance Fare:</span>
                         <span className="font-mono text-foreground">{formatINR(baseFare)}</span>
                       </div>
-                      {isRound && nightBata > 0 && (
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Night Bata:</span>
-                          <span className="font-mono text-foreground">{formatINR(commercialFare.driverBata)}</span>
-                        </div>
-                      )}
                       {(finalToll > 0 || permitCharge > 0) && (
                         <div className="flex justify-between items-center text-muted-foreground">
                           <span>Toll & Permit:</span>
@@ -1026,46 +1478,56 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   </div>
                 </div>
 
-                {/* Advance Collection */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-card/40 p-4 rounded-xl border border-border">
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Advance Amount (₹)</label>
-                    <Input
-                      type="number"
-                      value={advanceAmount}
-                      onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-                      className="bg-card border-border text-xs h-9 font-mono"
-                    />
+                {/* Advance Collection — editing a trip never records a new advance here;
+                    use the separate Record Payment action for that. */}
+                {!isEditing && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-card/40 p-4 rounded-xl border border-border">
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Advance Amount (₹)</label>
+                      <Input
+                        type="number"
+                        value={advanceAmount || ""}
+                        onChange={(e) => setAdvanceAmount(Number(e.target.value))}
+                        className="bg-card border-border text-xs h-9 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Payment Method</label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger className="bg-card border-border text-xs h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border text-foreground">
+                          <SelectItem value="UPI">UPI / GPay / PhonePe</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="Card">Credit / Debit Card</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Payment Reference / UTR</label>
+                      <Input
+                        placeholder="e.g. UPI Ref / UTR: 429188201992"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        className="bg-card border-border text-xs h-9 font-mono placeholder:text-muted-foreground"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Payment Method</label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="bg-card border-border text-xs h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border text-foreground">
-                        <SelectItem value="UPI">UPI / GPay / PhonePe</SelectItem>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Card">Credit / Debit Card</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Payment Reference / UTR</label>
-                    <Input
-                      placeholder="e.g. UPI Ref / UTR: 429188201992"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      className="bg-card border-border text-xs h-9 font-mono placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
+                )}
+                {isEditing && (
+                  <p className="text-[11px] text-muted-foreground bg-card/40 p-3 rounded-xl border border-border">
+                    Payments already recorded on this trip are unaffected by editing. Use "Record Payment" from the trip's page to log a new payment.
+                  </p>
+                )}
 
                 <div className="flex justify-between items-center p-3.5 rounded-xl bg-card border border-border text-xs font-mono">
                   <div>
                     <span className="text-muted-foreground block">Total Fare: {formatINR(customerTotal)}</span>
-                    <span className="text-emerald-700 dark:text-emerald-400 block">Advance Paid: {formatINR(advanceAmount)}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 block">
+                      {isEditing ? "Already Paid" : "Advance Paid"}: {formatINR(totalPaidForCalc)}
+                    </span>
                   </div>
                   <div className="text-right">
                     <span className="text-muted-foreground text-[10px] block uppercase">Remaining Balance Due</span>
@@ -1123,7 +1585,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 onClick={handleSubmitBooking}
                 className="bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-black text-xs h-9 px-5 cursor-pointer shadow-lg shadow-emerald-400/20"
               >
-                <CheckCircle2 className="w-4 h-4 mr-1.5" /> DISPATCH TRIP
+                <CheckCircle2 className="w-4 h-4 mr-1.5" /> {isEditing ? "SAVE CHANGES" : "DISPATCH TRIP"}
               </Button>
             )}
           </div>

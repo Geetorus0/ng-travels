@@ -1,5 +1,5 @@
 import type { TripLocation, RouteAlternative } from "@workspace/db/schema";
-import { estimateTollForRoute, type TollMatch } from "./tollService.js";
+import { estimateTollForRoute, type TollMatch, type TollRateMode } from "./tollService.js";
 
 export interface PlaceSearchResult {
   placeId: string;
@@ -38,7 +38,10 @@ export interface ComputedRouteOptions {
   tollAvailable: boolean;
   tollSource: "google_routes" | "nhai_open_dataset" | null;
   tollPlazas: TollMatch[];
+  tollRateMode: TollRateMode | null;
   alternatives: RouteAlternative[];
+  resolvedPickup: { name: string; formattedAddress?: string; lat: number; lng: number };
+  resolvedDestination: { name: string; formattedAddress?: string; lat: number; lng: number };
 }
 
 const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_ROUTES_API_KEY || "";
@@ -481,6 +484,33 @@ export async function calculateSingleDrivingLeg(
 }
 
 /**
+ * Decide which NHAI fare basis applies to a round trip: the discounted
+ * same-booth rate only covers a return crossing within 24 hours of the
+ * outbound one (National Highways Fee Rules, 2008). Most bookings here are
+ * multi-day outstation tours, so without explicit dates we can't assume the
+ * discount — but when the caller doesn't supply dates at all (e.g. a
+ * same-day-only route-planning tool with no date fields), fall back to the
+ * previous same-day assumption rather than changing that caller's numbers.
+ */
+function resolveTollRateMode(
+  isRoundTrip: boolean,
+  startDate?: string | null,
+  startTime?: string | null,
+  returnDate?: string | null,
+  returnTime?: string | null,
+): TollRateMode {
+  if (!isRoundTrip) return "single";
+  if (!startDate || !returnDate) return "round_trip_same_day";
+
+  const start = new Date(`${startDate}T${startTime || "00:00"}:00`);
+  const ret = new Date(`${returnDate}T${returnTime || "00:00"}:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(ret.getTime())) return "round_trip_same_day";
+
+  const hoursGap = (ret.getTime() - start.getTime()) / (1000 * 60 * 60);
+  return hoursGap >= 0 && hoursGap <= 24 ? "round_trip_same_day" : "round_trip_multi_day";
+}
+
+/**
  * Real Comprehensive Route Engine (One-Way and Round-Trip)
  * For Round-Trip:
  *  - Calculates Outbound leg: Pickup -> Destination
@@ -488,7 +518,17 @@ export async function calculateSingleDrivingLeg(
  *  - Total distance = Outbound distance + Return distance (never simply * 2)
  */
 export async function calculateRouteJourney(
-  pickupOrOptions: TripLocation | { pickup: TripLocation; destination: TripLocation; stops?: TripLocation[]; tripType?: string; options?: { avoidTolls?: boolean; avoidHighways?: boolean } },
+  pickupOrOptions: TripLocation | {
+    pickup: TripLocation;
+    destination: TripLocation;
+    stops?: TripLocation[];
+    tripType?: string;
+    options?: { avoidTolls?: boolean; avoidHighways?: boolean };
+    startDate?: string | null;
+    startTime?: string | null;
+    returnDate?: string | null;
+    returnTime?: string | null;
+  },
   destinationParam?: TripLocation,
   stopsParam: TripLocation[] = [],
   tripTypeParam: string = "single_trip",
@@ -499,6 +539,10 @@ export async function calculateRouteJourney(
   let stops = stopsParam;
   let tripType = tripTypeParam;
   let options = optionsParam;
+  let startDate: string | null | undefined;
+  let startTime: string | null | undefined;
+  let returnDate: string | null | undefined;
+  let returnTime: string | null | undefined;
 
   if (pickupOrOptions && "pickup" in pickupOrOptions && "destination" in pickupOrOptions) {
     pickup = (pickupOrOptions as any).pickup;
@@ -506,6 +550,10 @@ export async function calculateRouteJourney(
     stops = (pickupOrOptions as any).stops || [];
     tripType = (pickupOrOptions as any).tripType || "single_trip";
     options = (pickupOrOptions as any).options || {};
+    startDate = (pickupOrOptions as any).startDate;
+    startTime = (pickupOrOptions as any).startTime;
+    returnDate = (pickupOrOptions as any).returnDate;
+    returnTime = (pickupOrOptions as any).returnTime;
   } else {
     pickup = pickupOrOptions as TripLocation;
     destination = destinationParam!;
@@ -588,20 +636,72 @@ export async function calculateRouteJourney(
   // Neither Google Routes (not configured here) nor Geoapify provide toll
   // pricing — fall back to matching NHAI toll plazas (open dataset) against
   // the outbound road path. Outbound and return normally retrace the same
-  // highway, so this is priced once for the whole journey using the
-  // same-day round-trip rate when applicable, rather than doubling the
-  // one-way rate per leg.
+  // highway, so this is priced once for the whole journey, at whichever
+  // NHAI fare basis the actual outbound/return gap earns (same-day
+  // discounted rate, or the full rate for both crossings beyond 24 hours).
   let tollSource: ComputedRouteOptions["tollSource"] = tollAvailable ? "google_routes" : null;
   let tollPlazas: TollMatch[] = [];
+  let tollRateMode: TollRateMode | null = null;
   if (!tollAvailable) {
-    const tollEstimate = estimateTollForRoute(outbound.coordinates, isRoundTrip);
+    tollRateMode = resolveTollRateMode(isRoundTrip, startDate, startTime, returnDate, returnTime);
+    const tollEstimate = estimateTollForRoute(outbound.coordinates, tollRateMode);
     estimatedToll = tollEstimate.totalToll;
     tollPlazas = tollEstimate.plazas;
     tollAvailable = true;
     tollSource = "nhai_open_dataset";
   }
 
-  // 3. Alternatives for UI route selection
+  // 3. Alternatives for UI route selection: the primary (fastest) route, plus
+  // a toll-avoiding route when the primary actually carries a toll — computed
+  // as a genuinely separate routing request (not a price toggle on the same
+  // path), so distance/duration reflect the real toll-free road.
+  let tollFreeAlt: RouteAlternative | null = null;
+  if (!options.avoidTolls && (estimatedToll || 0) > 0) {
+    try {
+      const outboundNoToll = await calculateSingleDrivingLeg(
+        { lat: pLat, lng: pLng, name: pickup.name, placeId: pickup.placeId || undefined },
+        { lat: dLat, lng: dLng, name: destination.name, placeId: destination.placeId || undefined },
+        waypoints,
+        { ...options, avoidTolls: true },
+      );
+
+      let noTollTotalKm = outboundNoToll.distanceKm;
+      let noTollDurationMinutes = outboundNoToll.durationMinutes;
+      if (isRoundTrip) {
+        const returnNoToll = await calculateSingleDrivingLeg(
+          { lat: dLat, lng: dLng, name: destination.name, placeId: destination.placeId || undefined },
+          { lat: pLat, lng: pLng, name: pickup.name, placeId: pickup.placeId || undefined },
+          [...waypoints].reverse(),
+          { ...options, avoidTolls: true },
+        );
+        noTollTotalKm = Math.round((outboundNoToll.distanceKm + returnNoToll.distanceKm) * 10) / 10;
+        noTollDurationMinutes = outboundNoToll.durationMinutes + returnNoToll.durationMinutes;
+      }
+
+      // Indian toll roads are often untagged in the underlying map data, so
+      // "avoid tolls" frequently comes back as either the identical road or
+      // a trivial few-hundred-metre nudge — not a real alternative. Only
+      // surface it once the detour is big enough to actually be a distinct
+      // choice (a real bypass), not noise that looks unchanged on the map.
+      const extraKm = Math.round((noTollTotalKm - totalRoadDistanceKm) * 10) / 10;
+      const MIN_MEANINGFUL_DETOUR_KM = 3;
+      if (extraKm > MIN_MEANINGFUL_DETOUR_KM) {
+        tollFreeAlt = {
+          routeIndex: 1,
+          summary: `Toll-Free Route (+${extraKm} km detour, ${Math.floor(noTollDurationMinutes / 60)}h ${noTollDurationMinutes % 60}m)`,
+          distanceKm: noTollTotalKm,
+          durationMinutes: noTollDurationMinutes,
+          estimatedToll: 0,
+          via: isRoundTrip ? "Outbound & Return avoiding toll roads" : "Avoids toll roads",
+          polylineCoordinates: outboundNoToll.coordinates,
+          extraKm,
+        };
+      }
+    } catch (err) {
+      console.warn("[routeService] Toll-free alternative computation failed:", err);
+    }
+  }
+
   const alternatives: RouteAlternative[] = [
     {
       routeIndex: 0,
@@ -609,9 +709,12 @@ export async function calculateRouteJourney(
       distanceKm: totalRoadDistanceKm,
       durationMinutes: totalDurationMinutes,
       estimatedToll: estimatedToll || 0,
-      via: isRoundTrip ? "Outbound & Return via National Highway" : "Fastest National Highway",
+      via: tollFreeAlt
+        ? (isRoundTrip ? "Outbound & Return via toll roads (fastest)" : "Fastest route via toll roads")
+        : (isRoundTrip ? "Outbound & Return via National Highway" : "Fastest National Highway"),
       polylineCoordinates: outbound.coordinates,
     },
+    ...(tollFreeAlt ? [tollFreeAlt] : []),
   ];
 
   return {
@@ -625,6 +728,9 @@ export async function calculateRouteJourney(
     tollAvailable,
     tollSource,
     tollPlazas,
+    tollRateMode,
     alternatives,
+    resolvedPickup: { name: pickup.name, formattedAddress: pickup.address, lat: pLat, lng: pLng },
+    resolvedDestination: { name: destination.name, formattedAddress: destination.address, lat: dLat, lng: dLng },
   };
 }

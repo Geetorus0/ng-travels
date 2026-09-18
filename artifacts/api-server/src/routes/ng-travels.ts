@@ -384,6 +384,31 @@ router.post("/auth/driver-login", async (req, res): Promise<void> => {
       return;
     }
 
+    // Self-heal: the client derives `driverId` from this JWT's own
+    // user_metadata (not the response body below), so any auth account
+    // provisioned before driver_id was added to user_metadata — or created
+    // through a path that omitted it — would otherwise carry a session with
+    // no driver_id forever, and every driver would see every other driver's
+    // data (expenses, trips, etc.) client-side. Backfill it on every login;
+    // cheap and idempotent, and the client re-authenticates right after via
+    // setSession(), so the corrected metadata lands in the session it uses.
+    if (data.user.user_metadata?.driver_id !== driver.id) {
+      const { error: metaError } = await supabaseServer.auth.admin.updateUserById(data.user.id, {
+        user_metadata: { ...data.user.user_metadata, role: "driver", full_name: driver.name, driver_id: driver.id },
+      });
+      if (metaError) {
+        console.error("[auth] Failed to backfill driver_id in user_metadata:", metaError);
+      } else {
+        const refreshed = await supabaseServer.auth.signInWithPassword({
+          email: driverAuthEmail(driver.driverCode),
+          password: credential,
+        });
+        if (refreshed.data?.session) {
+          data.session = refreshed.data.session;
+        }
+      }
+    }
+
     await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.driverId, driver.id));
 
     res.json({
@@ -481,31 +506,11 @@ router.post("/admin/drivers", requireOwner, async (req, res): Promise<void> => {
   }
 
   try {
-    // Driver sign-in (see /auth/driver-login) always looks the account up by
-    // the synthetic driver.<code>@auth.ngtravels.internal address, not the
-    // driver's real contact email — the real email is stored on the driver
-    // record for reference/notifications, not used as the auth identity.
-    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
-      email: driverAuthEmail(driverCode.toUpperCase()),
-      phone: toE164(mobile),
-      password: initialPassword,
-      email_confirm: true,
-      phone_confirm: true,
-      user_metadata: {
-        full_name: name,
-        role: "driver",
-      },
-    });
-
-    if (authError || !authData?.user) {
-      res.status(400).json({
-        success: false,
-        error: { code: "AUTH_ERROR", message: authError?.message || "Failed to create auth account." },
-      });
-      return;
-    }
-
-    // Create driver record in database
+    // Create driver record first so its id exists to stamp into the auth
+    // account's user_metadata below — the client derives its driverId
+    // client-side from that metadata (not a server round trip), so an auth
+    // account created without driver_id in it would let a driver see every
+    // other driver's data (expenses, trips, etc.) client-side forever.
     const [driver] = await db
       .insert(driversTable)
       .values({
@@ -519,6 +524,32 @@ router.post("/admin/drivers", requireOwner, async (req, res): Promise<void> => {
         status: "active",
       })
       .returning();
+
+    // Driver sign-in (see /auth/driver-login) always looks the account up by
+    // the synthetic driver.<code>@auth.ngtravels.internal address, not the
+    // driver's real contact email — the real email is stored on the driver
+    // record for reference/notifications, not used as the auth identity.
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+      email: driverAuthEmail(driverCode.toUpperCase()),
+      phone: toE164(mobile),
+      password: initialPassword,
+      email_confirm: true,
+      phone_confirm: true,
+      user_metadata: {
+        full_name: name,
+        role: "driver",
+        driver_id: driver.id,
+      },
+    });
+
+    if (authError || !authData?.user) {
+      await db.delete(driversTable).where(eq(driversTable.id, driver.id));
+      res.status(400).json({
+        success: false,
+        error: { code: "AUTH_ERROR", message: authError?.message || "Failed to create auth account." },
+      });
+      return;
+    }
 
     // The handle_new_user() trigger already inserted a bare public.users row
     // for this auth identity; link it to the driver record just created.
@@ -1269,13 +1300,33 @@ router.post("/maps/resolve-location", async (req, res): Promise<void> => {
 
 router.post("/maps/routes", async (req, res): Promise<void> => {
   try {
-    const { pickup, destination, stops = [], tripType = "single_trip", options = {} } = req.body;
+    const {
+      pickup,
+      destination,
+      stops = [],
+      tripType = "single_trip",
+      options = {},
+      startDate,
+      startTime,
+      returnDate,
+      returnTime,
+    } = req.body;
     if (!pickup || !destination) {
       res.status(400).json({ error: "Pickup and destination locations are required" });
       return;
     }
 
-    const journey = await calculateRouteJourney(pickup, destination, stops, tripType, options);
+    const journey = await calculateRouteJourney({
+      pickup,
+      destination,
+      stops,
+      tripType,
+      options,
+      startDate,
+      startTime,
+      returnDate,
+      returnTime,
+    });
 
     const tollStatus =
       journey.tollSource === "google_routes"
@@ -1304,6 +1355,7 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
       tollStatus,
       tollSource: journey.tollSource,
       tollPlazas: journey.tollPlazas,
+      tollRateMode: journey.tollRateMode,
       routes: journey.alternatives,
       outbound: journey.outbound,
       return: journey.return,
@@ -1313,6 +1365,8 @@ router.post("/maps/routes", async (req, res): Promise<void> => {
       outboundCoordinates: journey.outbound.coordinates,
       returnCoordinates: journey.return?.coordinates || [],
       routeCoordinates: journey.outbound.coordinates,
+      resolvedPickup: journey.resolvedPickup,
+      resolvedDestination: journey.resolvedDestination,
     });
   } catch (err: any) {
     console.error("[maps/routes] Route error:", err);
@@ -1380,175 +1434,185 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
   const policy = req.body.billingDayPolicy || "CALENDAR_DAYS";
   const tripType = req.body.tripType || "single_trip";
 
-  // 1. Authoritative Route Verification
-  let journey: any = null;
+  // Everything below (fare calc, driver/vehicle lookups, the insert itself)
+  // used to run partly outside any try/catch, so a thrown error here bypassed
+  // the JSON error responses entirely — Express's default handler returns an
+  // HTML page for an uncaught rejection, which the client can't parse into a
+  // message, so it just shows a generic "Failed to create trip" with no way
+  // to tell what actually went wrong. Wrapping the whole handler fixes that.
   try {
-    if (req.body.pickup && req.body.destination) {
-      journey = await calculateRouteJourney(
-        req.body.pickup,
-        req.body.destination,
-        req.body.stops || [],
-        tripType,
-      );
+    // 1. Authoritative Route Verification
+    let journey: any = null;
+    try {
+      if (req.body.pickup && req.body.destination) {
+        journey = await calculateRouteJourney({
+          pickup: req.body.pickup,
+          destination: req.body.destination,
+          stops: req.body.stops || [],
+          tripType,
+          startDate: startDateStr,
+          startTime: req.body.startTime || "09:00",
+          returnDate: returnDateStr,
+          returnTime: req.body.returnTime || "20:00",
+        });
+      }
+    } catch (routeErr: any) {
+      console.warn("[trips/create] Online route verification warning:", routeErr.message);
     }
-  } catch (routeErr: any) {
-    console.warn("[trips/create] Online route verification warning:", routeErr.message);
-  }
 
-  const verifiedOutboundKm = journey ? journey.outbound.distanceKm : Number(req.body.outboundMapKm || req.body.mapDistanceKm || 0);
-  const verifiedReturnKm = journey ? (journey.return?.distanceKm || 0) : Number(req.body.returnMapKm || 0);
-  const verifiedTotalKm = journey ? journey.totalRoadDistanceKm : Number(req.body.totalMapKm || req.body.mapDistanceKm || 0);
-  const verifiedOutboundMinutes = journey ? journey.outbound.durationMinutes : Number(req.body.outboundDurationMinutes || 120);
-  const verifiedReturnMinutes = journey ? (journey.return?.durationMinutes || 0) : Number(req.body.returnDurationMinutes || 0);
-  const verifiedTotalMinutes = verifiedOutboundMinutes + verifiedReturnMinutes;
+    const verifiedOutboundKm = journey ? journey.outbound.distanceKm : Number(req.body.outboundMapKm || req.body.mapDistanceKm || 0);
+    const verifiedReturnKm = journey ? (journey.return?.distanceKm || 0) : Number(req.body.returnMapKm || 0);
+    const verifiedTotalKm = journey ? journey.totalRoadDistanceKm : Number(req.body.totalMapKm || req.body.mapDistanceKm || 0);
+    const verifiedOutboundMinutes = journey ? journey.outbound.durationMinutes : Number(req.body.outboundDurationMinutes || 120);
+    const verifiedReturnMinutes = journey ? (journey.return?.durationMinutes || 0) : Number(req.body.returnDurationMinutes || 0);
+    const verifiedTotalMinutes = verifiedOutboundMinutes + verifiedReturnMinutes;
 
-  // 2. Authoritative Commercial Fare Calculation
-  const commercialFare = calculateCommercialFare({
-    tripType,
-    outboundDistanceKm: verifiedOutboundKm,
-    returnDistanceKm: verifiedReturnKm,
-    totalRoadDistanceKm: verifiedTotalKm,
-    ratePerKm: Number(req.body.ratePerKm || 18),
-    startDate: startDateStr,
-    returnDate: returnDateStr,
-    startTime: req.body.startTime || "09:00",
-    returnTime: req.body.returnTime || "20:00",
-    billingDayPolicy: policy,
-    minimumKmPerDay: req.body.minimumKmPerDay != null ? Number(req.body.minimumKmPerDay) : undefined,
-    driverBataPerDay: req.body.driverBataPerDay != null ? Number(req.body.driverBataPerDay) : undefined,
-    nightBata: req.body.nightBata != null ? Number(req.body.nightBata) : undefined,
-    permitCharge: Number(req.body.permitCharge || 0),
-    toll: req.body.finalToll != null ? Number(req.body.finalToll) : (journey?.estimatedToll || Number(req.body.toll || 0)),
-    tollAvailable: journey?.tollAvailable ?? false,
-    parking: Number(req.body.parking || 0),
-    waiting: Number(req.body.waiting || req.body.waitingCharge || 0),
-    nightCharges: Number(req.body.nightCharges || req.body.nightCharge || 0),
-    discount: Number(req.body.discount || 0),
-    taxPercent: Number(req.body.taxPercent || 0),
-    totalPaid: Number(req.body.advance || req.body.totalPaid || 0),
-  });
+    // 2. Authoritative Commercial Fare Calculation
+    const commercialFare = calculateCommercialFare({
+      tripType,
+      outboundDistanceKm: verifiedOutboundKm,
+      returnDistanceKm: verifiedReturnKm,
+      totalRoadDistanceKm: verifiedTotalKm,
+      ratePerKm: Number(req.body.ratePerKm || 18),
+      startDate: startDateStr,
+      returnDate: returnDateStr,
+      startTime: req.body.startTime || "09:00",
+      returnTime: req.body.returnTime || "20:00",
+      billingDayPolicy: policy,
+      minimumKmPerDay: req.body.minimumKmPerDay != null ? Number(req.body.minimumKmPerDay) : undefined,
+      driverBataPerDay: req.body.driverBataPerDay != null ? Number(req.body.driverBataPerDay) : undefined,
+      nightBata: req.body.nightBata != null ? Number(req.body.nightBata) : undefined,
+      permitCharge: Number(req.body.permitCharge || 0),
+      toll: req.body.finalToll != null ? Number(req.body.finalToll) : (journey?.estimatedToll || Number(req.body.toll || 0)),
+      tollAvailable: journey?.tollAvailable ?? false,
+      parking: Number(req.body.parking || 0),
+      waiting: Number(req.body.waiting || req.body.waitingCharge || 0),
+      nightCharges: Number(req.body.nightCharges || req.body.nightCharge || 0),
+      discount: Number(req.body.discount || 0),
+      taxPercent: Number(req.body.taxPercent || 0),
+      totalPaid: Number(req.body.advance || req.body.totalPaid || 0),
+    });
 
-  const bookingId = `TRP-${Date.now().toString().slice(-7)}`;
+    const bookingId = `TRP-${Date.now().toString().slice(-7)}`;
 
-  let driverName: string | null = req.body.driverName || null;
-  let driverMobile: string | null = req.body.driverMobile || null;
-  if (req.body.driverId) {
-    const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, Number(req.body.driverId)));
-    if (drv) {
-      driverName = drv.name;
-      driverMobile = drv.mobile;
+    let driverName: string | null = req.body.driverName || null;
+    let driverMobile: string | null = req.body.driverMobile || null;
+    if (req.body.driverId) {
+      const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, Number(req.body.driverId)));
+      if (drv) {
+        driverName = drv.name;
+        driverMobile = drv.mobile;
+      }
     }
-  }
 
-  let vehicleNumber: string | null = req.body.vehicleNumber || null;
-  if (req.body.vehicleId) {
-    const [veh] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, Number(req.body.vehicleId)));
-    if (veh) {
-      vehicleNumber = veh.vehicleNumber;
+    let vehicleNumber: string | null = req.body.vehicleNumber || null;
+    if (req.body.vehicleId) {
+      const [veh] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, Number(req.body.vehicleId)));
+      if (veh) {
+        vehicleNumber = veh.vehicleNumber;
+      }
     }
-  }
 
-  // 3. Assemble Auditable Route Snapshot
-  const routeSnapshot = {
-    provider: journey?.provider || "geoapify",
-    calculatedAt: new Date().toISOString(),
-    tripType: commercialFare.tripType,
-    billingDayPolicy: commercialFare.billingDayPolicy,
-    billableDays: commercialFare.billableDays,
-    minimumKmPerDay: commercialFare.minimumKmPerDay,
-    minimumBillableKm: commercialFare.minimumBillableKm,
-    totalRoadDistanceKm: commercialFare.totalRoadDistanceKm,
-    totalBillableKm: commercialFare.totalBillableDistance,
-    totalDurationMinutes: verifiedTotalMinutes,
-    ratePerKm: commercialFare.ratePerKm,
-    distanceFare: commercialFare.distanceFare,
-    driverBata: commercialFare.driverBata,
-    permitCharge: commercialFare.permitCharge,
-    toll: commercialFare.toll,
-    tollAvailable: commercialFare.tollAvailable,
-    parking: commercialFare.parking,
-    waiting: commercialFare.waiting,
-    nightCharges: commercialFare.nightCharges,
-    discount: commercialFare.discount,
-    tax: commercialFare.tax,
-    customerTotal: commercialFare.customerTotal,
-    outbound: {
-      distanceKm: verifiedOutboundKm,
-      durationMinutes: verifiedOutboundMinutes,
-      polyline: journey?.outbound.encodedPolyline || null,
-      coordinates: journey?.outbound.coordinates || [],
-      origin: req.body.pickup,
+    // 3. Assemble Auditable Route Snapshot
+    const routeSnapshot = {
+      provider: journey?.provider || "geoapify",
+      calculatedAt: new Date().toISOString(),
+      tripType: commercialFare.tripType,
+      billingDayPolicy: commercialFare.billingDayPolicy,
+      billableDays: commercialFare.billableDays,
+      minimumKmPerDay: commercialFare.minimumKmPerDay,
+      minimumBillableKm: commercialFare.minimumBillableKm,
+      totalRoadDistanceKm: commercialFare.totalRoadDistanceKm,
+      totalBillableKm: commercialFare.totalBillableDistance,
+      totalDurationMinutes: verifiedTotalMinutes,
+      ratePerKm: commercialFare.ratePerKm,
+      distanceFare: commercialFare.distanceFare,
+      driverBata: commercialFare.driverBata,
+      permitCharge: commercialFare.permitCharge,
+      toll: commercialFare.toll,
+      tollAvailable: commercialFare.tollAvailable,
+      parking: commercialFare.parking,
+      waiting: commercialFare.waiting,
+      nightCharges: commercialFare.nightCharges,
+      discount: commercialFare.discount,
+      tax: commercialFare.tax,
+      customerTotal: commercialFare.customerTotal,
+      outbound: {
+        distanceKm: verifiedOutboundKm,
+        durationMinutes: verifiedOutboundMinutes,
+        polyline: journey?.outbound.encodedPolyline || null,
+        coordinates: journey?.outbound.coordinates || [],
+        origin: req.body.pickup,
+        destination: req.body.destination,
+      },
+      return: (commercialFare.tripType.includes("round") && journey?.return) ? {
+        distanceKm: verifiedReturnKm,
+        durationMinutes: verifiedReturnMinutes,
+        polyline: journey.return.encodedPolyline || null,
+        coordinates: journey.return.coordinates || [],
+        origin: req.body.destination,
+        destination: req.body.pickup,
+      } : null,
+    };
+
+    const tripData = {
+      bookingId,
+      customerId: Number(req.body.customerId),
+      driverId: req.body.driverId ? Number(req.body.driverId) : null,
+      driverName,
+      driverMobile,
+      vehicleId: req.body.vehicleId ? Number(req.body.vehicleId) : null,
+      vehicleNumber,
+      idempotencyKey: req.body.idempotencyKey || null,
+      tripType,
+      pickup: req.body.pickup,
       destination: req.body.destination,
-    },
-    return: (commercialFare.tripType.includes("round") && journey?.return) ? {
-      distanceKm: verifiedReturnKm,
-      durationMinutes: verifiedReturnMinutes,
-      polyline: journey.return.encodedPolyline || null,
-      coordinates: journey.return.coordinates || [],
-      origin: req.body.destination,
-      destination: req.body.pickup,
-    } : null,
-  };
+      stops: req.body.stops ?? [],
+      startDate: startDateStr,
+      startTime: req.body.startTime || "09:00",
+      returnDate: returnDateStr,
+      returnTime: req.body.returnTime ?? null,
+      passengerCount: Number(req.body.passengerCount ?? 1),
+      notes: req.body.notes ?? null,
+      specialInstructions: req.body.specialInstructions ?? null,
+      mapDistanceKm: String(commercialFare.totalRoadDistanceKm),
+      outboundMapKm: String(commercialFare.outboundDistanceKm),
+      returnMapKm: String(commercialFare.returnDistanceKm),
+      totalMapKm: String(commercialFare.totalRoadDistanceKm),
+      routeDurationMinutes: verifiedTotalMinutes,
+      outboundDurationMinutes: verifiedOutboundMinutes,
+      returnDurationMinutes: verifiedReturnMinutes,
+      routeSummary: journey?.alternatives[0]?.summary || req.body.routeSummary || `${commercialFare.totalRoadDistanceKm} km`,
+      selectedRouteSummary: journey?.alternatives[0]?.summary || req.body.selectedRouteSummary || null,
+      routeOptions: journey?.alternatives || req.body.routeOptions || [],
+      routeSnapshot,
+      apiEstimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
+      estimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
+      finalToll: String(commercialFare.toll),
+      outboundTollEstimate: null,
+      returnTollEstimate: null,
+      billingKm: String(commercialFare.totalBillableDistance),
+      ratePerKm: String(commercialFare.ratePerKm),
+      baseFare: String(commercialFare.distanceFare),
+      driverBata: String(commercialFare.driverBata),
+      toll: String(commercialFare.toll),
+      parking: String(commercialFare.parking),
+      permitCharge: String(commercialFare.permitCharge),
+      waitingCharge: String(commercialFare.waiting),
+      nightCharge: String(commercialFare.nightCharges),
+      discount: String(commercialFare.discount),
+      tax: String(commercialFare.tax),
+      billableDays: commercialFare.billableDays,
+      minimumKm: String(commercialFare.minimumBillableKm),
+      billingDayPolicy: commercialFare.billingDayPolicy,
+      customerTotal: String(commercialFare.customerTotal),
+      totalPaid: String(commercialFare.totalPaid),
+      remainingBalance: String(commercialFare.remainingBalance),
+      credit: String(commercialFare.credit),
+      status: req.body.driverId ? "assigned" : "upcoming",
+      isLocked: false,
+    };
 
-  const tripData = {
-    bookingId,
-    customerId: Number(req.body.customerId),
-    driverId: req.body.driverId ? Number(req.body.driverId) : null,
-    driverName,
-    driverMobile,
-    vehicleId: req.body.vehicleId ? Number(req.body.vehicleId) : null,
-    vehicleNumber,
-    idempotencyKey: req.body.idempotencyKey || null,
-    tripType,
-    pickup: req.body.pickup,
-    destination: req.body.destination,
-    stops: req.body.stops ?? [],
-    startDate: startDateStr,
-    startTime: req.body.startTime || "09:00",
-    returnDate: returnDateStr,
-    returnTime: req.body.returnTime ?? null,
-    passengerCount: Number(req.body.passengerCount ?? 1),
-    notes: req.body.notes ?? null,
-    specialInstructions: req.body.specialInstructions ?? null,
-    mapDistanceKm: String(commercialFare.totalRoadDistanceKm),
-    outboundMapKm: String(commercialFare.outboundDistanceKm),
-    returnMapKm: String(commercialFare.returnDistanceKm),
-    totalMapKm: String(commercialFare.totalRoadDistanceKm),
-    routeDurationMinutes: verifiedTotalMinutes,
-    outboundDurationMinutes: verifiedOutboundMinutes,
-    returnDurationMinutes: verifiedReturnMinutes,
-    routeSummary: journey?.alternatives[0]?.summary || req.body.routeSummary || `${commercialFare.totalRoadDistanceKm} km`,
-    selectedRouteSummary: journey?.alternatives[0]?.summary || req.body.selectedRouteSummary || null,
-    routeOptions: journey?.alternatives || req.body.routeOptions || [],
-    routeSnapshot,
-    apiEstimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
-    estimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
-    finalToll: String(commercialFare.toll),
-    outboundTollEstimate: null,
-    returnTollEstimate: null,
-    billingKm: String(commercialFare.totalBillableDistance),
-    ratePerKm: String(commercialFare.ratePerKm),
-    baseFare: String(commercialFare.distanceFare),
-    driverBata: String(commercialFare.driverBata),
-    toll: String(commercialFare.toll),
-    parking: String(commercialFare.parking),
-    permitCharge: String(commercialFare.permitCharge),
-    waitingCharge: String(commercialFare.waiting),
-    nightCharge: String(commercialFare.nightCharges),
-    discount: String(commercialFare.discount),
-    tax: String(commercialFare.tax),
-    billableDays: commercialFare.billableDays,
-    minimumKm: String(commercialFare.minimumBillableKm),
-    billingDayPolicy: commercialFare.billingDayPolicy,
-    customerTotal: String(commercialFare.customerTotal),
-    totalPaid: String(commercialFare.totalPaid),
-    remainingBalance: String(commercialFare.remainingBalance),
-    credit: String(commercialFare.credit),
-    status: req.body.driverId ? "assigned" : "upcoming",
-    isLocked: false,
-  };
-
-  try {
     const [created] = await db.insert(tripsTable).values(tripData as any).returning();
 
     // If advance payment recorded
@@ -1586,7 +1650,7 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
     res.status(201).json(view);
   } catch (err: any) {
     console.error("[trips] Create error:", err);
-    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to persist trip to database" } });
+    res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: err?.message || "Failed to persist trip to database" } });
   }
 });
 

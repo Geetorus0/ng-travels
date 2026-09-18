@@ -36,6 +36,10 @@ export type RouteAlternative = {
   via: string;
   polyline?: string | null;
   polylineCoordinates?: [number, number][];
+  // Extra road distance vs. the primary route — how much further a
+  // toll-avoiding detour actually is, so the UI can say "+X km" instead of
+  // implying a wholly different road when it's really a short local bypass.
+  extraKm?: number;
 };
 
 export type RouteSnapshotLeg = {
