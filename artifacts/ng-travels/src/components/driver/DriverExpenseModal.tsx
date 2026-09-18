@@ -1,19 +1,22 @@
 import { apiFetch } from "@/lib/apiFetch";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Receipt, CheckCircle2, IndianRupee, AlertCircle } from "lucide-react";
+import { Receipt, CheckCircle2, IndianRupee, AlertCircle, Camera, FileText, X } from "lucide-react";
 import { ButtonLoader } from "@/components/loading";
 
 export interface DriverExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   tripId: number;
-  onExpenseAdded: (newExpense: any) => void;
+  onExpenseAdded: (newExpense: any) => void | Promise<void>;
 }
+
+const MAX_RECEIPT_BYTES = 8 * 1024 * 1024;
+const ACCEPTED_RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"];
 
 export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
   isOpen,
@@ -28,11 +31,59 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePickReceipt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after removing it
+    if (!file) return;
+
+    if (!ACCEPTED_RECEIPT_TYPES.includes(file.type)) {
+      setError("Unsupported file type — please attach a JPG, PNG, WEBP, HEIC photo, or a PDF.");
+      return;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      setError("That file is too large — the proof of payment must be under 8MB.");
+      return;
+    }
+
+    setError(null);
+    setReceiptFile(file);
+    setReceiptPreviewUrl(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
+  };
+
+  const handleRemoveReceipt = () => {
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptFile(null);
+    setReceiptPreviewUrl(null);
+  };
+
   const handleSubmit = async () => {
     if (!amount || Number(amount) <= 0) return;
+    if (!receiptFile) {
+      setError("A photo or PDF proof of payment is required before submitting this expense.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
+      // Upload the proof first — the expense is only recorded once we have
+      // a real receipt URL to attach to it, so a driver can't submit a
+      // claim with no evidence at all.
+      const formData = new FormData();
+      formData.append("file", receiptFile);
+      const uploadRes = await apiFetch(`/api/expenses/upload-receipt`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => null);
+        throw new Error(errData?.error?.message || "Failed to upload the proof of payment.");
+      }
+      const { url: receiptPath } = await uploadRes.json();
+
       const res = await apiFetch(`/api/expenses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,6 +93,7 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
           amount: Number(amount),
           notes,
           location,
+          receiptPath,
         }),
       });
       if (!res.ok) {
@@ -49,7 +101,8 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
         throw new Error(errData?.error?.message || "Failed to submit expense.");
       }
       const newExpense = await res.json();
-      onExpenseAdded(newExpense);
+      await onExpenseAdded(newExpense);
+      handleRemoveReceipt();
       onClose();
     } catch (err: any) {
       setError(err?.message || "Network error while submitting expense.");
@@ -120,13 +173,63 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
             />
           </div>
 
+          <div>
+            <label className="text-xs text-muted-foreground font-semibold uppercase block mb-1">
+              Proof of Payment <span className="text-rose-600 dark:text-rose-400">*</span>
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_RECEIPT_TYPES.join(",")}
+              capture="environment"
+              onChange={handlePickReceipt}
+              className="hidden"
+            />
+
+            {!receiptFile ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/40 bg-card/60 text-muted-foreground hover:bg-amber-950/10 hover:border-amber-400 transition-colors cursor-pointer"
+              >
+                <Camera className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                <span className="text-[11px] font-semibold">Tap to attach a receipt photo or PDF</span>
+                <span className="text-[10px] text-muted-foreground">JPG, PNG, HEIC or PDF · up to 8MB</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-emerald-300 dark:border-emerald-500/40 bg-emerald-950/10">
+                {receiptPreviewUrl ? (
+                  <img src={receiptPreviewUrl} alt="Receipt preview" className="w-12 h-12 object-cover rounded-lg border border-border shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg border border-border bg-card flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-foreground truncate">{receiptFile.name}</div>
+                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Attached
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveReceipt}
+                  className="text-muted-foreground hover:text-rose-700 hover:dark:text-rose-400 cursor-pointer p-1"
+                  title="Remove attachment"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
           <p className="text-[11px] text-muted-foreground italic">
             * Note: Submitted expenses are marked as <strong>Pending</strong> until approved by the Operations Manager.
           </p>
 
           {error && (
             <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 rounded p-2.5 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -134,11 +237,11 @@ export const DriverExpenseModal: React.FC<DriverExpenseModalProps> = ({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={loading}
-            className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-5 text-sm"
+            disabled={loading || !receiptFile}
+            className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-5 text-sm disabled:opacity-50"
           >
             {loading ? (
-              <ButtonLoader label="Submitting Expense..." />
+              <ButtonLoader label="Uploading proof & submitting..." />
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4 mr-1.5" /> Submit for Approval

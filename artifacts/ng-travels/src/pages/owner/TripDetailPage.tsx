@@ -299,6 +299,16 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
                         </span>
                       </div>
                       {exp.notes && <p className="text-[11px] text-muted-foreground">{exp.notes}</p>}
+                      {exp.receiptPath && (
+                        <a
+                          href={exp.receiptPath}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400 hover:underline"
+                        >
+                          <FileText className="w-3 h-3" /> View Proof of Payment
+                        </a>
+                      )}
                     </div>
 
                     {exp.status === "pending" && onApproveExpense && onRejectExpense && (

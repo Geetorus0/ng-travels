@@ -1,15 +1,29 @@
 import React, { useState } from "react";
-import { Settings, Save, CheckCircle2, Building, Phone, Mail, IndianRupee, Globe, Smartphone, ShieldCheck, Car, Loader2 } from "lucide-react";
+import { Settings, Save, CheckCircle2, Building, Phone, Mail, IndianRupee, Globe, Smartphone, ShieldCheck, Car, Loader2, Users, Plus, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminUserManagementModal, CreateStaffUserData } from "@/components/admin/AdminUserManagementModal";
 
 interface SettingsPageProps {
   settings: any;
   onSaveSettings: (updated: any) => void | Promise<void>;
+  staffUsers?: any[];
+  staffUsersLoading?: boolean;
+  onCreateStaffUser?: (data: CreateStaffUserData) => Promise<void>;
+  onResetStaffPassword?: (userId: number, newPassword: string) => Promise<void>;
+  onUpdateStaffUser?: (userId: number, updates: { role?: string; status?: string }) => Promise<void>;
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSaveSettings }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({
+  settings = {},
+  onSaveSettings,
+  staffUsers = [],
+  staffUsersLoading = false,
+  onCreateStaffUser,
+  onResetStaffPassword,
+  onUpdateStaffUser,
+}) => {
   const [company, setCompany] = useState(settings.company || "NG Travels Operations");
   const [mobile, setMobile] = useState(settings.mobile || "+91 98450 21867");
   const [email, setEmail] = useState(settings.email || "operations@ngtravels.in");
@@ -18,6 +32,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSav
   const [terms, setTerms] = useState(settings.terms || "1. Toll, parking and state permit charges are customer payable at actuals.\n2. Billing starts and ends from garage to garage.\n3. AC will be switched off while driving in hill terrain.");
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [pendingStaffAction, setPendingStaffAction] = useState<number | null>(null);
+
+  const handleToggleStaffStatus = async (staffUser: any) => {
+    if (!onUpdateStaffUser || pendingStaffAction) return;
+    const nextStatus = staffUser.status === "active" ? "inactive" : "active";
+    setPendingStaffAction(staffUser.id);
+    try {
+      await onUpdateStaffUser(staffUser.id, { status: nextStatus });
+    } catch (err: any) {
+      alert(err.message || "Failed to update account status.");
+    } finally {
+      setPendingStaffAction(null);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +214,95 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSav
           </a>
         </div>
       </div>
+
+      {/* Admin & Staff Accounts */}
+      {onCreateStaffUser && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> Admin & Staff Accounts
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Logins for co-owners, managers, dispatchers, and accountants. Driver accounts are managed separately.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setIsStaffModalOpen(true)}
+              className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add Staff Account
+            </Button>
+          </div>
+
+          {staffUsersLoading && staffUsers.length === 0 ? (
+            <div className="p-6 flex items-center justify-center gap-2 bg-card/50 rounded-xl border border-border text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading staff accounts...
+            </div>
+          ) : staffUsers.length === 0 ? (
+            <div className="p-6 text-center bg-card/50 rounded-xl border border-border text-xs text-muted-foreground">
+              No admin or staff accounts yet — you're the only login.
+            </div>
+          ) : (
+            <div className="bg-card/70 border border-border rounded-xl divide-y divide-border overflow-hidden">
+              {staffUsers.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between gap-3 p-3.5 text-xs">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground truncate">{u.name}</span>
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 shrink-0">
+                        {u.role}
+                      </span>
+                      {u.status === "inactive" && (
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30 shrink-0">
+                          Deactivated
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground text-[10px] mt-0.5 truncate">
+                      {u.email}{u.phone ? ` • ${u.phone}` : ""}
+                    </div>
+                  </div>
+                  {u.role !== "owner" && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={Boolean(pendingStaffAction)}
+                        onClick={() => handleToggleStaffStatus(u)}
+                        className={`h-7 text-[10px] px-2 ${
+                          u.status === "active"
+                            ? "border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-400 hover:bg-rose-950/30"
+                            : "border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-950/30"
+                        }`}
+                      >
+                        {pendingStaffAction === u.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : u.status === "active" ? (
+                          <><Ban className="w-3 h-3 mr-1" /> Deactivate</>
+                        ) : (
+                          <><RotateCcw className="w-3 h-3 mr-1" /> Activate</>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {onCreateStaffUser && onResetStaffPassword && (
+        <AdminUserManagementModal
+          isOpen={isStaffModalOpen}
+          onClose={() => setIsStaffModalOpen(false)}
+          onCreateStaffUser={onCreateStaffUser}
+          onResetStaffPassword={onResetStaffPassword}
+          staffUsers={staffUsers}
+        />
+      )}
     </div>
   );
 };

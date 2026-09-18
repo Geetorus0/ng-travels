@@ -1387,6 +1387,21 @@ function MainApp() {
     },
   });
 
+  const { data: staffUsersData = [], isLoading: staffUsersLoading } = useQuery({
+    queryKey: ["/api/admin/users"],
+    enabled: isSignedIn && user?.realRole !== "driver",
+    queryFn: async () => {
+      try {
+        const res = await apiFetch("/api/admin/users", {
+          headers: { "x-user-role": user?.role || "owner" },
+        });
+        return await safeJsonArray(res);
+      } catch {
+        return [];
+      }
+    },
+  });
+
   // Dedicated Driver Queries
   const { data: driverTodayTrips = [], isLoading: driverTodayLoading } = useQuery({
     queryKey: ["/api/driver/today"],
@@ -1494,12 +1509,19 @@ function MainApp() {
       ? (driverTodayTrips as any).items
       : [];
 
-  // Action Handlers
-  const handleTripCreated = () => {
-    qc.invalidateQueries({ queryKey: ["/api/trips"] });
-    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
-    qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
+  // Action Handlers — every invalidateQueries call below is awaited (or
+  // Promise.all'd) rather than just fired-and-forgotten: these handlers are
+  // passed into modals/buttons that show a loading spinner until the
+  // returned promise settles, so an un-awaited invalidation let the spinner
+  // stop before the refetched data actually arrived, briefly showing stale
+  // state (the old status/list) as if the app were stuck.
+  const handleTripCreated = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["/api/driver/today"] }),
+      qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] }),
+    ]);
   };
 
   const handleApproveExpense = async (id: number) => {
@@ -1507,9 +1529,11 @@ function MainApp() {
       method: "PATCH",
       headers: { "x-user-role": "owner" },
     });
-    qc.invalidateQueries({ queryKey: ["/api/expenses"] });
-    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/expenses"] }),
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+    ]);
   };
 
   const handleRejectExpense = async (id: number) => {
@@ -1518,9 +1542,11 @@ function MainApp() {
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify({ reason: "Expense rejected by operations" }),
     });
-    qc.invalidateQueries({ queryKey: ["/api/expenses"] });
-    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    qc.invalidateQueries({ queryKey: ["/api/trips"] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/expenses"] }),
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+    ]);
   };
 
   const handleUpdateAvailability = async (
@@ -1532,9 +1558,11 @@ function MainApp() {
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify({ availability }),
     });
-    qc.invalidateQueries({ queryKey: ["/api/drivers"] });
-    qc.invalidateQueries({ queryKey: ["/api/driver/me"] });
-    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/drivers"] }),
+      qc.invalidateQueries({ queryKey: ["/api/driver/me"] }),
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+    ]);
   };
 
   const handleSaveSettings = async (updated: any) => {
@@ -1543,7 +1571,51 @@ function MainApp() {
       headers: { "Content-Type": "application/json", "x-user-role": "owner" },
       body: JSON.stringify(updated),
     });
-    qc.invalidateQueries({ queryKey: ["/api/settings"] });
+    await qc.invalidateQueries({ queryKey: ["/api/settings"] });
+  };
+
+  const handleCreateStaffUser = async (data: {
+    name: string;
+    email: string;
+    mobile?: string;
+    role: string;
+    initialPassword: string;
+  }) => {
+    const res = await apiFetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error?.error?.message || `Failed to create account (${res.status})`);
+    }
+    await qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+  };
+
+  const handleResetStaffPassword = async (userId: number, newPassword: string) => {
+    const res = await apiFetch(`/api/admin/users/${userId}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error?.error?.message || `Failed to reset password (${res.status})`);
+    }
+  };
+
+  const handleUpdateStaffUser = async (userId: number, updates: { role?: string; status?: string }) => {
+    const res = await apiFetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error?.error?.message || `Failed to update account (${res.status})`);
+    }
+    await qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
   };
 
   const handleMarkNotificationRead = async (id: number) => {
@@ -1551,7 +1623,7 @@ function MainApp() {
       method: "POST",
       headers: { "x-user-role": user?.role || "owner" },
     });
-    qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    await qc.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
   const handleMarkAllNotificationsRead = async () => {
@@ -1559,7 +1631,7 @@ function MainApp() {
       method: "POST",
       headers: { "x-user-role": user?.role || "owner" },
     });
-    qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    await qc.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
   const handleDriverMilestone = async (
@@ -1585,10 +1657,17 @@ function MainApp() {
       throw new Error(errData?.error?.message || "Failed to update trip status.");
     }
 
-    qc.invalidateQueries({ queryKey: ["/api/trips"] });
-    qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
-    qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
-    qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    // Awaited so the caller's loading spinner stays up until the trip data
+    // actually reflects the new status — otherwise the button flips back to
+    // "not loading" the instant the POST returns, but still shows the OLD
+    // stage (or nothing at all) for a beat until the background refetch
+    // lands, which reads as the whole app being slow/stuck.
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+      qc.invalidateQueries({ queryKey: ["/api/driver/today"] }),
+      qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] }),
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+    ]);
   };
 
   const nativeRole = (window as any).NG_APP_ROLE;
@@ -1965,6 +2044,11 @@ function MainApp() {
               <SettingsPage
                 settings={settingsData}
                 onSaveSettings={handleSaveSettings}
+                staffUsers={staffUsersData}
+                staffUsersLoading={staffUsersLoading}
+                onCreateStaffUser={handleCreateStaffUser}
+                onResetStaffPassword={handleResetStaffPassword}
+                onUpdateStaffUser={handleUpdateStaffUser}
               />
             </Route>
             <Route>
@@ -2011,9 +2095,11 @@ function MainApp() {
         isOpen={Boolean(cancelTrip)}
         onClose={() => setCancelTrip(null)}
         trip={cancelTrip}
-        onTripCancelled={() => {
-          qc.invalidateQueries({ queryKey: ["/api/trips"] });
-          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        onTripCancelled={async () => {
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+            qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+          ]);
         }}
       />
 
@@ -2021,10 +2107,12 @@ function MainApp() {
         isOpen={Boolean(paymentRecordTrip)}
         onClose={() => setPaymentRecordTrip(null)}
         trip={paymentRecordTrip}
-        onPaymentRecorded={() => {
-          qc.invalidateQueries({ queryKey: ["/api/trips"] });
-          qc.invalidateQueries({ queryKey: ["/api/payments"] });
-          qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        onPaymentRecorded={async () => {
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+            qc.invalidateQueries({ queryKey: ["/api/payments"] }),
+            qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+          ]);
         }}
       />
 
@@ -2034,12 +2122,14 @@ function MainApp() {
           onClose={() => setDriverKmTrip(null)}
           trip={driverKmTrip.trip}
           mode={driverKmTrip.mode}
-          onSuccess={() => {
-            qc.invalidateQueries({ queryKey: ["/api/trips"] });
-            qc.invalidateQueries({ queryKey: ["/api/driver/today"] });
-            qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] });
-            qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
-            qc.invalidateQueries({ queryKey: ["/api/drivers"] });
+          onSuccess={async () => {
+            await Promise.all([
+              qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+              qc.invalidateQueries({ queryKey: ["/api/driver/today"] }),
+              qc.invalidateQueries({ queryKey: ["/api/driver/current-trip"] }),
+              qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+              qc.invalidateQueries({ queryKey: ["/api/drivers"] }),
+            ]);
           }}
         />
       )}
@@ -2049,8 +2139,8 @@ function MainApp() {
           isOpen={Boolean(driverExpenseTripId)}
           onClose={() => setDriverExpenseTripId(null)}
           tripId={driverExpenseTripId}
-          onExpenseAdded={() => {
-            qc.invalidateQueries({ queryKey: ["/api/expenses"] });
+          onExpenseAdded={async () => {
+            await qc.invalidateQueries({ queryKey: ["/api/expenses"] });
           }}
         />
       )}
