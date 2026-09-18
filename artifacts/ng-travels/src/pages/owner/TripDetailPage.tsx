@@ -3,10 +3,10 @@ import { Link } from "wouter";
 import {
   ArrowLeft, Navigation, MapPin, User, Phone, Calendar, Clock, CircleDollarSign,
   Receipt, Fuel, Gauge, ShieldCheck, CheckCircle2, XCircle, Share2, Printer, Plus,
-  FileText, ArrowUpRight, AlertCircle, Loader2
+  FileText, ArrowUpRight, AlertCircle, Loader2, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatINR } from "@/lib/fareEngine";
+import { formatINR, canEditTrip } from "@/lib/fareEngine";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 
 interface TripDetailPageProps {
@@ -16,6 +16,7 @@ interface TripDetailPageProps {
   onOpenCustomerCopy: (trip: any) => void;
   onOpenPaymentModal: (trip: any) => void;
   onOpenCancelModal: (trip: any) => void;
+  onOpenEditTrip: (trip: any) => void;
   onApproveExpense?: (expenseId: number) => void | Promise<void>;
   onRejectExpense?: (expenseId: number) => void | Promise<void>;
   onStatusChange?: (newStatus: string) => void;
@@ -28,6 +29,7 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
   onOpenCustomerCopy,
   onOpenPaymentModal,
   onOpenCancelModal,
+  onOpenEditTrip,
   onApproveExpense,
   onRejectExpense,
   onStatusChange,
@@ -110,6 +112,16 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
 
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {canEditTrip(trip) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenEditTrip(trip)}
+              className="border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300 hover:bg-sky-950/30 text-xs font-semibold"
+            >
+              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit Trip
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

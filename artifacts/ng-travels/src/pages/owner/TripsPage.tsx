@@ -3,18 +3,19 @@ import { Link } from "wouter";
 import {
   Navigation, Search, Filter, Plus, Eye, Receipt, FileText, XCircle,
   CheckCircle2, ArrowUpRight, Calendar, User, Phone, MapPin, Gauge,
-  Clock, IndianRupee, ChevronRight
+  Clock, IndianRupee, ChevronRight, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatINR } from "@/lib/fareEngine";
+import { formatINR, canEditTrip } from "@/lib/fareEngine";
 import { NGTravelsLoader } from "@/components/loading";
 
 interface TripsPageProps {
   trips: any[];
   isLoading?: boolean;
   onOpenCreateTrip: () => void;
+  onOpenEditTrip: (trip: any) => void;
   onOpenCustomerCopy: (trip: any) => void;
   onOpenPaymentModal: (trip: any) => void;
   onOpenCancelModal: (trip: any) => void;
@@ -24,6 +25,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
   trips = [],
   isLoading = false,
   onOpenCreateTrip,
+  onOpenEditTrip,
   onOpenCustomerCopy,
   onOpenPaymentModal,
   onOpenCancelModal,
@@ -239,6 +241,17 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                     </Button>
                   )}
                 </div>
+
+                {canEditTrip(trip) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenEditTrip(trip)}
+                    className="w-full text-xs h-8 border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300 hover:bg-sky-950/30"
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Trip
+                  </Button>
+                )}
               </div>
             );
           })
@@ -360,6 +373,17 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                           >
                             <FileText className="w-3.5 h-3.5" />
                           </Button>
+                          {canEditTrip(trip) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onOpenEditTrip(trip)}
+                              className="h-7 w-7 p-0 text-sky-700 dark:text-sky-400 hover:bg-sky-950/30 cursor-pointer"
+                              title="Edit Trip"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                           {Number(trip.remainingBalance) > 0 && (
                             <Button
                               size="sm"

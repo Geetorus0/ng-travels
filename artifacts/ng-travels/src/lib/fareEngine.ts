@@ -294,6 +294,24 @@ export function formatKM(km: number | string | undefined | null): string {
   return `${val.toLocaleString("en-IN", { maximumFractionDigits: 1 })} km`;
 }
 
+// A trip is only safe to edit before the driver has actually started it —
+// once odometer/route data starts recording against it (started, in
+// progress, completed) or it's cancelled, changing pickup/route/fare would
+// contradict what's already happened on the ground.
+const NON_EDITABLE_TRIP_STATUSES = new Set([
+  "started",
+  "in_progress",
+  "reached_pickup",
+  "customer_picked_up",
+  "completed",
+  "cancelled",
+]);
+
+export function canEditTrip(trip: { status?: string | null } | null | undefined): boolean {
+  if (!trip?.status) return true;
+  return !NON_EDITABLE_TRIP_STATUSES.has(trip.status);
+}
+
 export function validateOdometer(
   startingKm: number,
   endingKm: number,

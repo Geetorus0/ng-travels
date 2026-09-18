@@ -14,8 +14,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSav
   const [mobile, setMobile] = useState(settings.mobile || "+91 98450 21867");
   const [email, setEmail] = useState(settings.email || "operations@ngtravels.in");
   const [defaultRate, setDefaultRate] = useState(settings.defaultRate || 18);
-  const [minimumKmPerDay, setMinimumKmPerDay] = useState(settings.minimumKmPerDay || 250);
-  const [driverBataPerDay, setDriverBataPerDay] = useState(settings.driverBataPerDay || 500);
   const [billingDayPolicy, setBillingDayPolicy] = useState(settings.billingDayPolicy || "CALENDAR_DAYS");
   const [terms, setTerms] = useState(settings.terms || "1. Toll, parking and state permit charges are customer payable at actuals.\n2. Billing starts and ends from garage to garage.\n3. AC will be switched off while driving in hill terrain.");
   const [saved, setSaved] = useState(false);
@@ -31,8 +29,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSav
         mobile,
         email,
         defaultRate: Number(defaultRate),
-        minimumKmPerDay: Number(minimumKmPerDay),
-        driverBataPerDay: Number(driverBataPerDay),
         billingDayPolicy,
         terms,
       });
@@ -98,36 +94,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings = {}, onSav
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-foreground font-semibold block mb-1">Commercial Rate / KM (₹)</label>
-            <Input
-              type="number"
-              value={defaultRate}
-              onChange={(e) => setDefaultRate(e.target.value)}
-              className="bg-card border-border text-xs font-mono font-bold text-amber-700 dark:text-amber-400"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-foreground font-semibold block mb-1">Minimum KM Rule / Day</label>
-            <Input
-              type="number"
-              value={minimumKmPerDay}
-              onChange={(e) => setMinimumKmPerDay(e.target.value)}
-              className="bg-card border-border text-xs font-mono font-bold text-sky-700 dark:text-sky-400"
-            />
-            <span className="text-[10px] text-muted-foreground mt-0.5 block">e.g. 250 km/day for round trips</span>
-          </div>
-          <div>
-            <label className="text-xs text-foreground font-semibold block mb-1">Driver Bata / Day (₹)</label>
-            <Input
-              type="number"
-              value={driverBataPerDay}
-              onChange={(e) => setDriverBataPerDay(e.target.value)}
-              className="bg-card border-border text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400"
-            />
-            <span className="text-[10px] text-muted-foreground mt-0.5 block">e.g. ₹500/day</span>
-          </div>
+        <div>
+          <label className="text-xs text-foreground font-semibold block mb-1">Commercial Rate / KM (₹)</label>
+          <Input
+            type="number"
+            value={defaultRate}
+            onChange={(e) => setDefaultRate(e.target.value)}
+            className="bg-card border-border text-xs font-mono font-bold text-amber-700 dark:text-amber-400 max-w-50"
+          />
         </div>
 
         <div>

@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Browser } from "@capacitor/browser";
 import {
   Navigation, MapPin, Gauge, Clock, ShieldCheck, Car, Radio,
   Compass, ExternalLink, RefreshCw, Layers, Plus, Minus, LocateFixed,
@@ -17,6 +18,15 @@ export interface WaypointLocation {
   latitude?: number;
   longitude?: number;
   address?: string;
+}
+
+export interface TollPlazaMarker {
+  id?: number;
+  name: string;
+  lat: number;
+  lon: number;
+  rate: number;
+  distanceAlongRouteKm?: number;
 }
 
 export interface RealtimeFleetMapProps {
@@ -43,6 +53,7 @@ export interface RealtimeFleetMapProps {
   totalMapKm?: number;
   outboundDurationMinutes?: number;
   returnDurationMinutes?: number;
+  tollPlazas?: TollPlazaMarker[];
 }
 
 export const GEOAPIFY_API_KEY = "fccc330705934d6abd2be56e77dff380";
@@ -104,6 +115,7 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
   totalMapKm,
   outboundDurationMinutes = 0,
   returnDurationMinutes = 0,
+  tollPlazas = [],
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -280,6 +292,47 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
     });
     routePoints.push(destCoords);
 
+    // 3b. NHAI Toll Plaza Pins — real coordinates + fare, in the order the
+    // vehicle actually reaches them along the route (matches the FASTag-style
+    // toll calculator: a marker per plaza with its exact rate on the map).
+    tollPlazas.forEach((plaza) => {
+      if (!plaza?.lat || !plaza?.lon) return;
+      const tollIcon = L.divIcon({
+        className: "google-toll-pin",
+        html: `
+          <div style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            background: #1f2937;
+            color: #FBBC04;
+            font-weight: 900;
+            font-size: 12px;
+            border-radius: 6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%);
+          ">
+            ₹
+          </div>
+        `,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+
+      L.marker([plaza.lat, plaza.lon], { icon: tollIcon })
+        .addTo(map)
+        .bindPopup(`
+          <div style="font-size: 12px; color: #1f2937; font-family: sans-serif;">
+            <b>${plaza.name}</b><br/>
+            ${plaza.distanceAlongRouteKm != null ? `${plaza.distanceAlongRouteKm} km into route<br/>` : ""}
+            Toll: <strong>${formatINR(plaza.rate)}</strong>
+          </div>
+        `);
+    });
+
     // 4. Authentic Real Driving Road Polylines (Phase 52)
     if (showRoutePolyline) {
       const isRound = tripType.toLowerCase().includes("round");
@@ -389,7 +442,7 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
     // Fit Bounds smoothly
     const bounds = L.latLngBounds(routePoints);
     map.fitBounds(bounds, { padding: [40, 40] });
-  }, [pickup?.name, destination?.name, stops, mapStyle, showRoutePolyline]);
+  }, [pickup?.name, destination?.name, stops, mapStyle, showRoutePolyline, tollPlazas, outboundCoordinates, returnCoordinates, routeCoordinates]);
 
   // Live GPS Telemetry Polling from Server (only for an actual dispatched trip)
   useEffect(() => {
@@ -451,11 +504,19 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
   }, [isLiveTrip, previewSpeedKmh, previewEtaMinutes, pickupCoords[0], pickupCoords[1], destCoords[0], destCoords[1]]);
 
   const openGoogleMapsDirections = () => {
-    const origin = encodeURIComponent(pickup?.name || "Erode");
-    const dest = encodeURIComponent(destination?.name || "Coimbatore");
+    // Prefer exact resolved coordinates over the typed name — Google Maps
+    // would otherwise re-geocode a plain name itself, which can land on a
+    // different same-named place than the one the app actually routed.
+    const origin = pLat && pLng ? `${pLat},${pLng}` : encodeURIComponent(pickup?.name || "Erode");
+    const dest = dLat && dLng ? `${dLat},${dLng}` : encodeURIComponent(destination?.name || "Coimbatore");
     const waypointsParam = stops.length > 0 ? `&waypoints=${encodeURIComponent(stops.map((s) => s.name).join("|"))}` : "";
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypointsParam}`;
-    window.open(url, "_blank");
+
+    // In the Android app, Browser.open() shows the page in an in-app Custom
+    // Tabs sheet that slides over the app (no separate browser switch, no
+    // Google API key needed). In a plain web browser it falls back to a
+    // normal new tab, same as before.
+    Browser.open({ url });
   };
 
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();

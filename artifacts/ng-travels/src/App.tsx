@@ -1179,6 +1179,7 @@ function MainApp() {
 
   // Modal States
   const [createTripOpen, setCreateTripOpen] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<any | null>(null);
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [customerCopyTrip, setCustomerCopyTrip] = useState<any | null>(null);
   const [paymentRecordTrip, setPaymentRecordTrip] = useState<any | null>(null);
@@ -1719,17 +1720,31 @@ function MainApp() {
             <Route path="/driver/expenses">
               <DriverExpensesPage
                 expenses={
+                  // Fail closed, not open: a driver session with no driverId
+                  // (shouldn't happen post-fix, but the server has already
+                  // shown us it can) must see nothing here, not everyone's
+                  // expenses. Only an owner/admin previewing this route sees
+                  // the unfiltered list.
                   Array.isArray(expenseList)
-                    ? expenseList.filter(
-                        (e: any) =>
-                          !user?.driverId || e?.driverId === user?.driverId,
-                      )
+                    ? user?.realRole === "driver"
+                      ? expenseList.filter((e: any) => e?.driverId === user?.driverId)
+                      : expenseList
                     : []
                 }
                 isLoading={expensesLoading}
-                onOpenExpenseModal={() =>
-                  setDriverExpenseTripId(driverCurrentTrip?.id || null)
-                }
+                onOpenExpenseModal={() => {
+                  // The modal is keyed to a trip (expenses require one server-side)
+                  // and only opens once driverExpenseTripId is set, so falling
+                  // back to just driverCurrentTrip left this button doing nothing
+                  // — silently, no error — whenever the driver wasn't mid-trip.
+                  // Fall back to today's most recent assigned trip instead.
+                  const fallbackTripId = driverCurrentTrip?.id || driverTodayTripList[0]?.id || null;
+                  if (!fallbackTripId) {
+                    alert("You need a trip assigned today before you can log an expense.");
+                    return;
+                  }
+                  setDriverExpenseTripId(fallbackTripId);
+                }}
               />
             </Route>
             <Route path="/driver/vehicle">
@@ -1828,6 +1843,7 @@ function MainApp() {
                   setInitialEnquiryForTrip(null);
                   setCreateTripOpen(true);
                 }}
+                onOpenEditTrip={(trip) => setEditingTrip(trip)}
                 onOpenCustomerCopy={(trip) => setCustomerCopyTrip(trip)}
                 onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
                 onOpenCancelModal={(trip) => setCancelTrip(trip)}
@@ -1851,6 +1867,7 @@ function MainApp() {
                     onOpenCustomerCopy={(trip) => setCustomerCopyTrip(trip)}
                     onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
                     onOpenCancelModal={(trip) => setCancelTrip(trip)}
+                    onOpenEditTrip={(trip) => setEditingTrip(trip)}
                     onApproveExpense={handleApproveExpense}
                     onRejectExpense={handleRejectExpense}
                   />
@@ -1959,18 +1976,20 @@ function MainApp() {
 
       {/* Global Modals */}
       <CreateTripModal
-        isOpen={createTripOpen}
-        onClose={() => setCreateTripOpen(false)}
+        isOpen={createTripOpen || Boolean(editingTrip)}
+        onClose={() => {
+          setCreateTripOpen(false);
+          setEditingTrip(null);
+        }}
         onTripCreated={handleTripCreated}
         customers={customerList}
         drivers={driverList}
         defaultRate={settingsData.defaultRate || 18}
-        defaultMinimumKm={settingsData.minimumKmPerDay || 250}
-        defaultDriverBata={settingsData.driverBataPerDay || 500}
         defaultBillingDayPolicy={
           settingsData.billingDayPolicy || "CALENDAR_DAYS"
         }
         initialEnquiry={initialEnquiryForTrip}
+        editingTrip={editingTrip}
       />
 
       <CustomerCopyModal

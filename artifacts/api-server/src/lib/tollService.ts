@@ -26,6 +26,9 @@ export interface TollMatch {
   state: string | null;
   rate: number;
   distanceMeters: number;
+  lat: number;
+  lon: number;
+  distanceAlongRouteKm: number;
 }
 
 export interface TollEstimateResult {
@@ -60,7 +63,7 @@ function distanceToSegmentMeters(
   aLon: number,
   bLat: number,
   bLon: number,
-): number {
+): { distanceMeters: number; t: number } {
   const latScale = 110574; // meters per degree latitude (roughly constant)
   const lonScale = 111320 * Math.cos(toRad(pLat)); // meters per degree longitude at this latitude
 
@@ -78,36 +81,72 @@ function distanceToSegmentMeters(
 
   const cx = ax + t * abx;
   const cy = ay + t * aby;
-  return Math.sqrt(cx * cx + cy * cy);
+  return { distanceMeters: Math.sqrt(cx * cx + cy * cy), t };
 }
 
-function minDistanceToRoute(plazaLat: number, plazaLon: number, coordinates: [number, number][]): number {
-  if (coordinates.length === 0) return Infinity;
+interface RouteMatch {
+  distanceMeters: number;
+  distanceAlongRouteMeters: number;
+}
+
+/**
+ * Perpendicular distance from a point to the nearest route segment, plus
+ * how far along the route (from the origin) that nearest point sits — the
+ * latter lets the UI show each toll plaza's position along the trip, the
+ * way a highway toll calculator marks plazas on the route line.
+ */
+function matchToRoute(
+  plazaLat: number,
+  plazaLon: number,
+  coordinates: [number, number][],
+  cumulativeMeters: number[],
+): RouteMatch {
+  if (coordinates.length === 0) return { distanceMeters: Infinity, distanceAlongRouteMeters: 0 };
   if (coordinates.length === 1) {
-    return haversineMeters(plazaLat, plazaLon, coordinates[0][0], coordinates[0][1]);
+    return {
+      distanceMeters: haversineMeters(plazaLat, plazaLon, coordinates[0][0], coordinates[0][1]),
+      distanceAlongRouteMeters: 0,
+    };
   }
-  let min = Infinity;
+
+  let best: RouteMatch = { distanceMeters: Infinity, distanceAlongRouteMeters: 0 };
   for (let i = 0; i < coordinates.length - 1; i++) {
     const [aLat, aLon] = coordinates[i];
     const [bLat, bLon] = coordinates[i + 1];
-    const d = distanceToSegmentMeters(plazaLat, plazaLon, aLat, aLon, bLat, bLon);
-    if (d < min) min = d;
-    if (min < 50) break; // close enough, stop early
+    const { distanceMeters, t } = distanceToSegmentMeters(plazaLat, plazaLon, aLat, aLon, bLat, bLon);
+    if (distanceMeters < best.distanceMeters) {
+      const segmentLength = cumulativeMeters[i + 1] - cumulativeMeters[i];
+      best = {
+        distanceMeters,
+        distanceAlongRouteMeters: cumulativeMeters[i] + t * segmentLength,
+      };
+      if (distanceMeters < 50) break; // close enough, stop early
+    }
   }
-  return min;
+  return best;
 }
+
+/**
+ * Which NHAI fare applies for the whole journey at a matched plaza:
+ * - "single": one crossing, one-way — `carSingle`.
+ * - "round_trip_same_day": both crossings happen at the same plaza within the
+ *   24-hour window the National Highways Fee Rules, 2008 give for a return
+ *   journey — NHAI's discounted same-booth rate applies (`carReturn`, a
+ *   ~1.5x-of-single fare, not 2x).
+ * - "round_trip_multi_day": a round trip whose return leg passes the plaza
+ *   more than 24 hours after the outbound leg (the common case for
+ *   multi-day outstation tours) — the 24-hour concession no longer applies,
+ *   so the return crossing is billed as a fresh single trip: `carSingle x 2`.
+ */
+export type TollRateMode = "single" | "round_trip_same_day" | "round_trip_multi_day";
 
 /**
  * Estimate toll cost for a driving route by matching NHAI toll plazas whose
  * coordinates fall within MAX_MATCH_DISTANCE_M of the route polyline.
- *
- * `carSingle` for a one-way leg; `carReturn` when the same road is being
- * billed as a same-day round trip (NHAI's return rate is a discounted
- * same-booth rate, not 2x single — e.g. often ~1.5x, not 2x).
  */
 export function estimateTollForRoute(
   coordinates: [number, number][],
-  isRoundTrip: boolean,
+  rateMode: TollRateMode,
 ): TollEstimateResult {
   if (!Array.isArray(coordinates) || coordinates.length === 0) {
     return { totalToll: 0, plazas: [] };
@@ -122,22 +161,49 @@ export function estimateTollForRoute(
   }
   const pad = 0.02; // ~2km bounding-box pad, cheap prefilter before the real distance check
 
+  // Cumulative distance (meters) at each coordinate, so a matched plaza's
+  // nearest point on the route can be converted into "N km into the trip".
+  const cumulativeMeters: number[] = [0];
+  for (let i = 1; i < coordinates.length; i++) {
+    const [aLat, aLon] = coordinates[i - 1];
+    const [bLat, bLon] = coordinates[i];
+    cumulativeMeters.push(cumulativeMeters[i - 1] + haversineMeters(aLat, aLon, bLat, bLon));
+  }
+
   const matches: TollMatch[] = [];
   for (const plaza of tollPlazas) {
     if (plaza.lat < minLat - pad || plaza.lat > maxLat + pad) continue;
     if (plaza.lon < minLon - pad || plaza.lon > maxLon + pad) continue;
 
-    const distanceMeters = minDistanceToRoute(plaza.lat, plaza.lon, coordinates);
+    const { distanceMeters, distanceAlongRouteMeters } = matchToRoute(
+      plaza.lat,
+      plaza.lon,
+      coordinates,
+      cumulativeMeters,
+    );
     if (distanceMeters <= MAX_MATCH_DISTANCE_M) {
+      const rate =
+        rateMode === "round_trip_same_day"
+          ? plaza.carReturn
+          : rateMode === "round_trip_multi_day"
+            ? plaza.carSingle * 2
+            : plaza.carSingle;
+
       matches.push({
         id: plaza.id,
         name: plaza.name,
         state: plaza.state,
-        rate: isRoundTrip ? plaza.carReturn : plaza.carSingle,
+        rate,
         distanceMeters: Math.round(distanceMeters),
+        lat: plaza.lat,
+        lon: plaza.lon,
+        distanceAlongRouteKm: Math.round((distanceAlongRouteMeters / 1000) * 10) / 10,
       });
     }
   }
+
+  // Present plazas in the order the vehicle actually reaches them along the route.
+  matches.sort((a, b) => a.distanceAlongRouteKm - b.distanceAlongRouteKm);
 
   const totalToll = matches.reduce((sum, m) => sum + m.rate, 0);
   return { totalToll, plazas: matches };

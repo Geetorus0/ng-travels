@@ -350,7 +350,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               value={coordsInput}
               onChange={(e) => setCoordsInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleResolveLocation()}
-              className={`bg-card border-border text-xs h-10 placeholder:text-muted-foreground ${colors.ring}`}
+              className={`bg-card border-border text-xs h-10 placeholder:text-muted-foreground min-w-0 flex-1 ${colors.ring}`}
             />
             <Button
               type="button"
