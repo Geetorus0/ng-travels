@@ -68,8 +68,8 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl bg-background text-foreground border-border p-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/80">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-2 pl-6 pr-12 py-4 border-b border-border bg-card/80 shrink-0">
+          <div className="flex items-center flex-wrap gap-2.5">
             <img src="/logo.png" alt="NG Travels" className="w-8 h-8 rounded-lg object-contain bg-black border border-amber-300 dark:border-amber-500/30 p-0.5" />
             <div>
               <span className="text-amber-700 dark:text-amber-400 font-bold text-base tracking-wider block">NG TRAVELS</span>
@@ -79,7 +79,7 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
               CUSTOMER COPY
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={handlePrint} className="border-border hover:bg-muted text-xs">
               <Printer className="w-3.5 h-3.5 mr-1.5" /> Print
             </Button>
