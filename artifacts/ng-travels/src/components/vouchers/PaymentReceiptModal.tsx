@@ -56,13 +56,13 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-background text-foreground border-border p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/80">
+      <DialogContent className="max-w-md bg-background text-foreground border-border p-0 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between flex-wrap gap-2 pl-6 pr-12 py-4 border-b border-border bg-card/80 shrink-0">
           <div className="flex items-center gap-2.5">
             <img src="/logo.png" alt="NG Travels" className="w-7 h-7 rounded-md object-contain bg-black border border-amber-300 dark:border-amber-500/30 p-0.5" />
             <span className="font-bold text-foreground">Payment Receipt</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={handlePrint} className="border-border hover:bg-muted text-xs">
               <Printer className="w-3.5 h-3.5 mr-1" /> Print
             </Button>
@@ -72,7 +72,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-6 text-sm bg-background">
+        <div className="p-6 overflow-y-auto space-y-6 text-sm bg-background">
           <div className="text-center pb-4 border-b border-border">
             <img src="/logo.png" alt="NG Travels" className="w-16 h-16 rounded-xl object-contain bg-black border border-amber-300 dark:border-amber-500/30 p-1 mx-auto mb-2 shadow-lg" />
             <h3 className="font-bold text-lg text-foreground">{companyInfo.company}</h3>
