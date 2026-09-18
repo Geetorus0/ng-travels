@@ -5,6 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminUserManagementModal, CreateStaffUserData } from "@/components/admin/AdminUserManagementModal";
 
+// Hosted on Supabase Storage (public "app-releases" bucket), not served
+// from /public — *.apk is git-ignored at the repo root, so a file only
+// present in the local public/ folder would never actually reach the
+// deployed site. Re-upload here after building a new APK.
+const APK_DOWNLOAD_URLS = {
+  owner: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
+  driver: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
+};
+
 interface SettingsPageProps {
   settings: any;
   onSaveSettings: (updated: any) => void | Promise<void>;
@@ -172,12 +181,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </form>
 
-      {/* Standalone APK Downloads (Owner & Driver) */}
+      {/* Standalone APK Downloads (Owner & Driver) — hosted on Supabase
+          Storage rather than served from /public: *.apk is git-ignored at
+          the repo root, so a file only placed in public/ locally would
+          never actually reach the deployed site. */}
       <div className="space-y-3 pt-2">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">
           Standalone Android Applications (v1.0)
         </h3>
-        
+
         {/* Owner APK Card */}
         <div className="bg-gradient-to-r from-amber-950/40 via-card to-card p-5 rounded-xl border border-amber-300 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
           <div className="space-y-1">
@@ -189,7 +201,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               Complete Operations Command Desk, booking dispatch, customer vouchers, live GPS radar, and revenue reports.
             </p>
           </div>
-          <a href="/NG-Travels-Owner.apk" download="NG-Travels-Owner-v1.0.apk">
+          <a href={APK_DOWNLOAD_URLS.owner} download="NG-Travels-Owner-v1.0.apk">
             <Button className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-amber-400/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
               <Smartphone className="w-4 h-4" /> Download Owner APK
             </Button>
@@ -207,7 +219,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               Driver cockpit HUD, today's journey roster, starting/ending odometer capture, fuel/toll claims, and turn-by-turn navigation.
             </p>
           </div>
-          <a href="/NG-Travels-Driver.apk" download="NG-Travels-Driver-v1.0.apk">
+          <a href={APK_DOWNLOAD_URLS.driver} download="NG-Travels-Driver-v1.0.apk">
             <Button className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
               <Smartphone className="w-4 h-4" /> Download Driver APK
             </Button>
