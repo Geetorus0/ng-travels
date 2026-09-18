@@ -24,7 +24,7 @@ import { TripActionLoader, ButtonLoader } from "@/components/loading";
 export interface CreateTripModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTripCreated: (newTrip: any) => void;
+  onTripCreated: (newTrip: any) => void | Promise<void>;
   customers: any[];
   drivers: any[];
   defaultRate?: number;
@@ -710,7 +710,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       }
 
       const savedTrip = await res.json();
-      onTripCreated(savedTrip);
+      // Awaited so the "Dispatch Trip"/"Save Changes" spinner (and the modal
+      // itself) stays up until the trips list has actually refetched, not
+      // just until the create/update request itself finishes.
+      await onTripCreated(savedTrip);
       onClose();
     } catch (err: any) {
       alert(err.message || `Failed to ${isEditing ? "update" : "create"} trip`);
@@ -1260,7 +1263,16 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         type="number"
                         min={0}
                         value={distanceKm || ""}
-                        onChange={(e) => setDistanceKm(Math.max(0, Number(e.target.value)))}
+                        onChange={(e) => {
+                          // The billable-KM calc actually derives its total from
+                          // outboundKm + returnKm, not from this field directly —
+                          // so a manual edit here has to clear those stale
+                          // auto-estimated halves too, or they silently override
+                          // whatever the user just typed.
+                          setDistanceKm(Math.max(0, Number(e.target.value)));
+                          setOutboundKm(0);
+                          setReturnKm(0);
+                        }}
                         placeholder="e.g. 350"
                         className="bg-card border-border text-sm h-10 font-mono font-bold text-amber-700 dark:text-amber-400 placeholder:text-muted-foreground"
                       />

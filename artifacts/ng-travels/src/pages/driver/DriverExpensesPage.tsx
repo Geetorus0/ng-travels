@@ -1,5 +1,5 @@
 import React from "react";
-import { Receipt, Plus, Fuel, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Receipt, Plus, Fuel, Clock, CheckCircle2, XCircle, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/fareEngine";
 import { NGTravelsLoader } from "@/components/loading";
@@ -72,6 +72,17 @@ export const DriverExpensesPage: React.FC<DriverExpensesPageProps> = ({
 
               {exp.location && <div className="text-muted-foreground text-[11px]">Location: {exp.location}</div>}
               {exp.notes && <div className="text-muted-foreground text-[11px] italic">Notes: {exp.notes}</div>}
+
+              {exp.receiptPath && (
+                <a
+                  href={exp.receiptPath}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400 hover:underline"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" /> View Proof of Payment
+                </a>
+              )}
 
               <div className="flex justify-between items-center pt-2 border-t border-border/80">
                 <span className="text-muted-foreground text-[10px]">Status:</span>

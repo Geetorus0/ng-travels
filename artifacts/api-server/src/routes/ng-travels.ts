@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import multer from "multer";
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   appSettingsTable,
@@ -656,6 +657,195 @@ router.post("/admin/drivers/:driverId/reset-password", requireOwner, async (req,
       success: false,
       error: { code: "SERVER_ERROR", message: "Unable to reset driver password." },
     });
+  }
+});
+
+/**
+ * ADMIN / STAFF USER MANAGEMENT ROUTES
+ * =============================================================
+ * Owner/Admin login accounts (not drivers — those are managed above).
+ */
+
+// Roles creatable through this endpoint. "owner" and "super_admin" are
+// deliberately excluded — granting the highest privilege tier isn't a
+// simple-form action, and "driver" has its own dedicated flow above.
+const STAFF_ROLES = ["admin", "manager", "dispatcher", "accountant"] as const;
+
+router.get("/admin/users", requireOwner, async (_req, res): Promise<void> => {
+  try {
+    const rows = await db
+      .select()
+      .from(usersTable)
+      .where(ne(usersTable.role, "driver"))
+      .orderBy(asc(usersTable.name));
+    res.json(rows.map((u) => ({ ...u, authUserId: undefined })));
+  } catch (err: any) {
+    console.error("[admin/users] Database query failed:", err?.message);
+    res.status(503).json({ success: false, error: { code: "DATABASE_ERROR", message: "Unable to load staff accounts. Please try again." } });
+  }
+});
+
+router.post("/admin/users", requireOwner, async (req, res): Promise<void> => {
+  const { name, email, mobile, role, initialPassword } = req.body;
+
+  if (!name || !email || !initialPassword) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Name, email, and initial password are required." },
+    });
+    return;
+  }
+  if (initialPassword.length < 6) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Password must be at least 6 characters." },
+    });
+    return;
+  }
+  const staffRole = STAFF_ROLES.includes(role) ? role : "admin";
+
+  try {
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+      email: String(email).toLowerCase().trim(),
+      phone: mobile ? toE164(mobile) : undefined,
+      password: initialPassword,
+      email_confirm: true,
+      phone_confirm: mobile ? true : undefined,
+      user_metadata: {
+        full_name: name,
+        role: staffRole,
+      },
+    });
+
+    if (authError || !authData?.user) {
+      const isDuplicate = /already.*registered|already exists/i.test(authError?.message || "");
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "AUTH_ERROR",
+          message: isDuplicate
+            ? "An account with this email already exists."
+            : authError?.message || "Failed to create auth account.",
+        },
+      });
+      return;
+    }
+
+    // The handle_new_user() trigger already inserted a bare public.users row
+    // for this auth identity; fill in the actual profile fields on it.
+    const [staffUser] = await db
+      .update(usersTable)
+      .set({
+        name,
+        email: String(email).toLowerCase().trim(),
+        phone: mobile || null,
+        role: staffRole,
+        status: "active",
+      })
+      .where(eq(usersTable.authUserId, authData.user.id))
+      .returning();
+
+    await writeAudit(req, `Created ${staffRole} account`, "user", staffUser?.id ?? authData.user.id, null, { name, email, role: staffRole });
+
+    res.status(201).json({
+      success: true,
+      message: `${staffRole.charAt(0).toUpperCase()}${staffRole.slice(1)} account created successfully.`,
+      user: staffUser ? { ...staffUser, authUserId: undefined } : null,
+    });
+  } catch (err: any) {
+    console.error("[admin/users] Create error:", err);
+    res.status(500).json({
+      success: false,
+      error: { code: "SERVER_ERROR", message: "Unable to create the staff account." },
+    });
+  }
+});
+
+router.patch("/admin/users/:id", requireOwner, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const { role, status } = req.body;
+
+  try {
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Staff account not found." } });
+      return;
+    }
+    if (existing.role === "driver") {
+      res.status(400).json({ success: false, error: { code: "INVALID_TARGET", message: "Use the driver management endpoints for driver accounts." } });
+      return;
+    }
+    if (existing.role === "owner") {
+      res.status(400).json({ success: false, error: { code: "INVALID_TARGET", message: "The account owner's role/status can't be changed here." } });
+      return;
+    }
+
+    const viewer = await viewerFor(req);
+    if (viewer?.id === id && status === "inactive") {
+      res.status(400).json({ success: false, error: { code: "SELF_LOCKOUT", message: "You can't deactivate your own account." } });
+      return;
+    }
+
+    const updates: Record<string, any> = {};
+    if (role) {
+      if (!STAFF_ROLES.includes(role)) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid role." } });
+        return;
+      }
+      updates.role = role;
+    }
+    if (status === "active" || status === "inactive") updates.status = status;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Nothing to update." } });
+      return;
+    }
+
+    const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
+    await writeAudit(req, "Updated staff account", "user", id, existing, updated);
+    res.json({ success: true, user: { ...updated, authUserId: undefined } });
+  } catch (err: any) {
+    console.error("[admin/users] Update error:", err);
+    res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to update the staff account." } });
+  }
+});
+
+router.post("/admin/users/:id/reset-password", requireOwner, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "New password must be at least 6 characters." },
+    });
+    return;
+  }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!user || user.role === "driver") {
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Staff account not found." } });
+      return;
+    }
+    if (!user.authUserId) {
+      res.status(400).json({ success: false, error: { code: "NO_AUTH_USER", message: "This account has no linked login." } });
+      return;
+    }
+
+    const { error: updateError } = await supabaseServer.auth.admin.updateUserById(user.authUserId, {
+      password: newPassword,
+    });
+    if (updateError) {
+      res.status(400).json({ success: false, error: { code: "AUTH_ERROR", message: updateError.message || "Failed to reset password." } });
+      return;
+    }
+
+    await writeAudit(req, "Reset staff password", "user", id);
+    res.json({ success: true, message: `Password reset for ${user.name}.` });
+  } catch (err: any) {
+    console.error("[admin/users] Reset password error:", err);
+    res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to reset password." } });
   }
 });
 
@@ -2379,6 +2569,56 @@ async function recordPaymentHandler(req: Request, res: Response): Promise<void> 
 
 router.post("/trips/:id/payments", requireOwner, recordPaymentHandler);
 router.post("/payments", requireOwner, recordPaymentHandler);
+
+const EXPENSE_RECEIPTS_BUCKET = "expense-receipts";
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB — a phone photo or a scanned PDF, not a video
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
+
+/**
+ * Upload a driver's proof-of-payment (photo or PDF) for an expense claim.
+ * Uses the service-role Supabase client so it bypasses Storage RLS entirely
+ * — no bucket policy is required, only the bucket itself needs to exist.
+ */
+router.post("/expenses/upload-receipt", receiptUpload.single("file"), async (req, res): Promise<void> => {
+  if (!req.file) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "No file received, or the file type isn't supported (JPG/PNG/WEBP/HEIC/PDF only)." },
+    });
+    return;
+  }
+
+  try {
+    const viewer = await viewerFor(req);
+    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+    const path = `${viewer?.driverId || "unknown"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const { error: uploadError } = await supabaseServer.storage
+      .from(EXPENSE_RECEIPTS_BUCKET)
+      .upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (uploadError) {
+      console.error("[expenses/upload-receipt] Storage upload error:", uploadError);
+      res.status(500).json({
+        success: false,
+        error: { code: "STORAGE_ERROR", message: "Unable to store the receipt. Please try again." },
+      });
+      return;
+    }
+
+    const { data: publicUrlData } = supabaseServer.storage.from(EXPENSE_RECEIPTS_BUCKET).getPublicUrl(path);
+    res.json({ success: true, url: publicUrlData.publicUrl, path });
+  } catch (err: any) {
+    console.error("[expenses/upload-receipt] Error:", err);
+    res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to upload the receipt." } });
+  }
+});
 
 router.get("/expenses", async (_req, res): Promise<void> => {
   try {

@@ -11,7 +11,7 @@ export interface DriverKmModalProps {
   onClose: () => void;
   trip: any;
   mode: "start" | "end";
-  onSuccess: (updatedTrip: any) => void;
+  onSuccess: (updatedTrip: any) => void | Promise<void>;
 }
 
 export const DriverKmModal: React.FC<DriverKmModalProps> = ({
@@ -71,7 +71,11 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
       }
 
       const updatedTrip = await res.json();
-      onSuccess(updatedTrip);
+      // Awaited so the spinner (and this modal) stays up until the trip
+      // list/current-trip queries actually refetch — otherwise the modal
+      // closes and the driver briefly sees the OLD stage/button underneath
+      // until the background refetch lands.
+      await onSuccess(updatedTrip);
       onClose();
     } catch {
       setError("Network error while submitting odometer reading.");

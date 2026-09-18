@@ -11,7 +11,7 @@ export interface CancelTripModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: any;
-  onTripCancelled: (cancelledTrip: any) => void;
+  onTripCancelled: (cancelledTrip: any) => void | Promise<void>;
 }
 
 export const CancelTripModal: React.FC<CancelTripModalProps> = ({
@@ -37,7 +37,7 @@ export const CancelTripModal: React.FC<CancelTripModalProps> = ({
         body: JSON.stringify({ reason }),
       });
       const data = await res.json();
-      onTripCancelled(data);
+      await onTripCancelled(data);
       onClose();
     } catch (err) {
       console.error(err);

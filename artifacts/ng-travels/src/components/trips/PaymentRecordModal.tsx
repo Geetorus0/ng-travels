@@ -12,7 +12,7 @@ export interface PaymentRecordModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: any;
-  onPaymentRecorded: (newPayment: any) => void;
+  onPaymentRecorded: (newPayment: any) => void | Promise<void>;
 }
 
 export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
@@ -54,7 +54,7 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
       }
 
       const newPayment = await res.json();
-      onPaymentRecorded(newPayment);
+      await onPaymentRecorded(newPayment);
       onClose();
     } catch {
       alert("Failed to record payment. Please try again.");
