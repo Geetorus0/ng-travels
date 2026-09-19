@@ -2841,16 +2841,16 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
  */
 const APP_VERSIONS = {
   owner: {
-    versionCode: 2,
-    versionName: "1.1.0",
+    versionCode: 3,
+    versionName: "1.1.1",
     url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
-    releaseNotes: "Live Trips GPS radar, admin/staff accounts, expense receipt uploads, and reliability fixes.",
+    releaseNotes: "Fixed Record Payment showing ₹0 for Total Fare / Paid / Due Balance.",
   },
   driver: {
-    versionCode: 2,
-    versionName: "1.1.0",
+    versionCode: 3,
+    versionName: "1.1.1",
     url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
-    releaseNotes: "Expense receipt uploads (now required) and reliability fixes for trip status updates.",
+    releaseNotes: "Reliability fixes for trip payments and status updates.",
   },
 };
 
