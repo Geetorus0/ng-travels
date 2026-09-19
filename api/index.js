@@ -98736,6 +98736,10 @@ router2.post("/expenses", async (req, res) => {
     res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Expense amount must be positive" } });
     return;
   }
+  if (!receiptPath || typeof receiptPath !== "string" || !receiptPath.trim()) {
+    res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "A proof of payment (receipt photo or PDF) is required." } });
+    return;
+  }
   try {
     const viewer = await viewerFor(req);
     const [expense] = await db.insert(tripExpensesTable).values({
@@ -98882,6 +98886,23 @@ router2.get("/audit-logs", requireOwner, async (_req, res) => {
 });
 router2.get("/settings", requireOwner, async (_req, res) => {
   res.json(await settingsView());
+});
+var APP_VERSIONS = {
+  owner: {
+    versionCode: 2,
+    versionName: "1.1.0",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
+    releaseNotes: "Live Trips GPS radar, admin/staff accounts, expense receipt uploads, and reliability fixes."
+  },
+  driver: {
+    versionCode: 2,
+    versionName: "1.1.0",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
+    releaseNotes: "Expense receipt uploads (now required) and reliability fixes for trip status updates."
+  }
+};
+router2.get("/app/version", async (_req, res) => {
+  res.json(APP_VERSIONS);
 });
 router2.patch("/settings", requireOwner, async (req, res) => {
   try {

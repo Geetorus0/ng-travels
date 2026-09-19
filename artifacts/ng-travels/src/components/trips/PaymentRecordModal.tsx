@@ -29,9 +29,9 @@ export const PaymentRecordModal: React.FC<PaymentRecordModalProps> = ({
 
   if (!trip) return null;
 
-  const totalFare = Number(trip.totalFare || 0);
-  const totalPaid = Number(trip.paidAmount || 0);
-  const remaining = Math.max(0, totalFare - totalPaid);
+  const totalFare = Number(trip.customerTotal || 0);
+  const totalPaid = Number(trip.totalPaid || 0);
+  const remaining = Math.max(0, Number(trip.remainingBalance ?? totalFare - totalPaid));
 
   const handleSubmit = async () => {
     if (!amount || Number(amount) <= 0) return;

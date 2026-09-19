@@ -1159,6 +1159,8 @@ function ResetPasswordPage() {
 
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
+import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
+import { AppUpdateBanner } from "@/components/common/AppUpdateBanner";
 
 function MainApp() {
   const {
@@ -1176,6 +1178,7 @@ function MainApp() {
   // Connect Real-Time Server-Sent Events Sync
   const { status: realtimeStatus } = useRealtimeSync();
   const { theme, toggleTheme } = useTheme();
+  const appUpdateInfo = useAppUpdateCheck();
 
   // Modal States
   const [createTripOpen, setCreateTripOpen] = useState(false);
@@ -2144,6 +2147,8 @@ function MainApp() {
           }}
         />
       )}
+
+      <AppUpdateBanner info={appUpdateInfo} />
     </>
   );
 }

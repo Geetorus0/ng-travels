@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Navigation, CalendarDays, MapPin, Users,
   Car, CircleDollarSign, Receipt, BarChart3, Bell, LogOut, Search,
   Smartphone, ArrowLeft, Plus, MessageSquareQuote, ShieldAlert,
-  Settings, Menu, X, ChevronRight, HelpCircle, Sun, Moon
+  Settings, Menu, X, ChevronRight, HelpCircle, Sun, Moon, Radio
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({
 
   const navLinks = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Live Trips", href: "/live-trips", icon: Radio },
     { label: "Trips", href: "/trips", icon: Navigation },
     { label: "Vehicles", href: "/vehicles", icon: Car },
     { label: "Drivers", href: "/drivers", icon: Users },
@@ -67,6 +68,7 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({
   const getPageTitle = () => {
     if (location.startsWith("/trips/")) return "Trip Details";
     if (location === "/trips") return "Trips Operations";
+    if (location === "/live-trips") return "Live Trips & GPS Radar";
     if (location === "/vehicles") return "Commercial Fleet Vehicles";
     if (location === "/customers") return "Customer Directory";
     if (location === "/drivers" || location === "/driver-availability") return "Driver Fleet";

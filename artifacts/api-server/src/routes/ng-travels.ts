@@ -2638,6 +2638,12 @@ router.post("/expenses", async (req, res): Promise<void> => {
     res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Expense amount must be positive" } });
     return;
   }
+  // Enforced server-side, not just in the driver app's UI — a proof of
+  // payment is mandatory for every expense claim, whatever client submits it.
+  if (!receiptPath || typeof receiptPath !== "string" || !receiptPath.trim()) {
+    res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "A proof of payment (receipt photo or PDF) is required." } });
+    return;
+  }
 
   try {
     const viewer = await viewerFor(req);
@@ -2824,6 +2830,32 @@ router.get("/audit-logs", requireOwner, async (_req, res): Promise<void> => {
 
 router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
   res.json(await settingsView());
+});
+
+/**
+ * Standalone Android app version manifest — checked by the packaged Owner
+ * and Driver APKs on launch (see useAppUpdateCheck.ts on the client) so an
+ * out-of-date install can prompt the user to download the current build.
+ * Bump versionCode/versionName here (matching android/app/build.gradle) and
+ * re-upload the APK to app-releases every time a new build goes out.
+ */
+const APP_VERSIONS = {
+  owner: {
+    versionCode: 3,
+    versionName: "1.1.1",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
+    releaseNotes: "Fixed Record Payment showing ₹0 for Total Fare / Paid / Due Balance.",
+  },
+  driver: {
+    versionCode: 3,
+    versionName: "1.1.1",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
+    releaseNotes: "Reliability fixes for trip payments and status updates.",
+  },
+};
+
+router.get("/app/version", async (_req, res): Promise<void> => {
+  res.json(APP_VERSIONS);
 });
 
 router.patch("/settings", requireOwner, async (req, res): Promise<void> => {

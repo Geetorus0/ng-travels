@@ -285,30 +285,50 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
             ) : (
               <div className="space-y-2">
                 {expenses.map((exp) => (
-                  <div key={exp.id} className="bg-background/60 p-3 rounded-lg border border-border flex items-center justify-between text-xs">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-rose-700 dark:text-rose-400 font-mono">{formatINR(exp.amount)}</span>
-                        <span className="font-semibold text-foreground">• {exp.category}</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded capitalize ${
-                          exp.status === "approved" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" :
-                          exp.status === "rejected" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30" :
-                          "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 animate-pulse"
-                        }`}>
-                          {exp.status}
-                        </span>
-                      </div>
-                      {exp.notes && <p className="text-[11px] text-muted-foreground">{exp.notes}</p>}
-                      {exp.receiptPath && (
+                  <div key={exp.id} className="bg-background/60 p-3 rounded-lg border border-border flex items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {exp.receiptPath ? (
                         <a
                           href={exp.receiptPath}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400 hover:underline"
+                          title="View proof of payment"
+                          className="shrink-0"
                         >
-                          <FileText className="w-3 h-3" /> View Proof of Payment
+                          {/\.pdf($|\?)/i.test(exp.receiptPath) ? (
+                            <div className="w-11 h-11 rounded-lg border border-border bg-card flex items-center justify-center hover:border-amber-400 transition-colors">
+                              <FileText className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                            </div>
+                          ) : (
+                            <img
+                              src={exp.receiptPath}
+                              alt="Proof of payment"
+                              className="w-11 h-11 rounded-lg object-cover border border-border hover:border-amber-400 transition-colors"
+                            />
+                          )}
                         </a>
+                      ) : (
+                        <div
+                          className="w-11 h-11 rounded-lg border border-dashed border-rose-300 dark:border-rose-500/40 flex items-center justify-center shrink-0"
+                          title="No proof attached"
+                        >
+                          <AlertCircle className="w-4 h-4 text-rose-700 dark:text-rose-400" />
+                        </div>
                       )}
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-rose-700 dark:text-rose-400 font-mono">{formatINR(exp.amount)}</span>
+                          <span className="font-semibold text-foreground">• {exp.category}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded capitalize ${
+                            exp.status === "approved" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" :
+                            exp.status === "rejected" ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30" :
+                            "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 animate-pulse"
+                          }`}>
+                            {exp.status}
+                          </span>
+                        </div>
+                        {exp.notes && <p className="text-[11px] text-muted-foreground">{exp.notes}</p>}
+                      </div>
                     </div>
 
                     {exp.status === "pending" && onApproveExpense && onRejectExpense && (
