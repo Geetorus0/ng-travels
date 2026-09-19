@@ -10,8 +10,7 @@ import { AdminUserManagementModal, CreateStaffUserData } from "@/components/admi
 // present in the local public/ folder would never actually reach the
 // deployed site. Re-upload here after building a new APK.
 const APK_DOWNLOAD_URLS = {
-  owner: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
-  driver: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
+  app: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
 };
 
 interface SettingsPageProps {
@@ -181,47 +180,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </form>
 
-      {/* Standalone APK Downloads (Owner & Driver) — hosted on Supabase
-          Storage rather than served from /public: *.apk is git-ignored at
-          the repo root, so a file only placed in public/ locally would
-          never actually reach the deployed site. */}
+      {/* Standalone APK Download — hosted on Supabase Storage rather than
+          served from /public: *.apk is git-ignored at the repo root, so a
+          file only placed in public/ locally would never actually reach
+          the deployed site. One unified app now: users pick Admin or
+          Driver right on the sign-in screen after installing. */}
       <div className="space-y-3 pt-2">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">
-          Standalone Android Applications (v1.0)
+          Standalone Android Application (v1.2)
         </h3>
 
-        {/* Owner APK Card */}
         <div className="bg-gradient-to-r from-amber-950/40 via-card to-card p-5 rounded-xl border border-amber-300 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-amber-700 dark:text-amber-400 uppercase bg-amber-100 dark:bg-amber-500/10 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-500/20">
-              <ShieldCheck className="w-3 h-3" /> OWNER / ADMIN APK
+              <ShieldCheck className="w-3 h-3" /> <Car className="w-3 h-3" /> ADMIN + DRIVER APK
             </div>
-            <h4 className="text-sm font-bold text-foreground">NG Travels Owner App</h4>
+            <h4 className="text-sm font-bold text-foreground">NG-Travels App</h4>
             <p className="text-xs text-muted-foreground max-w-md">
-              Complete Operations Command Desk, booking dispatch, customer vouchers, live GPS radar, and revenue reports.
+              One app for everyone — pick Operations Admin or Driver Pilot on the sign-in screen. Full Command Desk, dispatch, live GPS radar, and revenue reports for admins; cockpit HUD, journey roster, odometer capture, and expense claims for drivers.
             </p>
           </div>
-          <a href={APK_DOWNLOAD_URLS.owner} download="NG-Travels-Owner-v1.0.apk">
+          <a href={APK_DOWNLOAD_URLS.app} download="NG-Travels-v1.2.apk">
             <Button className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-amber-400/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
-              <Smartphone className="w-4 h-4" /> Download Owner APK
-            </Button>
-          </a>
-        </div>
-
-        {/* Driver APK Card */}
-        <div className="bg-gradient-to-r from-emerald-950/40 via-card to-card p-5 rounded-xl border border-emerald-300 dark:border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-500/20">
-              <Car className="w-3 h-3" /> DRIVER / PILOT APK
-            </div>
-            <h4 className="text-sm font-bold text-foreground">NG Travels Driver App</h4>
-            <p className="text-xs text-muted-foreground max-w-md">
-              Driver cockpit HUD, today's journey roster, starting/ending odometer capture, fuel/toll claims, and turn-by-turn navigation.
-            </p>
-          </div>
-          <a href={APK_DOWNLOAD_URLS.driver} download="NG-Travels-Driver-v1.0.apk">
-            <Button className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
-              <Smartphone className="w-4 h-4" /> Download Driver APK
+              <Smartphone className="w-4 h-4" /> Download NG-Travels APK
             </Button>
           </a>
         </div>

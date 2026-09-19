@@ -2,6 +2,7 @@ import React from "react";
 import { Receipt, Plus, Fuel, Clock, CheckCircle2, XCircle, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/fareEngine";
+import { openExternalUrl } from "@/lib/openExternal";
 import { NGTravelsLoader } from "@/components/loading";
 
 interface DriverExpensesPageProps {
@@ -74,14 +75,13 @@ export const DriverExpensesPage: React.FC<DriverExpensesPageProps> = ({
               {exp.notes && <div className="text-muted-foreground text-[11px] italic">Notes: {exp.notes}</div>}
 
               {exp.receiptPath && (
-                <a
-                  href={exp.receiptPath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400 hover:underline"
+                <button
+                  type="button"
+                  onClick={() => openExternalUrl(exp.receiptPath)}
+                  className="inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400 hover:underline cursor-pointer"
                 >
                   <ImageIcon className="w-3.5 h-3.5" /> View Proof of Payment
-                </a>
+                </button>
               )}
 
               <div className="flex justify-between items-center pt-2 border-t border-border/80">

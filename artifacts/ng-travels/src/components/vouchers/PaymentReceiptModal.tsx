@@ -2,6 +2,7 @@ import React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/fareEngine";
+import { openWhatsApp } from "@/lib/openExternal";
 import { Printer, Share2, CheckCircle, Receipt } from "lucide-react";
 
 export interface PaymentReceiptProps {
@@ -34,7 +35,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
   };
 
   const handleWhatsApp = () => {
-    const message = encodeURIComponent(
+    const message =
       `*NG Travels Official Payment Receipt*\n` +
       `Receipt No: REC-${payment.id}\n` +
       `Booking ID: ${trip.bookingId}\n` +
@@ -43,9 +44,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptProps> = ({
       `Payment Method: ${payment.method} (${payment.paymentType || "Payment"})\n` +
       `Reference / TXN: ${payment.reference || "N/A"}\n` +
       `Remaining Trip Balance: ₹${trip.remainingBalance}\n\n` +
-      `Received with thanks!\n${companyInfo.company}`
-    );
-    window.open(`https://wa.me/${(trip.customerMobile || "").replace(/\D/g, "")}?text=${message}`, "_blank");
+      `Received with thanks!\n${companyInfo.company}`;
+    openWhatsApp(trip.customerMobile, message);
   };
 
   const paymentDateStr = new Date(payment.paymentDate || payment.createdAt).toLocaleDateString("en-IN", {

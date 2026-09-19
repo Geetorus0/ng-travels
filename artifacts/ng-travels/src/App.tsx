@@ -1673,31 +1673,19 @@ function MainApp() {
     ]);
   };
 
-  const nativeRole = (window as any).NG_APP_ROLE;
   const isDriverPath =
     location === "/driver" || location.startsWith("/driver/");
+  // The app is now a single unified build for both roles (no more
+  // separate Owner/Driver APKs pinning a fixed workspace) — the real
+  // server-side account role is what decides this, same as the web app.
+  // A genuine driver account can never render the owner workspace —
+  // regardless of path or the cosmetic switchRole() preview state — since
+  // owner-only actions there would just 403 against the real server-side
+  // role anyway.
   const isDriverWorkspace =
-    nativeRole === "driver"
+    user?.realRole === "driver"
       ? true
-      : nativeRole === "owner"
-        ? false
-        // A genuine driver account can never render the owner workspace —
-        // regardless of path or the cosmetic switchRole() preview state —
-        // since owner-only actions there would just 403 against the real
-        // server-side role anyway.
-        : user?.realRole === "driver"
-          ? true
-          : isDriverPath || user?.role === "driver";
-
-  // Force route alignment if native APK
-  useEffect(() => {
-    if (!isSignedIn) return;
-    if (nativeRole === "driver" && !isDriverPath) {
-      setLocation("/driver");
-    } else if (nativeRole === "owner" && isDriverPath) {
-      setLocation("/dashboard");
-    }
-  }, [nativeRole, location, isDriverPath, setLocation, isSignedIn]);
+      : isDriverPath || user?.role === "driver";
 
   if (!isLoaded) {
     return (
