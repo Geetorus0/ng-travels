@@ -2832,6 +2832,32 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
   res.json(await settingsView());
 });
 
+/**
+ * Standalone Android app version manifest — checked by the packaged Owner
+ * and Driver APKs on launch (see useAppUpdateCheck.ts on the client) so an
+ * out-of-date install can prompt the user to download the current build.
+ * Bump versionCode/versionName here (matching android/app/build.gradle) and
+ * re-upload the APK to app-releases every time a new build goes out.
+ */
+const APP_VERSIONS = {
+  owner: {
+    versionCode: 2,
+    versionName: "1.1.0",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
+    releaseNotes: "Live Trips GPS radar, admin/staff accounts, expense receipt uploads, and reliability fixes.",
+  },
+  driver: {
+    versionCode: 2,
+    versionName: "1.1.0",
+    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
+    releaseNotes: "Expense receipt uploads (now required) and reliability fixes for trip status updates.",
+  },
+};
+
+router.get("/app/version", async (_req, res): Promise<void> => {
+  res.json(APP_VERSIONS);
+});
+
 router.patch("/settings", requireOwner, async (req, res): Promise<void> => {
   try {
     for (const [key, val] of Object.entries(req.body)) {
