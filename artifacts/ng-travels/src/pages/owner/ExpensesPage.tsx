@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/fareEngine";
+import { openExternalUrl } from "@/lib/openExternal";
 import { NGTravelsLoader } from "@/components/loading";
 
 interface ExpensesPageProps {
@@ -160,12 +161,11 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                     </td>
                     <td className="py-3 px-4 text-center">
                       {exp.receiptPath ? (
-                        <a
-                          href={exp.receiptPath}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => openExternalUrl(exp.receiptPath)}
                           title="View proof of payment"
-                          className="inline-block"
+                          className="inline-block cursor-pointer"
                         >
                           {/\.pdf($|\?)/i.test(exp.receiptPath) ? (
                             <div className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center hover:border-amber-400 transition-colors mx-auto">
@@ -178,7 +178,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                               className="w-10 h-10 rounded-lg object-cover border border-border hover:border-amber-400 transition-colors mx-auto"
                             />
                           )}
-                        </a>
+                        </button>
                       ) : (
                         <div className="w-10 h-10 rounded-lg border border-dashed border-rose-300 dark:border-rose-500/40 flex items-center justify-center mx-auto" title="No proof attached">
                           <ImageOff className="w-4 h-4 text-rose-700 dark:text-rose-400" />

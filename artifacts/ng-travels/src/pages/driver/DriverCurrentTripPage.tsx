@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/fareEngine";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 import { ButtonLoader } from "@/components/loading";
+import { openExternalUrl } from "@/lib/openExternal";
 
 interface DriverCurrentTripPageProps {
   trip: any;
@@ -186,16 +187,20 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
 
       {/* Navigation Buttons (Google Maps Deep Links) */}
       <div className="grid grid-cols-2 gap-2">
-        <a href={navigateToPickupUrl} target="_blank" rel="noreferrer" className="block">
-          <Button variant="outline" className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer">
-            <ExternalLink className="w-4 h-4 mr-1 text-emerald-700 dark:text-emerald-400" /> Nav to Pickup
-          </Button>
-        </a>
-        <a href={navigateToDestUrl} target="_blank" rel="noreferrer" className="block">
-          <Button variant="outline" className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer">
-            <ExternalLink className="w-4 h-4 mr-1 text-amber-700 dark:text-amber-400" /> Nav to Dest
-          </Button>
-        </a>
+        <Button
+          variant="outline"
+          onClick={() => openExternalUrl(navigateToPickupUrl)}
+          className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer"
+        >
+          <ExternalLink className="w-4 h-4 mr-1 text-emerald-700 dark:text-emerald-400" /> Nav to Pickup
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => openExternalUrl(navigateToDestUrl)}
+          className="w-full border-border bg-card/80 hover:bg-muted text-foreground font-bold text-xs py-5 cursor-pointer"
+        >
+          <ExternalLink className="w-4 h-4 mr-1 text-amber-700 dark:text-amber-400" /> Nav to Dest
+        </Button>
       </div>
 
       {/* Journey Milestone Stepper Buttons */}

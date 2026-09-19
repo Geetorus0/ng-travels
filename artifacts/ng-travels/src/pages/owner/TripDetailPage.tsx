@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatINR, canEditTrip } from "@/lib/fareEngine";
-import { openWhatsApp } from "@/lib/openExternal";
+import { openWhatsApp, openExternalUrl } from "@/lib/openExternal";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 
 interface TripDetailPageProps {
@@ -289,12 +289,11 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
                   <div key={exp.id} className="bg-background/60 p-3 rounded-lg border border-border flex items-center justify-between text-xs gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       {exp.receiptPath ? (
-                        <a
-                          href={exp.receiptPath}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => openExternalUrl(exp.receiptPath)}
                           title="View proof of payment"
-                          className="shrink-0"
+                          className="shrink-0 cursor-pointer"
                         >
                           {/\.pdf($|\?)/i.test(exp.receiptPath) ? (
                             <div className="w-11 h-11 rounded-lg border border-border bg-card flex items-center justify-center hover:border-amber-400 transition-colors">
@@ -307,7 +306,7 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
                               className="w-11 h-11 rounded-lg object-cover border border-border hover:border-amber-400 transition-colors"
                             />
                           )}
-                        </a>
+                        </button>
                       ) : (
                         <div
                           className="w-11 h-11 rounded-lg border border-dashed border-rose-300 dark:border-rose-500/40 flex items-center justify-center shrink-0"

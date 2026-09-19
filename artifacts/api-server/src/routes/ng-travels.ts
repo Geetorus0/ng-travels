@@ -2847,10 +2847,10 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
  * valid update-check response and can prompt the user to install this one.
  */
 const CURRENT_APP_VERSION = {
-  versionCode: 5,
-  versionName: "1.2.0",
+  versionCode: 6,
+  versionName: "1.2.1",
   url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
-  releaseNotes: "NG-Travels is now one app for everyone — pick Admin or Driver on the sign-in screen.",
+  releaseNotes: "Fixed Nav to Pickup/Destination and receipt/proof-of-payment links not opening on Android.",
 };
 const APP_VERSIONS = {
   owner: CURRENT_APP_VERSION,
