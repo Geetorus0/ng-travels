@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Fuel, Search, CheckCircle2, XCircle, Check, X, Filter, CircleDollarSign, Loader2 } from "lucide-react";
+import { Fuel, Search, CheckCircle2, XCircle, Check, X, Filter, CircleDollarSign, Loader2, FileText, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -118,6 +118,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
               <th className="py-3 px-4">Booking Ref</th>
               <th className="py-3 px-4">Submitted By</th>
               <th className="py-3 px-4">Details & Location</th>
+              <th className="py-3 px-4 text-center">Proof</th>
               <th className="py-3 px-4 text-right">Amount</th>
               <th className="py-3 px-4 text-center">Status</th>
               <th className="py-3 px-4 text-right">Approval Action</th>
@@ -126,7 +127,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
           <tbody className="divide-y divide-border/60">
             {isLoading && expenseList.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12">
+                <td colSpan={9} className="py-12">
                   <div className="flex justify-center">
                     <NGTravelsLoader size="sm" text="Loading expenses..." />
                   </div>
@@ -134,7 +135,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                <td colSpan={9} className="py-12 text-center text-muted-foreground">
                   No expense records match the selected filters.
                 </td>
               </tr>
@@ -156,6 +157,33 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                     <td className="py-3 px-4 max-w-[240px]">
                       <div className="truncate text-foreground">{exp.notes || "Standard claim"}</div>
                       {exp.location && <div className="text-[10px] text-muted-foreground truncate">{exp.location}</div>}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {exp.receiptPath ? (
+                        <a
+                          href={exp.receiptPath}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="View proof of payment"
+                          className="inline-block"
+                        >
+                          {/\.pdf($|\?)/i.test(exp.receiptPath) ? (
+                            <div className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center hover:border-amber-400 transition-colors mx-auto">
+                              <FileText className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                            </div>
+                          ) : (
+                            <img
+                              src={exp.receiptPath}
+                              alt="Proof of payment"
+                              className="w-10 h-10 rounded-lg object-cover border border-border hover:border-amber-400 transition-colors mx-auto"
+                            />
+                          )}
+                        </a>
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg border border-dashed border-rose-300 dark:border-rose-500/40 flex items-center justify-center mx-auto" title="No proof attached">
+                          <ImageOff className="w-4 h-4 text-rose-700 dark:text-rose-400" />
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-rose-700 dark:text-rose-400 text-sm">
                       {formatINR(exp.amount)}

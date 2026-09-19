@@ -2638,6 +2638,12 @@ router.post("/expenses", async (req, res): Promise<void> => {
     res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Expense amount must be positive" } });
     return;
   }
+  // Enforced server-side, not just in the driver app's UI — a proof of
+  // payment is mandatory for every expense claim, whatever client submits it.
+  if (!receiptPath || typeof receiptPath !== "string" || !receiptPath.trim()) {
+    res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "A proof of payment (receipt photo or PDF) is required." } });
+    return;
+  }
 
   try {
     const viewer = await viewerFor(req);
