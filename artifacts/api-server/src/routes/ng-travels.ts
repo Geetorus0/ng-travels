@@ -2841,16 +2841,16 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
  */
 const APP_VERSIONS = {
   owner: {
-    versionCode: 3,
-    versionName: "1.1.1",
+    versionCode: 4,
+    versionName: "1.1.2",
     url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
-    releaseNotes: "Fixed Record Payment showing ₹0 for Total Fare / Paid / Due Balance.",
+    releaseNotes: "Fixed WhatsApp buttons not opening the WhatsApp app.",
   },
   driver: {
-    versionCode: 3,
-    versionName: "1.1.1",
+    versionCode: 4,
+    versionName: "1.1.2",
     url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
-    releaseNotes: "Reliability fixes for trip payments and status updates.",
+    releaseNotes: "Reliability fixes for external links opened from the app.",
   },
 };
 

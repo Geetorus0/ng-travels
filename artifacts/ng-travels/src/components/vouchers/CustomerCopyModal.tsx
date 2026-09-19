@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatINR, formatKM } from "@/lib/fareEngine";
+import { openWhatsApp } from "@/lib/openExternal";
 import { Printer, Download, Share2, MapPin, Calendar, Clock, User, Phone, CheckCircle2, X } from "lucide-react";
 
 export interface CustomerCopyProps {
@@ -43,7 +44,7 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
       month: "short",
       year: "numeric",
     });
-    const message = encodeURIComponent(
+    const message =
       `*NG Travels Booking Confirmation*\n` +
       `Booking ID: ${trip.bookingId}\n` +
       `Customer: ${trip.customerName}\n` +
@@ -53,9 +54,8 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
       `Total Estimated Fare: ₹${trip.customerTotal}\n` +
       `Advance Paid: ₹${trip.totalPaid}\n` +
       `Balance Due: ₹${trip.remainingBalance}\n\n` +
-      `Thank you for travelling with ${companyInfo.company}!\nHelpdesk: ${companyInfo.mobile}`
-    );
-    window.open(`https://wa.me/${(trip.customerMobile || "").replace(/\D/g, "")}?text=${message}`, "_blank");
+      `Thank you for travelling with ${companyInfo.company}!\nHelpdesk: ${companyInfo.mobile}`;
+    openWhatsApp(trip.customerMobile, message);
   };
 
   const formattedDate = new Date(trip.startDate).toLocaleDateString("en-IN", {
