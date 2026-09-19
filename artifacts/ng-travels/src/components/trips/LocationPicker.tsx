@@ -5,6 +5,7 @@ import { MapPin, Search, Map as MapIcon, Link2, LocateFixed, Loader, AlertCircle
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/apiFetch";
+import { getAccuratePosition } from "@/lib/nativeGeo";
 
 export interface PickedPlace {
   placeId?: string;
@@ -237,7 +238,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     if (mode !== "map" || !mapContainerRef.current || mapInstanceRef.current) return;
     const startLat = 12.9716, startLng = 77.5946; // Bengaluru default center
     const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: false }).setView([startLat, startLng], 11);
-    L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=fccc330705934d6abd2be56e77dff380`, {
+    L.tileLayer(`https://maps.geoapify.com/v1/tile/klokantech-basic/{z}/{x}/{y}.png?apiKey=fccc330705934d6abd2be56e77dff380`, {
       maxZoom: 20,
     }).addTo(map);
     map.on("click", (e: L.LeafletMouseEvent) => {
@@ -269,20 +270,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     onSelect(place);
   };
 
-  const useMyLocation = () => {
-    if (!navigator.geolocation) {
-      setResolveError("Geolocation isn't available in this browser.");
-      return;
+  const useMyLocation = async () => {
+    try {
+      const pos = await getAccuratePosition();
+      placeMarker(pos.latitude, pos.longitude);
+      reverseGeocodePin(pos.latitude, pos.longitude);
+    } catch {
+      setResolveError("Unable to get your current location — check location permissions.");
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        placeMarker(latitude, longitude);
-        reverseGeocodePin(latitude, longitude);
-      },
-      () => setResolveError("Unable to get your current location — check location permissions."),
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
   };
 
   const tabs: { id: Mode; label: string; icon: React.ReactNode }[] = [

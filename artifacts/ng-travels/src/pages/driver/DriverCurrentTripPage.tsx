@@ -9,6 +9,7 @@ import { formatINR } from "@/lib/fareEngine";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 import { ButtonLoader } from "@/components/loading";
 import { openExternalUrl } from "@/lib/openExternal";
+import { watchAccuratePosition } from "@/lib/nativeGeo";
 
 interface DriverCurrentTripPageProps {
   trip: any;
@@ -43,7 +44,6 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
   useEffect(() => {
     if (!trip || !isTracking) return;
 
-    let watchId: number | null = null;
     const pLat = trip.pickup?.latitude || 11.3410;
     const pLng = trip.pickup?.longitude || 77.7172;
     const dLat = trip.destination?.latitude || 11.0168;
@@ -76,32 +76,29 @@ export const DriverCurrentTripPage: React.FC<DriverCurrentTripPageProps> = ({
       }
     };
 
-    // Genuine Device Geolocation API tracking
-    if ("geolocation" in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const speedKmH = pos.coords.speed !== null && pos.coords.speed !== undefined
-            ? Math.max(0, Math.round(pos.coords.speed * 3.6))
-            : 0;
-          pushLocation(
-            pos.coords.latitude,
-            pos.coords.longitude,
-            speedKmH,
-            pos.coords.heading || 0,
-            pos.coords.accuracy || 10
-          );
-        },
-        (err) => {
-          console.warn("[DriverHUD] Geolocation watch notice:", err.message);
-        },
-        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
-      );
-    }
+    // Genuine device GPS tracking — prefers the native Capacitor plugin on
+    // Android (real GPS fix) over the WebView's navigator.geolocation
+    // (often a much coarser network-based fix).
+    let cancelled = false;
+    let stopWatch: (() => void) | null = null;
+    watchAccuratePosition(
+      (pos) => {
+        const speedKmH = pos.speed !== null && pos.speed !== undefined
+          ? Math.max(0, Math.round(pos.speed * 3.6))
+          : 0;
+        pushLocation(pos.latitude, pos.longitude, speedKmH, pos.heading || 0, pos.accuracy || 10);
+      },
+      (message) => {
+        console.warn("[DriverHUD] Geolocation watch notice:", message);
+      },
+    ).then((stop) => {
+      if (cancelled) stop();
+      else stopWatch = stop;
+    });
 
     return () => {
-      if (watchId !== null && "geolocation" in navigator) {
-        navigator.geolocation.clearWatch(watchId);
-      }
+      cancelled = true;
+      stopWatch?.();
     };
   }, [trip?.id, isTracking]);
 

@@ -80,6 +80,7 @@
     "@capacitor/browser": "^8.0.4",
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/geolocation": "^8",
     "@supabase/supabase-js": "^2.115.0",
     "leaflet": "^1.9.4",
     "xlsx": "^0.18.5"

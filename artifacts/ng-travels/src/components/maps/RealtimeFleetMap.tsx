@@ -124,7 +124,7 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
   const polylineRef = useRef<L.Polyline | null>(null);
 
   // Default to Google Maps Style (Bright & High Contrast)
-  const [mapStyle, setMapStyle] = useState<"google" | "satellite" | "dark">("google");
+  const [mapStyle, setMapStyle] = useState<"street" | "satellite" | "dark">("street");
   const [telemetry, setTelemetry] = useState({
     speed: 64,
     progress: 48,
@@ -168,15 +168,15 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Authentic Google Maps-like HD Tile URLs
     const getTileUrl = (style: string) => {
       if (style === "satellite") {
         return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}";
       } else if (style === "dark") {
         return `https://maps.geoapify.com/v1/tile/dark-matter-purple-roads/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`;
       } else {
-        // Google Maps Street Style: Carto Voyager / Geoapify OSM Bright
-        return `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`;
+        // Clean modern street style (Klokantech Basic) — closer to current
+        // map UI conventions than the older OSM Bright style.
+        return `https://maps.geoapify.com/v1/tile/klokantech-basic/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`;
       }
     };
 
@@ -573,11 +573,11 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setMapStyle(mapStyle === "google" ? "satellite" : mapStyle === "satellite" ? "dark" : "google")}
+            onClick={() => setMapStyle(mapStyle === "street" ? "satellite" : mapStyle === "satellite" ? "dark" : "street")}
             className="bg-background/95 border-border text-foreground hover:text-white text-xs h-7 sm:h-8 px-2.5 shadow-lg"
           >
             <Layers className="w-3.5 h-3.5 mr-1" />
-            <span className="capitalize text-[10px] hidden xs:inline">{mapStyle === "google" ? "Google Map" : mapStyle}</span>
+            <span className="capitalize text-[10px] hidden xs:inline">{mapStyle === "street" ? "Street" : mapStyle}</span>
           </Button>
 
           <Button
