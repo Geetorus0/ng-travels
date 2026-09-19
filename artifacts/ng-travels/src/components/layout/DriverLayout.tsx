@@ -31,7 +31,6 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({
   onToggleTheme,
 }) => {
   const [location] = useLocation();
-  const isDriverApk = (window as any).NG_APP_ROLE === "driver";
 
   const navItems = [
     { label: "Cockpit", href: "/driver", icon: Home },
@@ -68,8 +67,8 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({
         <div className="flex items-center gap-1.5">
           <SyncStatusModal />
 
-          {/* Switch to Admin (hidden in Driver APK, and for accounts without real admin access) */}
-          {!isDriverApk && canSwitchToAdmin && (
+          {/* Switch to Admin (hidden for accounts without real admin access) */}
+          {canSwitchToAdmin && (
             <Button
               size="sm"
               variant="ghost"

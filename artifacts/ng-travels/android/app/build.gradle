@@ -4,33 +4,24 @@ android {
     namespace = "in.ngtravels.operations"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "in.ngtravels.operations"
+        // One app for both roles: users pick Admin or Driver on the sign-in
+        // screen, and the server-side account role drives everything from
+        // there. Reuses the Owner package id so existing Owner-app installs
+        // upgrade in place; standalone Driver-app installs (different
+        // package id) will need a fresh install of this unified app.
+        applicationId "com.ngtravels.owner"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.1.2"
+        versionCode 5
+        versionName "1.2.0"
+        resValue "string", "app_name", "NG-Travels"
+        resValue "string", "title_activity_main", "NG-Travels"
+        resValue "string", "app_role", "admin"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:*.apk:!*.apk'
-        }
-    }
-    flavorDimensions "role"
-    productFlavors {
-        owner {
-            dimension "role"
-            applicationId "com.ngtravels.owner"
-            resValue "string", "app_name", "NG Travels Owner"
-            resValue "string", "title_activity_main", "NG Travels Owner"
-            resValue "string", "app_role", "owner"
-        }
-        driver {
-            dimension "role"
-            applicationId "com.ngtravels.driver"
-            resValue "string", "app_name", "NG Travels Driver"
-            resValue "string", "title_activity_main", "NG Travels Driver"
-            resValue "string", "app_role", "driver"
         }
     }
     buildTypes {

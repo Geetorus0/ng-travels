@@ -2833,25 +2833,28 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
 });
 
 /**
- * Standalone Android app version manifest — checked by the packaged Owner
- * and Driver APKs on launch (see useAppUpdateCheck.ts on the client) so an
- * out-of-date install can prompt the user to download the current build.
- * Bump versionCode/versionName here (matching android/app/build.gradle) and
+ * Standalone Android app version manifest — checked by the packaged APK on
+ * launch (see useAppUpdateCheck.ts on the client) so an out-of-date install
+ * can prompt the user to download the current build. Bump
+ * versionCode/versionName here (matching android/app/build.gradle) and
  * re-upload the APK to app-releases every time a new build goes out.
+ *
+ * As of v1.2.0 this is ONE unified app (both Admin and Driver sign in
+ * through the same APK — com.ngtravels.owner) instead of separate
+ * Owner/Driver builds. The response still carries both `owner` and
+ * `driver` keys (identical content, pointing at the same APK) purely so
+ * that any already-installed pre-1.2.0 Owner or Driver APK still gets a
+ * valid update-check response and can prompt the user to install this one.
  */
+const CURRENT_APP_VERSION = {
+  versionCode: 5,
+  versionName: "1.2.0",
+  url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
+  releaseNotes: "NG-Travels is now one app for everyone — pick Admin or Driver on the sign-in screen.",
+};
 const APP_VERSIONS = {
-  owner: {
-    versionCode: 4,
-    versionName: "1.1.2",
-    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
-    releaseNotes: "Fixed WhatsApp buttons not opening the WhatsApp app.",
-  },
-  driver: {
-    versionCode: 4,
-    versionName: "1.1.2",
-    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
-    releaseNotes: "Reliability fixes for external links opened from the app.",
-  },
+  owner: CURRENT_APP_VERSION,
+  driver: CURRENT_APP_VERSION,
 };
 
 router.get("/app/version", async (_req, res): Promise<void> => {
