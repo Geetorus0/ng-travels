@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Required on Android 13+ (API 33+) for DownloadManager to show its
+         progress/complete notification when the WebView hands off the APK
+         download link (e.g. Settings page "Download APK") to it. Without
+         this, the download still finishes in the background, but its
+         notification is frozen at "downloading" forever since the OS
+         silently blocks the app from posting the "complete" update. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
