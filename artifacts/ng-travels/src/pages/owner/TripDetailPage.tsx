@@ -3,8 +3,9 @@ import { Link } from "wouter";
 import {
   ArrowLeft, Navigation, MapPin, User, Phone, Calendar, Clock, CircleDollarSign,
   Receipt, Fuel, Gauge, ShieldCheck, CheckCircle2, XCircle, Share2, Printer, Plus,
-  FileText, ArrowUpRight, AlertCircle, Loader2, Pencil
+  FileText, ArrowUpRight, AlertCircle, Loader2, Pencil, UserCog, Radio
 } from "lucide-react";
+import { ButtonLoader } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { formatINR, canEditTrip } from "@/lib/fareEngine";
 import { openWhatsApp, openExternalUrl } from "@/lib/openExternal";
@@ -18,6 +19,10 @@ interface TripDetailPageProps {
   onOpenPaymentModal: (trip: any) => void;
   onOpenCancelModal: (trip: any) => void;
   onOpenEditTrip: (trip: any) => void;
+  onOpenAssignDriver: (trip: any) => void;
+  onOpenStartKmModal: (trip: any) => void;
+  onOpenEndKmModal: (trip: any) => void;
+  onUpdateMilestone: (tripId: number, status: string, note?: string) => Promise<void>;
   onApproveExpense?: (expenseId: number) => void | Promise<void>;
   onRejectExpense?: (expenseId: number) => void | Promise<void>;
   onStatusChange?: (newStatus: string) => void;
@@ -31,11 +36,17 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
   onOpenPaymentModal,
   onOpenCancelModal,
   onOpenEditTrip,
+  onOpenAssignDriver,
+  onOpenStartKmModal,
+  onOpenEndKmModal,
+  onUpdateMilestone,
   onApproveExpense,
   onRejectExpense,
   onStatusChange,
 }) => {
   const [pendingExpenseAction, setPendingExpenseAction] = useState<{ id: number; action: "approve" | "reject" } | null>(null);
+  const [milestoneUpdating, setMilestoneUpdating] = useState(false);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
 
   const handleApproveExpense = async (id: number) => {
     if (!onApproveExpense || pendingExpenseAction) return;
@@ -54,6 +65,18 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
       await onRejectExpense(id);
     } finally {
       setPendingExpenseAction(null);
+    }
+  };
+
+  const handleMilestone = async (tripId: number, status: string, note: string) => {
+    setMilestoneUpdating(true);
+    setMilestoneError(null);
+    try {
+      await onUpdateMilestone(tripId, status, note);
+    } catch (err: any) {
+      setMilestoneError(err?.message || "Failed to update trip status. Please try again.");
+    } finally {
+      setMilestoneUpdating(false);
     }
   };
 
@@ -121,6 +144,16 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
               className="border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300 hover:bg-sky-950/30 text-xs font-semibold"
             >
               <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit Trip
+            </Button>
+          )}
+          {canEditTrip(trip) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenAssignDriver(trip)}
+              className="border-purple-300 dark:border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-950/30 text-xs font-semibold"
+            >
+              <UserCog className="w-3.5 h-3.5 mr-1.5" /> {trip.driverId ? "Reassign Driver" : "Assign Driver"}
             </Button>
           )}
           <Button
@@ -241,6 +274,98 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Ops Trip Lifecycle Control — same stage-by-stage progression the
+              driver app runs, exposed here so operations can advance a trip
+              on the driver's behalf (phone issues, manual dispatch, etc). */}
+          {trip.status !== "cancelled" && trip.status !== "completed" && (
+            <div className="bg-card/70 p-5 rounded-xl border border-border space-y-3">
+              <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <Radio className="w-4 h-4 text-amber-700 dark:text-amber-400" /> Trip Lifecycle Control (Ops Override)
+              </h2>
+
+              {!trip.driverId ? (
+                <div className="bg-background/60 p-3 rounded-lg border border-dashed border-border text-xs text-muted-foreground flex items-center justify-between gap-3">
+                  <span>Assign a driver before advancing the trip stage.</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenAssignDriver(trip)}
+                    className="h-7 text-[11px] border-purple-300 dark:border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-950/30 shrink-0"
+                  >
+                    <UserCog className="w-3.5 h-3.5 mr-1" /> Assign Driver
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(trip.status === "assigned" || trip.status === "upcoming") && (
+                    <Button
+                      disabled={milestoneUpdating}
+                      onClick={() => handleMilestone(trip.id, "accepted", "Trip accepted on driver's behalf (ops)")}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-5 text-xs cursor-pointer shadow-lg shadow-emerald-500/20 uppercase tracking-wide"
+                    >
+                      {milestoneUpdating ? <ButtonLoader label="Accepting Trip..." /> : <><CheckCircle2 className="w-4 h-4 mr-2" /> 1. Accept Trip Assignment</>}
+                    </Button>
+                  )}
+
+                  {trip.status === "accepted" && (
+                    <Button
+                      disabled={milestoneUpdating}
+                      onClick={() => handleMilestone(trip.id, "driver_arrived", "Driver arrived at pickup point (ops)")}
+                      className="w-full bg-sky-500 hover:bg-sky-400 text-zinc-950 font-black py-5 text-xs cursor-pointer shadow-lg shadow-sky-500/20 uppercase tracking-wide"
+                    >
+                      {milestoneUpdating ? <ButtonLoader label="Confirming Pickup Arrival..." /> : <><MapPin className="w-4 h-4 mr-2" /> 2. Arrived at Pickup Location</>}
+                    </Button>
+                  )}
+
+                  {trip.status === "driver_arrived" && (
+                    <Button
+                      onClick={() => onOpenStartKmModal(trip)}
+                      className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-5 text-xs cursor-pointer shadow-lg shadow-amber-400/20 uppercase tracking-wide"
+                    >
+                      <Gauge className="w-4 h-4 mr-2" /> 3. Start Trip (Enter Starting KM)
+                    </Button>
+                  )}
+
+                  {trip.status === "started" && (
+                    <Button
+                      disabled={milestoneUpdating}
+                      onClick={() => handleMilestone(trip.id, "in_progress", "Passenger boarded, journey in progress (ops)")}
+                      className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-5 text-xs cursor-pointer shadow-lg shadow-amber-400/20 uppercase tracking-wide"
+                    >
+                      {milestoneUpdating ? <ButtonLoader label="Starting Transit..." /> : <><Navigation className="w-4 h-4 mr-2" /> 4. Passenger Boarded (In Progress)</>}
+                    </Button>
+                  )}
+
+                  {trip.status === "in_progress" && (
+                    <Button
+                      disabled={milestoneUpdating}
+                      onClick={() => handleMilestone(trip.id, "reached_destination", "Arrived at final destination (ops)")}
+                      className="w-full bg-sky-500 hover:bg-sky-400 text-zinc-950 font-black py-5 text-xs cursor-pointer shadow-lg shadow-sky-500/20 uppercase tracking-wide"
+                    >
+                      {milestoneUpdating ? <ButtonLoader label="Confirming Destination Arrival..." /> : <><MapPin className="w-4 h-4 mr-2" /> 5. Reached Destination</>}
+                    </Button>
+                  )}
+
+                  {trip.status === "reached_destination" && (
+                    <Button
+                      onClick={() => onOpenEndKmModal(trip)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 text-xs cursor-pointer shadow-lg shadow-emerald-600/20 uppercase tracking-wide"
+                    >
+                      <Gauge className="w-4 h-4 mr-2" /> 6. Complete Trip (Enter Ending KM)
+                    </Button>
+                  )}
+
+                  {milestoneError && (
+                    <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 rounded-xl p-3 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{milestoneError}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Payments Ledger for this Trip */}
           <div className="bg-card/70 p-5 rounded-xl border border-border space-y-3">
@@ -385,11 +510,15 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
                 <span className="font-mono font-bold text-foreground">{trip.billingKm} km</span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-muted-foreground">Rate Per KM</span>
-                <span className="font-mono text-foreground">₹{trip.ratePerKm}/km</span>
+                <span className="text-muted-foreground">{trip.pricingMode === "package" ? "Pricing" : "Rate Per KM"}</span>
+                <span className="font-mono text-foreground">
+                  {trip.pricingMode === "package" ? "Flat Package Rate" : `₹${trip.ratePerKm}/km`}
+                </span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-foreground font-medium">Base Vehicle Fare</span>
+                <span className="text-foreground font-medium">
+                  {trip.pricingMode === "package" ? "Package Fare" : "Base Vehicle Fare"}
+                </span>
                 <span className="font-mono font-medium text-foreground">{formatINR(trip.baseFare)}</span>
               </div>
               <div className="flex justify-between py-1.5">

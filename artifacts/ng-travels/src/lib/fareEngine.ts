@@ -23,12 +23,19 @@ export interface FareCalculationResult {
 
 export type BillingDayPolicy = "CALENDAR_DAYS" | "24_HOUR_PERIODS" | "PER_DAY_MINIMUM";
 
+export type PricingMode = "per_km" | "package";
+
 export interface CommercialFareInput {
   tripType: string;
   outboundDistanceKm: number;
   returnDistanceKm?: number;
   totalRoadDistanceKm: number;
   ratePerKm: number;
+  // "package" replaces the per-km/day-minimum distance math with a flat
+  // packageTotal amount; every other charge (toll, parking, tax, etc.)
+  // still applies on top as usual.
+  pricingMode?: PricingMode;
+  packageTotal?: number;
   startDate: string;
   returnDate?: string | null;
   startTime?: string;
@@ -59,6 +66,8 @@ export interface CommercialFareBreakdown {
   minimumBillableKm: number;
   totalBillableDistance: number;
   ratePerKm: number;
+  pricingMode: PricingMode;
+  packageTotal: number;
   distanceFare: number;
   driverBataPerDay: number;
   driverBata: number;
@@ -149,7 +158,11 @@ export function calculateCommercialFare(input: CommercialFareInput): CommercialF
   const totalBillableDistance = Math.max(totalRoadDistanceKm, minimumBillableKm);
 
   const ratePerKm = Math.max(0, Number(input.ratePerKm || 0));
-  const distanceFare = Math.round(totalBillableDistance * ratePerKm * 100) / 100;
+  const pricingMode: PricingMode = input.pricingMode === "package" ? "package" : "per_km";
+  const packageTotal = Math.max(0, Math.round(Number(input.packageTotal || 0) * 100) / 100);
+  const distanceFare = pricingMode === "package"
+    ? packageTotal
+    : Math.round(totalBillableDistance * ratePerKm * 100) / 100;
 
   const driverBataPerDay = Math.max(0, Number(input.driverBataPerDay ?? (isRoundTrip ? 500 : 0)));
   const nightBata = Math.max(0, Number(input.nightBata || 0));
@@ -197,6 +210,8 @@ export function calculateCommercialFare(input: CommercialFareInput): CommercialF
     minimumBillableKm,
     totalBillableDistance,
     ratePerKm,
+    pricingMode,
+    packageTotal,
     distanceFare,
     driverBataPerDay,
     driverBata,

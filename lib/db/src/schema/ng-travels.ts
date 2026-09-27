@@ -287,6 +287,10 @@ export const tripsTable = pgTable(
     ratePerKm: numeric("rate_per_km", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    // per_km: baseFare = totalBillableDistance * ratePerKm (day-minimum enforced)
+    // package: baseFare = packageTotal (flat), ratePerKm/day-minimum ignored
+    pricingMode: text("pricing_mode").notNull().default("per_km"),
+    packageTotal: numeric("package_total", { precision: 12, scale: 2 }),
     baseFare: numeric("base_fare", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
