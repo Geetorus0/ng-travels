@@ -2861,10 +2861,10 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
  * valid update-check response and can prompt the user to install this one.
  */
 const CURRENT_APP_VERSION = {
-  versionCode: 7,
-  versionName: "1.2.2",
+  versionCode: 8,
+  versionName: "1.3.0",
   url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
-  releaseNotes: "More accurate live GPS tracking and a fresher-looking map style.",
+  releaseNotes: "Trip planner: rate-per-km/package pricing toggle and quick driver assignment, plus an admin trip-start control panel to run the driver's trip stages from the office.",
 };
 const APP_VERSIONS = {
   owner: CURRENT_APP_VERSION,
