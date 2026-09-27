@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
@@ -10,6 +10,22 @@ const app: any = express();
 // weak ETag generation so responses aren't treated as cacheable and clients
 // don't get 304s for data that's meant to be re-fetched every time.
 app.set("etag", false);
+
+// Vercel's Node.js runtime stamps every function response with
+// "Cache-Control: public, max-age=0, must-revalidate" by default unless the
+// app sets its own — "public" tells any intermediate cache (CDN, proxy, and
+// notably a native mobile HTTP stack like Android's OkHttp, which the
+// Capacitor app's CapacitorHttp plugin routes through) that this
+// authorization-gated, per-user response is safe to store and reuse across
+// different callers. It isn't: two requests to the same URL with different
+// Authorization headers can get completely different data. Force no-store
+// on every API response so nothing between the app and this server ever
+// caches or replays one user's data for another, or replays a stale
+// response after a fresh login.
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 const httpLogger = typeof pinoHttp === "function" ? pinoHttp : (pinoHttp as any).default || pinoHttp;
 
