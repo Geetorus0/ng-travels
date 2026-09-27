@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import {
   Navigation, Search, Filter, Plus, Eye, Receipt, FileText, XCircle,
   CheckCircle2, ArrowUpRight, Calendar, User, Phone, MapPin, Gauge,
-  Clock, IndianRupee, ChevronRight, Pencil
+  Clock, IndianRupee, ChevronRight, Pencil, UserCog
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ interface TripsPageProps {
   onOpenCustomerCopy: (trip: any) => void;
   onOpenPaymentModal: (trip: any) => void;
   onOpenCancelModal: (trip: any) => void;
+  onOpenAssignDriver: (trip: any) => void;
 }
 
 export const TripsPage: React.FC<TripsPageProps> = ({
@@ -29,6 +30,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
   onOpenCustomerCopy,
   onOpenPaymentModal,
   onOpenCancelModal,
+  onOpenAssignDriver,
 }) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -167,7 +169,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                   <div className="text-[10px] text-muted-foreground pl-5 flex items-center gap-2">
                     <span>{trip.billingKm} km</span>
                     <span>•</span>
-                    <span>₹{trip.ratePerKm}/km</span>
+                    <span>{trip.pricingMode === "package" ? "Package Rate" : `₹${trip.ratePerKm}/km`}</span>
                     <span>•</span>
                     <span className="capitalize">{trip.tripType || "Single"}</span>
                   </div>
@@ -243,14 +245,24 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                 </div>
 
                 {canEditTrip(trip) && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onOpenEditTrip(trip)}
-                    className="w-full text-xs h-8 border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300 hover:bg-sky-950/30"
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Trip
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onOpenEditTrip(trip)}
+                      className="w-full text-xs h-8 border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300 hover:bg-sky-950/30"
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Trip
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onOpenAssignDriver(trip)}
+                      className="w-full text-xs h-8 border-purple-300 dark:border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-950/30"
+                    >
+                      <UserCog className="w-3.5 h-3.5 mr-1" /> {trip.driverId ? "Reassign" : "Assign Driver"}
+                    </Button>
+                  </div>
                 )}
               </div>
             );
@@ -324,7 +336,7 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                           {getRouteText(trip)}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          {trip.billingKm} km • ₹{trip.ratePerKm}/km
+                          {trip.billingKm} km • {trip.pricingMode === "package" ? "Package Rate" : `₹${trip.ratePerKm}/km`}
                         </div>
                       </td>
 
@@ -382,6 +394,17 @@ export const TripsPage: React.FC<TripsPageProps> = ({
                               title="Edit Trip"
                             >
                               <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {canEditTrip(trip) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onOpenAssignDriver(trip)}
+                              className="h-7 w-7 p-0 text-purple-700 dark:text-purple-400 hover:bg-purple-950/30 cursor-pointer"
+                              title={trip.driverId ? "Reassign Driver" : "Assign Driver"}
+                            >
+                              <UserCog className="w-3.5 h-3.5" />
                             </Button>
                           )}
                           {Number(trip.remainingBalance) > 0 && (

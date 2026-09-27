@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { LocationPicker } from "@/components/trips/LocationPicker";
 import { RealtimeFleetMap } from "@/components/maps/RealtimeFleetMap";
 import {
@@ -113,6 +114,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const [primaryTollPlazas, setPrimaryTollPlazas] = useState<any[]>([]);
 
   // Step 4: Commercial Pricing Parameters
+  const [pricingMode, setPricingMode] = useState<"per_km" | "package">("per_km");
+  const [packageTotal, setPackageTotal] = useState(0);
   const [ratePerKm, setRatePerKm] = useState(defaultRate);
   const [finalToll, setFinalToll] = useState(0);
   const [parking, setParking] = useState(0);
@@ -346,6 +349,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       setOutboundDurationMinutes(Number(editingTrip.outboundDurationMinutes || 0));
       setReturnDurationMinutes(Number(editingTrip.returnDurationMinutes || 0));
 
+      setPricingMode(editingTrip.pricingMode === "package" ? "package" : "per_km");
+      setPackageTotal(Number(editingTrip.packageTotal || 0));
       setRatePerKm(Number(editingTrip.ratePerKm || defaultRate));
       setFinalToll(Number(editingTrip.finalToll || editingTrip.toll || 0));
       setParking(Number(editingTrip.parking || 0));
@@ -401,6 +406,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       setSelectedRouteIdx(0);
       setPrimaryTollPlazas([]);
 
+      setPricingMode("per_km");
+      setPackageTotal(0);
       setRatePerKm(defaultRate);
       setFinalToll(0);
       setParking(0);
@@ -480,6 +487,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     returnDistanceKm: effectiveReturnKm,
     totalRoadDistanceKm: distanceKm,
     ratePerKm,
+    pricingMode,
+    packageTotal,
     startDate,
     returnDate: isRound ? returnDate : null,
     startTime,
@@ -522,6 +531,16 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       if (distanceKm <= 0) {
         const proceed = confirm("Road Distance is currently 0 KM. Would you like to enter a distance in KM now?");
         if (proceed) return;
+      }
+    }
+    if (step === 4) {
+      if (pricingMode === "package" && packageTotal <= 0) {
+        alert("Please enter the total package amount");
+        return;
+      }
+      if (pricingMode === "per_km" && ratePerKm <= 0) {
+        alert("Please enter a rate per KM");
+        return;
       }
     }
     setStep((prev) => Math.min(prev + 1, 5));
@@ -628,6 +647,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           estimatedToll: commercialFare.toll > 0 ? String(commercialFare.toll) : null,
           billingKm: String(commercialFare.totalBillableDistance),
           ratePerKm: String(commercialFare.ratePerKm),
+          pricingMode: commercialFare.pricingMode,
+          packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
           baseFare: String(commercialFare.distanceFare),
           finalToll: String(commercialFare.toll),
           toll: String(commercialFare.toll),
@@ -680,6 +701,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           estimatedToll: finalToll,
           billingKm: commercialFare.totalBillableDistance,
           ratePerKm,
+          pricingMode,
+          packageTotal,
           minimumKmPerDay: 0,
           driverBataPerDay: 0,
           billingDayPolicy,
@@ -1325,15 +1348,50 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                       Commercial Rate Parameters
                     </span>
 
-                    <div>
-                      <label className="text-[11px] text-foreground block mb-1">Rate Per KM (₹) *</label>
-                      <Input
-                        type="number"
-                        value={ratePerKm || ""}
-                        onChange={(e) => setRatePerKm(Number(e.target.value))}
-                        className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400"
+                    {/* Pricing Mode Switch: Rate per KM vs flat Total Package Rate */}
+                    <div className="flex items-center justify-between bg-background/70 border border-border rounded-lg px-3 py-2.5">
+                      <div>
+                        <span className={`text-[11px] font-bold ${pricingMode === "per_km" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                          Rate per KM
+                        </span>
+                        <span className="text-[10px] text-muted-foreground mx-1.5">/</span>
+                        <span className={`text-[11px] font-bold ${pricingMode === "package" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                          Total Package Rate
+                        </span>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {pricingMode === "package"
+                            ? "Flat package amount — toll/parking/tax still apply on top."
+                            : "Fare computed from billable KM × rate, with day-minimum enforcement."}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={pricingMode === "package"}
+                        onCheckedChange={(checked) => setPricingMode(checked ? "package" : "per_km")}
                       />
                     </div>
+
+                    {pricingMode === "package" ? (
+                      <div>
+                        <label className="text-[11px] text-foreground block mb-1">Total Package Amount (₹) *</label>
+                        <Input
+                          type="number"
+                          value={packageTotal || ""}
+                          onChange={(e) => setPackageTotal(Number(e.target.value))}
+                          placeholder="e.g. 12000"
+                          className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400 placeholder:text-muted-foreground"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[11px] text-foreground block mb-1">Rate Per KM (₹) *</label>
+                        <Input
+                          type="number"
+                          value={ratePerKm || ""}
+                          onChange={(e) => setRatePerKm(Number(e.target.value))}
+                          className="bg-card border-border text-xs h-9 font-mono font-bold text-amber-700 dark:text-amber-400"
+                        />
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -1391,13 +1449,17 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                   <div className="bg-card/80 border border-border rounded-xl p-4 flex flex-col justify-between text-xs space-y-3">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center border-b border-border pb-2">
-                        <span className="font-bold text-foreground">Billable Volume:</span>
+                        <span className="font-bold text-foreground">
+                          {pricingMode === "package" ? "Package Basis:" : "Billable Volume:"}
+                        </span>
                         <span className="font-mono text-foreground">
-                          {commercialFare.totalBillableDistance} KM @ ₹{ratePerKm}/km
+                          {pricingMode === "package"
+                            ? `Flat total (${commercialFare.totalBillableDistance} KM travelled)`
+                            : `${commercialFare.totalBillableDistance} KM @ ₹${ratePerKm}/km`}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-muted-foreground">
-                        <span>Base Distance Fare:</span>
+                        <span>{pricingMode === "package" ? "Package Fare:" : "Base Distance Fare:"}</span>
                         <span className="font-mono text-foreground">{formatINR(baseFare)}</span>
                       </div>
                       {(finalToll > 0 || permitCharge > 0) && (

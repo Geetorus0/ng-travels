@@ -239,6 +239,8 @@ function tripView(
     returnTollEstimate: trip.returnTollEstimate == null ? null : numeric(trip.returnTollEstimate),
     billingKm: numeric(trip.billingKm),
     ratePerKm: numeric(trip.ratePerKm),
+    pricingMode: trip.pricingMode || "per_km",
+    packageTotal: trip.packageTotal == null ? null : numeric(trip.packageTotal),
     baseFare: numeric(trip.baseFare),
     toll: numeric(trip.finalToll ?? trip.toll),
     parking: numeric(trip.parking),
@@ -1664,6 +1666,8 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
       returnDistanceKm: verifiedReturnKm,
       totalRoadDistanceKm: verifiedTotalKm,
       ratePerKm: Number(req.body.ratePerKm || 18),
+      pricingMode: req.body.pricingMode === "package" ? "package" : "per_km",
+      packageTotal: Number(req.body.packageTotal || 0),
       startDate: startDateStr,
       returnDate: returnDateStr,
       startTime: req.body.startTime || "09:00",
@@ -1716,6 +1720,8 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
       totalBillableKm: commercialFare.totalBillableDistance,
       totalDurationMinutes: verifiedTotalMinutes,
       ratePerKm: commercialFare.ratePerKm,
+      pricingMode: commercialFare.pricingMode,
+      packageTotal: commercialFare.packageTotal,
       distanceFare: commercialFare.distanceFare,
       driverBata: commercialFare.driverBata,
       permitCharge: commercialFare.permitCharge,
@@ -1783,6 +1789,8 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
       returnTollEstimate: null,
       billingKm: String(commercialFare.totalBillableDistance),
       ratePerKm: String(commercialFare.ratePerKm),
+      pricingMode: commercialFare.pricingMode,
+      packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
       baseFare: String(commercialFare.distanceFare),
       driverBata: String(commercialFare.driverBata),
       toll: String(commercialFare.toll),
@@ -1941,7 +1949,9 @@ router.post("/trips/:id/assign", requireOwner, async (req, res): Promise<void> =
 
     await writeAudit(req, `Assigned driver ${driverName} & vehicle ${vehicleNumber}`, "trip", id);
     broadcastRealtimeEvent("TRIP_ASSIGNED", { tripId: id, bookingId: trip.bookingId, driverId, vehicleId });
-    res.json(trip);
+
+    const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, trip.customerId));
+    res.json(tripView(trip, customer));
   } catch (err: any) {
     console.error("[trips] Assignment error:", err);
     res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to assign driver/vehicle" } });
@@ -2334,7 +2344,11 @@ router.post("/driver/trips/:id/complete", async (req, res): Promise<void> => {
     // Bill whichever is higher: actual meter km or agreed billing km
     const chargedKm = Math.max(actualKm, numeric(trip.billingKm));
     const ratePerKm = numeric(trip.ratePerKm);
-    const recalculatedBase = Math.round(chargedKm * ratePerKm * 100) / 100;
+    // A flat package trip keeps its agreed total regardless of actual meter
+    // KM — only per-km trips get their base fare recalculated off the road.
+    const recalculatedBase = trip.pricingMode === "package"
+      ? numeric(trip.baseFare)
+      : Math.round(chargedKm * ratePerKm * 100) / 100;
     const customerTotal = Math.round((recalculatedBase + tollAmount + parkingAmount + permitAmount) * 100) / 100;
     const totalPaid = numeric(trip.totalPaid);
     const remainingBalance = Math.max(0, Math.round((customerTotal - totalPaid) * 100) / 100);

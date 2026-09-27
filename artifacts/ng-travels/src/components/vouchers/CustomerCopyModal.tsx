@@ -50,7 +50,7 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
       `Customer: ${trip.customerName}\n` +
       `Route: ${pickup} ➔ ${dest}\n` +
       `Date & Time: ${date} at ${trip.startTime}\n` +
-      `Billing KM: ${trip.billingKm} km @ ₹${trip.ratePerKm}/km\n` +
+      `Billing KM: ${trip.billingKm} km${trip.pricingMode === "package" ? " (Package Rate)" : ` @ ₹${trip.ratePerKm}/km`}\n` +
       `Total Estimated Fare: ₹${trip.customerTotal}\n` +
       `Advance Paid: ₹${trip.totalPaid}\n` +
       `Balance Due: ₹${trip.remainingBalance}\n\n` +
@@ -172,8 +172,12 @@ export const CustomerCopyModal: React.FC<CustomerCopyProps> = ({
               </thead>
               <tbody className="divide-y divide-border/60">
                 <tr>
-                  <td className="py-2.5 text-foreground font-medium">Base Vehicle Fare</td>
-                  <td className="text-right text-muted-foreground">{trip.billingKm} km × ₹{trip.ratePerKm}/km</td>
+                  <td className="py-2.5 text-foreground font-medium">
+                    {trip.pricingMode === "package" ? "Package Fare" : "Base Vehicle Fare"}
+                  </td>
+                  <td className="text-right text-muted-foreground">
+                    {trip.pricingMode === "package" ? `${trip.billingKm} km (flat package)` : `${trip.billingKm} km × ₹${trip.ratePerKm}/km`}
+                  </td>
                   <td className="text-right font-medium text-foreground">{formatINR(trip.baseFare)}</td>
                 </tr>
                 {Number(trip.toll || 0) > 0 && (

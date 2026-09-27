@@ -58,6 +58,8 @@ export interface RealtimeFleetMapProps {
 
 export const GEOAPIFY_API_KEY = "fccc330705934d6abd2be56e77dff380";
 
+const GPS_TRACKED_STATUSES = new Set(["started", "reached_pickup", "customer_picked_up", "in_progress"]);
+
 // Fallback coordinate dictionary for common cities/landmarks across India
 const CITY_COORDS: Record<string, [number, number]> = {
   erode: [11.341, 77.7172],
@@ -143,7 +145,11 @@ export const RealtimeFleetMap: React.FC<RealtimeFleetMapProps> = ({
   const pickupCoords = getCoordsForPlace(pickup?.name || "", pLat, pLng);
   const destCoords = getCoordsForPlace(destination?.name || "", dLat, dLng);
 
-  const isLiveTrip = Boolean(activeTrip?.id);
+  // Only poll for GPS telemetry once the trip is actually in a stage that
+  // pushes location (mirrors the driver app's own tracking gate) — polling
+  // for e.g. an "upcoming"/"assigned" trip just spams 404s since no
+  // driverLocations row exists for it yet.
+  const isLiveTrip = Boolean(activeTrip?.id) && GPS_TRACKED_STATUSES.has(activeTrip?.status);
 
   // Real route stats derived from the actual calculated route, not a random simulation.
   const totalDistanceKm = totalMapKm || billingKm || outboundDistanceKm + returnDistanceKm || 0;

@@ -80,6 +80,7 @@ import { AppSplashLoader, ButtonLoader } from "@/components/loading";
 
 // Modular Modals & Vouchers
 import { CreateTripModal } from "@/components/trips/CreateTripModal";
+import { AssignDriverModal } from "@/components/trips/AssignDriverModal";
 import { CancelTripModal } from "@/components/trips/CancelTripModal";
 import { PaymentRecordModal } from "@/components/trips/PaymentRecordModal";
 import { CustomerCopyModal } from "@/components/vouchers/CustomerCopyModal";
@@ -1187,6 +1188,7 @@ function MainApp() {
   const [customerCopyTrip, setCustomerCopyTrip] = useState<any | null>(null);
   const [paymentRecordTrip, setPaymentRecordTrip] = useState<any | null>(null);
   const [cancelTrip, setCancelTrip] = useState<any | null>(null);
+  const [assignDriverTrip, setAssignDriverTrip] = useState<any | null>(null);
   const [receiptPayment, setReceiptPayment] = useState<{
     payment: any;
     trip: any;
@@ -1917,6 +1919,7 @@ function MainApp() {
                 onOpenCustomerCopy={(trip) => setCustomerCopyTrip(trip)}
                 onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
                 onOpenCancelModal={(trip) => setCancelTrip(trip)}
+                onOpenAssignDriver={(trip) => setAssignDriverTrip(trip)}
               />
             </Route>
             <Route path="/trips/:id">
@@ -1938,6 +1941,10 @@ function MainApp() {
                     onOpenPaymentModal={(trip) => setPaymentRecordTrip(trip)}
                     onOpenCancelModal={(trip) => setCancelTrip(trip)}
                     onOpenEditTrip={(trip) => setEditingTrip(trip)}
+                    onOpenAssignDriver={(trip) => setAssignDriverTrip(trip)}
+                    onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
+                    onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
+                    onUpdateMilestone={handleDriverMilestone}
                     onApproveExpense={handleApproveExpense}
                     onRejectExpense={handleRejectExpense}
                   />
@@ -2102,6 +2109,22 @@ function MainApp() {
           await Promise.all([
             qc.invalidateQueries({ queryKey: ["/api/trips"] }),
             qc.invalidateQueries({ queryKey: ["/api/payments"] }),
+            qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+          ]);
+        }}
+      />
+
+      <AssignDriverModal
+        isOpen={Boolean(assignDriverTrip)}
+        onClose={() => setAssignDriverTrip(null)}
+        trip={assignDriverTrip}
+        drivers={driverList}
+        vehicles={vehicleList}
+        onAssigned={async () => {
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["/api/trips"] }),
+            qc.invalidateQueries({ queryKey: ["/api/drivers"] }),
+            qc.invalidateQueries({ queryKey: ["/api/vehicles"] }),
             qc.invalidateQueries({ queryKey: ["/api/dashboard"] }),
           ]);
         }}
