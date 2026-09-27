@@ -1,16 +1,20 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Settings, Save, CheckCircle2, Building, Phone, Mail, IndianRupee, Globe, Smartphone, ShieldCheck, Car, Loader2, Users, Plus, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminUserManagementModal, CreateStaffUserData } from "@/components/admin/AdminUserManagementModal";
+import { apiFetch } from "@/lib/apiFetch";
 
-// Hosted on Supabase Storage (public "app-releases" bucket), not served
-// from /public — *.apk is git-ignored at the repo root, so a file only
-// present in the local public/ folder would never actually reach the
-// deployed site. Re-upload here after building a new APK.
-const APK_DOWNLOAD_URLS = {
-  app: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
+// Fallback shown only until /api/app/version answers (or if it fails) —
+// the server's CURRENT_APP_VERSION (artifacts/api-server/src/routes/ng-travels.ts)
+// is the actual source of truth; re-upload the APK there after each build,
+// this local fallback just needs to stay roughly current for offline/error cases.
+const FALLBACK_APP_VERSION = {
+  versionName: "1.3.0",
+  url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
+  releaseNotes: "",
 };
 
 interface SettingsPageProps {
@@ -42,6 +46,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [saving, setSaving] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [pendingStaffAction, setPendingStaffAction] = useState<number | null>(null);
+
+  const { data: appVersionManifest } = useQuery<any>({
+    queryKey: ["/api/app/version"],
+    queryFn: async () => {
+      const res = await apiFetch("/api/app/version");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  // The Admin and Driver roles now ship as one unified APK, so both manifest
+  // entries point at the same build — either one reflects the current release.
+  const appVersion = appVersionManifest?.owner || appVersionManifest?.driver || FALLBACK_APP_VERSION;
 
   const handleToggleStaffStatus = async (staffUser: any) => {
     if (!onUpdateStaffUser || pendingStaffAction) return;
@@ -187,7 +204,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           Driver right on the sign-in screen after installing. */}
       <div className="space-y-3 pt-2">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">
-          Standalone Android Application (v1.2)
+          Standalone Android Application (v{appVersion.versionName})
         </h3>
 
         <div className="bg-gradient-to-r from-amber-950/40 via-card to-card p-5 rounded-xl border border-amber-300 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
@@ -197,10 +214,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
             <h4 className="text-sm font-bold text-foreground">NG-Travels App</h4>
             <p className="text-xs text-muted-foreground max-w-md">
-              One app for everyone — pick Operations Admin or Driver Pilot on the sign-in screen. Full Command Desk, dispatch, live GPS radar, and revenue reports for admins; cockpit HUD, journey roster, odometer capture, and expense claims for drivers.
+              {appVersion.releaseNotes ||
+                "One app for everyone — pick Operations Admin or Driver Pilot on the sign-in screen. Full Command Desk, dispatch, live GPS radar, and revenue reports for admins; cockpit HUD, journey roster, odometer capture, and expense claims for drivers."}
             </p>
           </div>
-          <a href={APK_DOWNLOAD_URLS.app} download="NG-Travels-v1.2.apk">
+          <a href={appVersion.url} download={`NG-Travels-v${appVersion.versionName}.apk`}>
             <Button className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-amber-400/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
               <Smartphone className="w-4 h-4" /> Download NG-Travels APK
             </Button>

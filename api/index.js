@@ -87396,6 +87396,10 @@ var tripsTable = pgTable(
     routeSnapshot: jsonb("route_snapshot").$type(),
     billingKm: numeric("billing_km", { precision: 12, scale: 2 }).notNull().default("0"),
     ratePerKm: numeric("rate_per_km", { precision: 12, scale: 2 }).notNull().default("0"),
+    // per_km: baseFare = totalBillableDistance * ratePerKm (day-minimum enforced)
+    // package: baseFare = packageTotal (flat), ratePerKm/day-minimum ignored
+    pricingMode: text("pricing_mode").notNull().default("per_km"),
+    packageTotal: numeric("package_total", { precision: 12, scale: 2 }),
     baseFare: numeric("base_fare", { precision: 12, scale: 2 }).notNull().default("0"),
     driverBata: numeric("driver_bata", { precision: 12, scale: 2 }).notNull().default("0"),
     toll: numeric("toll", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -95740,7 +95744,9 @@ function calculateCommercialFare(input2) {
   const minimumBillableKm = minimumKmPerDay * billableDays;
   const totalBillableDistance = Math.max(totalRoadDistanceKm, minimumBillableKm);
   const ratePerKm = Math.max(0, Number(input2.ratePerKm || 0));
-  const distanceFare = Math.round(totalBillableDistance * ratePerKm * 100) / 100;
+  const pricingMode = input2.pricingMode === "package" ? "package" : "per_km";
+  const packageTotal = Math.max(0, Math.round(Number(input2.packageTotal || 0) * 100) / 100);
+  const distanceFare = pricingMode === "package" ? packageTotal : Math.round(totalBillableDistance * ratePerKm * 100) / 100;
   const driverBataPerDay = Math.max(0, Number(input2.driverBataPerDay ?? (isRoundTrip ? 500 : 0)));
   const nightBata = Math.max(0, Number(input2.nightBata || 0));
   const driverBata = Math.round((driverBataPerDay * billableDays + nightBata) * 100) / 100;
@@ -95781,6 +95787,8 @@ function calculateCommercialFare(input2) {
     minimumBillableKm,
     totalBillableDistance,
     ratePerKm,
+    pricingMode,
+    packageTotal,
     distanceFare,
     driverBataPerDay,
     driverBata,
@@ -96926,6 +96934,8 @@ function tripView(trip, customer) {
     returnTollEstimate: trip.returnTollEstimate == null ? null : numeric2(trip.returnTollEstimate),
     billingKm: numeric2(trip.billingKm),
     ratePerKm: numeric2(trip.ratePerKm),
+    pricingMode: trip.pricingMode || "per_km",
+    packageTotal: trip.packageTotal == null ? null : numeric2(trip.packageTotal),
     baseFare: numeric2(trip.baseFare),
     toll: numeric2(trip.finalToll ?? trip.toll),
     parking: numeric2(trip.parking),
@@ -98010,6 +98020,8 @@ router2.post("/trips", requireOwner, async (req, res) => {
       returnDistanceKm: verifiedReturnKm,
       totalRoadDistanceKm: verifiedTotalKm,
       ratePerKm: Number(req.body.ratePerKm || 18),
+      pricingMode: req.body.pricingMode === "package" ? "package" : "per_km",
+      packageTotal: Number(req.body.packageTotal || 0),
       startDate: startDateStr,
       returnDate: returnDateStr,
       startTime: req.body.startTime || "09:00",
@@ -98057,6 +98069,8 @@ router2.post("/trips", requireOwner, async (req, res) => {
       totalBillableKm: commercialFare.totalBillableDistance,
       totalDurationMinutes: verifiedTotalMinutes,
       ratePerKm: commercialFare.ratePerKm,
+      pricingMode: commercialFare.pricingMode,
+      packageTotal: commercialFare.packageTotal,
       distanceFare: commercialFare.distanceFare,
       driverBata: commercialFare.driverBata,
       permitCharge: commercialFare.permitCharge,
@@ -98123,6 +98137,8 @@ router2.post("/trips", requireOwner, async (req, res) => {
       returnTollEstimate: null,
       billingKm: String(commercialFare.totalBillableDistance),
       ratePerKm: String(commercialFare.ratePerKm),
+      pricingMode: commercialFare.pricingMode,
+      packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
       baseFare: String(commercialFare.distanceFare),
       driverBata: String(commercialFare.driverBata),
       toll: String(commercialFare.toll),
@@ -98250,7 +98266,8 @@ router2.post("/trips/:id/assign", requireOwner, async (req, res) => {
     }
     await writeAudit(req, `Assigned driver ${driverName} & vehicle ${vehicleNumber}`, "trip", id);
     broadcastRealtimeEvent("TRIP_ASSIGNED", { tripId: id, bookingId: trip.bookingId, driverId, vehicleId });
-    res.json(trip);
+    const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, trip.customerId));
+    res.json(tripView(trip, customer));
   } catch (err) {
     console.error("[trips] Assignment error:", err);
     res.status(500).json({ success: false, error: { code: "DATABASE_ERROR", message: "Failed to assign driver/vehicle" } });
@@ -98508,7 +98525,7 @@ router2.post("/driver/trips/:id/complete", async (req, res) => {
     const permitAmount = numeric2(trip.permitCharge);
     const chargedKm = Math.max(actualKm, numeric2(trip.billingKm));
     const ratePerKm = numeric2(trip.ratePerKm);
-    const recalculatedBase = Math.round(chargedKm * ratePerKm * 100) / 100;
+    const recalculatedBase = trip.pricingMode === "package" ? numeric2(trip.baseFare) : Math.round(chargedKm * ratePerKm * 100) / 100;
     const customerTotal = Math.round((recalculatedBase + tollAmount + parkingAmount + permitAmount) * 100) / 100;
     const totalPaid = numeric2(trip.totalPaid);
     const remainingBalance = Math.max(0, Math.round((customerTotal - totalPaid) * 100) / 100);
@@ -98887,19 +98904,15 @@ router2.get("/audit-logs", requireOwner, async (_req, res) => {
 router2.get("/settings", requireOwner, async (_req, res) => {
   res.json(await settingsView());
 });
+var CURRENT_APP_VERSION = {
+  versionCode: 8,
+  versionName: "1.3.0",
+  url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
+  releaseNotes: "Trip planner: rate-per-km/package pricing toggle and quick driver assignment, plus an admin trip-start control panel to run the driver's trip stages from the office."
+};
 var APP_VERSIONS = {
-  owner: {
-    versionCode: 2,
-    versionName: "1.1.0",
-    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Owner.apk",
-    releaseNotes: "Live Trips GPS radar, admin/staff accounts, expense receipt uploads, and reliability fixes."
-  },
-  driver: {
-    versionCode: 2,
-    versionName: "1.1.0",
-    url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels-Driver.apk",
-    releaseNotes: "Expense receipt uploads (now required) and reliability fixes for trip status updates."
-  }
+  owner: CURRENT_APP_VERSION,
+  driver: CURRENT_APP_VERSION
 };
 router2.get("/app/version", async (_req, res) => {
   res.json(APP_VERSIONS);
@@ -98949,6 +98962,10 @@ var logger = (0, import_pino.default)({
 // src/app.ts
 var app = (0, import_express4.default)();
 app.set("etag", false);
+app.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 var httpLogger = typeof import_pino_http.default === "function" ? import_pino_http.default : import_pino_http.default.default || import_pino_http.default;
 app.use(
   httpLogger({
