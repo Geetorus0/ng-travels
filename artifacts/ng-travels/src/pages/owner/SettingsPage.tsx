@@ -12,7 +12,7 @@ import { apiFetch } from "@/lib/apiFetch";
 // is the actual source of truth; re-upload the APK there after each build,
 // this local fallback just needs to stay roughly current for offline/error cases.
 const FALLBACK_APP_VERSION = {
-  versionName: "1.3.0",
+  versionName: "1.3.2",
   url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
   releaseNotes: "",
 };

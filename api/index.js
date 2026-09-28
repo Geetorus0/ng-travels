@@ -87402,6 +87402,11 @@ var tripsTable = pgTable(
     packageTotal: numeric("package_total", { precision: 12, scale: 2 }),
     baseFare: numeric("base_fare", { precision: 12, scale: 2 }).notNull().default("0"),
     driverBata: numeric("driver_bata", { precision: 12, scale: 2 }).notNull().default("0"),
+    // percentage: driverCommissionAmount = customerTotal * driverCommissionValue / 100
+    // flat: driverCommissionAmount = driverCommissionValue (entered directly in ₹)
+    driverCommissionType: text("driver_commission_type").notNull().default("percentage"),
+    driverCommissionValue: numeric("driver_commission_value", { precision: 12, scale: 2 }).notNull().default("0"),
+    driverCommissionAmount: numeric("driver_commission_amount", { precision: 12, scale: 2 }).notNull().default("0"),
     toll: numeric("toll", { precision: 12, scale: 2 }).notNull().default("0"),
     parking: numeric("parking", { precision: 12, scale: 2 }).notNull().default("0"),
     permitCharge: numeric("permit_charge", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -96937,6 +96942,9 @@ function tripView(trip, customer) {
     pricingMode: trip.pricingMode || "per_km",
     packageTotal: trip.packageTotal == null ? null : numeric2(trip.packageTotal),
     baseFare: numeric2(trip.baseFare),
+    driverCommissionType: trip.driverCommissionType || "percentage",
+    driverCommissionValue: numeric2(trip.driverCommissionValue),
+    driverCommissionAmount: numeric2(trip.driverCommissionAmount),
     toll: numeric2(trip.finalToll ?? trip.toll),
     parking: numeric2(trip.parking),
     permitCharge: numeric2(trip.permitCharge),
@@ -98040,6 +98048,9 @@ router2.post("/trips", requireOwner, async (req, res) => {
       taxPercent: Number(req.body.taxPercent || 0),
       totalPaid: Number(req.body.advance || req.body.totalPaid || 0)
     });
+    const driverCommissionType = req.body.driverCommissionType === "flat" ? "flat" : "percentage";
+    const driverCommissionValue = Math.max(0, Number(req.body.driverCommissionValue || 0));
+    const driverCommissionAmount = driverCommissionType === "flat" ? driverCommissionValue : Math.round(commercialFare.customerTotal * (driverCommissionValue / 100) * 100) / 100;
     const bookingId = `TRP-${Date.now().toString().slice(-7)}`;
     let driverName = req.body.driverName || null;
     let driverMobile = req.body.driverMobile || null;
@@ -98140,6 +98151,9 @@ router2.post("/trips", requireOwner, async (req, res) => {
       pricingMode: commercialFare.pricingMode,
       packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
       baseFare: String(commercialFare.distanceFare),
+      driverCommissionType,
+      driverCommissionValue: String(driverCommissionValue),
+      driverCommissionAmount: String(driverCommissionAmount),
       driverBata: String(commercialFare.driverBata),
       toll: String(commercialFare.toll),
       parking: String(commercialFare.parking),
@@ -98530,10 +98544,12 @@ router2.post("/driver/trips/:id/complete", async (req, res) => {
     const totalPaid = numeric2(trip.totalPaid);
     const remainingBalance = Math.max(0, Math.round((customerTotal - totalPaid) * 100) / 100);
     const credit = Math.max(0, Math.round((totalPaid - customerTotal) * 100) / 100);
+    const driverCommissionAmount = trip.driverCommissionType === "flat" ? numeric2(trip.driverCommissionValue) : Math.round(customerTotal * (numeric2(trip.driverCommissionValue) / 100) * 100) / 100;
     const [completed] = await db.update(tripsTable).set({
       status: "completed",
       endingKm: String(endKm),
       actualKm: String(actualKm),
+      driverCommissionAmount: String(driverCommissionAmount),
       billingKm: String(chargedKm),
       baseFare: String(recalculatedBase),
       finalToll: String(tollAmount),
@@ -98737,6 +98753,44 @@ router2.post("/expenses/upload-receipt", receiptUpload.single("file"), async (re
     res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to upload the receipt." } });
   }
 });
+var ODOMETER_PHOTOS_BUCKET = "odometer-photos";
+var odometerPhotoUpload = (0, import_multer.default)({
+  storage: import_multer.default.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  // 8MB — a single camera photo, not a video
+  fileFilter: (_req, file2, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    cb(null, allowed.includes(file2.mimetype));
+  }
+});
+router2.post("/driver/trips/upload-km-photo", odometerPhotoUpload.single("file"), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "No photo received, or the file type isn't supported (JPG/PNG/WEBP/HEIC only)." }
+    });
+    return;
+  }
+  try {
+    const viewer = await viewerFor(req);
+    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+    const path = `${viewer?.driverId || viewer?.id || "unknown"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: uploadError } = await supabaseServer.storage.from(ODOMETER_PHOTOS_BUCKET).upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (uploadError) {
+      console.error("[driver/trips/upload-km-photo] Storage upload error:", uploadError);
+      res.status(500).json({
+        success: false,
+        error: { code: "STORAGE_ERROR", message: "Unable to store the odometer photo. Please try again." }
+      });
+      return;
+    }
+    const { data: publicUrlData } = supabaseServer.storage.from(ODOMETER_PHOTOS_BUCKET).getPublicUrl(path);
+    res.json({ success: true, url: publicUrlData.publicUrl, path });
+  } catch (err) {
+    console.error("[driver/trips/upload-km-photo] Error:", err);
+    res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to upload the odometer photo." } });
+  }
+});
 router2.get("/expenses", async (_req, res) => {
   try {
     const rows = await db.select().from(tripExpensesTable).orderBy(desc(tripExpensesTable.createdAt));
@@ -98905,10 +98959,10 @@ router2.get("/settings", requireOwner, async (_req, res) => {
   res.json(await settingsView());
 });
 var CURRENT_APP_VERSION = {
-  versionCode: 8,
-  versionName: "1.3.0",
+  versionCode: 9,
+  versionName: "1.3.1",
   url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
-  releaseNotes: "Trip planner: rate-per-km/package pricing toggle and quick driver assignment, plus an admin trip-start control panel to run the driver's trip stages from the office."
+  releaseNotes: "Fixes the in-app APK download getting stuck at 100% by requesting the Android 13+ notification permission the download progress needs."
 };
 var APP_VERSIONS = {
   owner: CURRENT_APP_VERSION,

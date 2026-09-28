@@ -117,6 +117,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const [pricingMode, setPricingMode] = useState<"per_km" | "package">("per_km");
   const [packageTotal, setPackageTotal] = useState(0);
   const [ratePerKm, setRatePerKm] = useState(defaultRate);
+  const [driverCommissionType, setDriverCommissionType] = useState<"percentage" | "flat">("percentage");
+  const [driverCommissionValue, setDriverCommissionValue] = useState(0);
   const [finalToll, setFinalToll] = useState(0);
   const [parking, setParking] = useState(0);
   const [permitCharge, setPermitCharge] = useState(0);
@@ -352,6 +354,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       setPricingMode(editingTrip.pricingMode === "package" ? "package" : "per_km");
       setPackageTotal(Number(editingTrip.packageTotal || 0));
       setRatePerKm(Number(editingTrip.ratePerKm || defaultRate));
+      setDriverCommissionType(editingTrip.driverCommissionType === "flat" ? "flat" : "percentage");
+      setDriverCommissionValue(Number(editingTrip.driverCommissionValue || 0));
       setFinalToll(Number(editingTrip.finalToll || editingTrip.toll || 0));
       setParking(Number(editingTrip.parking || 0));
       setPermitCharge(Number(editingTrip.permitCharge || 0));
@@ -409,6 +413,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
       setPricingMode("per_km");
       setPackageTotal(0);
       setRatePerKm(defaultRate);
+      setDriverCommissionType("percentage");
+      setDriverCommissionValue(0);
       setFinalToll(0);
       setParking(0);
       setPermitCharge(0);
@@ -511,6 +517,10 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   const customerTotal = commercialFare.customerTotal;
   const remainingBalance = commercialFare.remainingBalance;
   const billableDays = commercialFare.billableDays;
+  // Internal ops figure only — never affects the customer-facing fare above.
+  const driverCommissionAmount = driverCommissionType === "flat"
+    ? driverCommissionValue
+    : Math.round(customerTotal * (driverCommissionValue / 100) * 100) / 100;
 
   const handleNext = () => {
     if (step === 1) {
@@ -649,6 +659,9 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           ratePerKm: String(commercialFare.ratePerKm),
           pricingMode: commercialFare.pricingMode,
           packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
+          driverCommissionType,
+          driverCommissionValue: String(driverCommissionValue),
+          driverCommissionAmount: String(driverCommissionAmount),
           baseFare: String(commercialFare.distanceFare),
           finalToll: String(commercialFare.toll),
           toll: String(commercialFare.toll),
@@ -703,6 +716,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           ratePerKm,
           pricingMode,
           packageTotal,
+          driverCommissionType,
+          driverCommissionValue,
           minimumKmPerDay: 0,
           driverBataPerDay: 0,
           billingDayPolicy,
@@ -1443,6 +1458,40 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         />
                       </div>
                     </div>
+
+                    {/* Driver Commission — internal ops figure, never shown
+                        to the customer and never affects Customer Total Fare. */}
+                    <div className="pt-1 border-t border-border/80 space-y-3">
+                      <div className="flex items-center justify-between bg-background/70 border border-border rounded-lg px-3 py-2.5">
+                        <div>
+                          <span className={`text-[11px] font-bold ${driverCommissionType === "percentage" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                            Commission %
+                          </span>
+                          <span className="text-[10px] text-muted-foreground mx-1.5">/</span>
+                          <span className={`text-[11px] font-bold ${driverCommissionType === "flat" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                            Flat Value
+                          </span>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Driver Commission (internal — not billed to customer)</p>
+                        </div>
+                        <Switch
+                          checked={driverCommissionType === "flat"}
+                          onCheckedChange={(checked) => setDriverCommissionType(checked ? "flat" : "percentage")}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-foreground block mb-1">
+                          {driverCommissionType === "flat" ? "Commission Amount (₹)" : "Commission (% of Customer Total)"}
+                        </label>
+                        <Input
+                          type="number"
+                          value={driverCommissionValue || ""}
+                          onChange={(e) => setDriverCommissionValue(Math.max(0, Number(e.target.value)))}
+                          placeholder={driverCommissionType === "flat" ? "e.g. 500" : "e.g. 10"}
+                          className="bg-card border-border text-xs h-9 font-mono font-bold text-foreground placeholder:text-muted-foreground"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Right Column: Live Itemized Fare Ledger */}
@@ -1491,6 +1540,14 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                         <span className="font-black text-xs text-amber-700 dark:text-amber-400 uppercase">Customer Total Fare:</span>
                         <span className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">{formatINR(customerTotal)}</span>
                       </div>
+                      {driverCommissionValue > 0 && (
+                        <div className="flex justify-between items-center bg-purple-950/10 p-2.5 rounded-lg border border-purple-300 dark:border-purple-500/30">
+                          <span className="text-[11px] font-bold text-purple-700 dark:text-purple-400 uppercase">
+                            Driver Commission {driverCommissionType === "percentage" ? `(${driverCommissionValue}%)` : "(Flat)"}:
+                          </span>
+                          <span className="font-mono font-bold text-purple-700 dark:text-purple-300">{formatINR(driverCommissionAmount)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

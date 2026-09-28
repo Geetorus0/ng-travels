@@ -23,6 +23,7 @@ interface TripDetailPageProps {
   onOpenStartKmModal: (trip: any) => void;
   onOpenEndKmModal: (trip: any) => void;
   onUpdateMilestone: (tripId: number, status: string, note?: string) => Promise<void>;
+  onOpenExpenseModal: (tripId: number) => void;
   onApproveExpense?: (expenseId: number) => void | Promise<void>;
   onRejectExpense?: (expenseId: number) => void | Promise<void>;
   onStatusChange?: (newStatus: string) => void;
@@ -40,6 +41,7 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
   onOpenStartKmModal,
   onOpenEndKmModal,
   onUpdateMilestone,
+  onOpenExpenseModal,
   onApproveExpense,
   onRejectExpense,
   onStatusChange,
@@ -256,15 +258,39 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
               </div>
               <div>
                 <span className="text-muted-foreground text-[10px] block">Starting KM</span>
-                <span className="font-mono font-bold text-foreground text-sm">
-                  {trip.startingKm ? `${trip.startingKm} km` : "Pending"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-foreground text-sm">
+                    {trip.startingKm ? `${trip.startingKm} km` : "Pending"}
+                  </span>
+                  {trip.startKmPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => openExternalUrl(trip.startKmPhoto)}
+                      title="View odometer photo"
+                      className="shrink-0 cursor-pointer"
+                    >
+                      <img src={trip.startKmPhoto} alt="Starting odometer" className="w-6 h-6 rounded object-cover border border-border hover:border-amber-400 transition-colors" />
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground text-[10px] block">Ending KM</span>
-                <span className="font-mono font-bold text-foreground text-sm">
-                  {trip.endingKm ? `${trip.endingKm} km` : "Pending"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-foreground text-sm">
+                    {trip.endingKm ? `${trip.endingKm} km` : "Pending"}
+                  </span>
+                  {trip.endKmPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => openExternalUrl(trip.endKmPhoto)}
+                      title="View odometer photo"
+                      className="shrink-0 cursor-pointer"
+                    >
+                      <img src={trip.endKmPhoto} alt="Ending odometer" className="w-6 h-6 rounded object-cover border border-border hover:border-amber-400 transition-colors" />
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground text-[10px] block">Actual KM Clocked</span>
@@ -402,9 +428,14 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
 
           {/* Operational Expenses for this Trip */}
           <div className="bg-card/70 p-5 rounded-xl border border-border space-y-3">
-            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-              <Fuel className="w-4 h-4 text-rose-700 dark:text-rose-400" /> Operational Expenses ({expenses.length})
-            </h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                <Fuel className="w-4 h-4 text-rose-700 dark:text-rose-400" /> Operational Expenses ({expenses.length})
+              </h2>
+              <Button size="sm" onClick={() => onOpenExpenseModal(trip.id)} className="h-7 text-xs bg-rose-600 hover:bg-rose-500 text-white">
+                <Plus className="w-3 h-3 mr-1" /> Add Expense
+              </Button>
+            </div>
 
             {expenses.length === 0 ? (
               <p className="text-xs text-muted-foreground py-3 text-center">No expenses submitted for this trip.</p>
@@ -555,10 +586,20 @@ export const TripDetailPage: React.FC<TripDetailPageProps> = ({
                 <span>Approved Company Expenses:</span>
                 <span className="font-mono text-rose-700 dark:text-rose-400">{formatINR(trip.expenseTotal || 0)}</span>
               </div>
+              {Number(trip.driverCommissionAmount || 0) > 0 && (
+                <div className="flex justify-between text-muted-foreground text-[11px]">
+                  <span>
+                    Driver Commission {trip.driverCommissionType === "percentage" ? `(${trip.driverCommissionValue}%)` : "(Flat)"}:
+                  </span>
+                  <span className="font-mono text-rose-700 dark:text-rose-400">{formatINR(trip.driverCommissionAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-emerald-700 dark:text-emerald-400">
                 <span>Trip Operating Profit:</span>
                 <span className="font-mono">
-                  {formatINR(Number(trip.customerTotal) - Number(trip.expenseTotal || 0))}
+                  {formatINR(
+                    Number(trip.customerTotal) - Number(trip.expenseTotal || 0) - Number(trip.driverCommissionAmount || 0)
+                  )}
                 </span>
               </div>
             </div>

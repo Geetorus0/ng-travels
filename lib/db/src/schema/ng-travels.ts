@@ -297,6 +297,15 @@ export const tripsTable = pgTable(
     driverBata: numeric("driver_bata", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    // percentage: driverCommissionAmount = customerTotal * driverCommissionValue / 100
+    // flat: driverCommissionAmount = driverCommissionValue (entered directly in ₹)
+    driverCommissionType: text("driver_commission_type").notNull().default("percentage"),
+    driverCommissionValue: numeric("driver_commission_value", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    driverCommissionAmount: numeric("driver_commission_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     toll: numeric("toll", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

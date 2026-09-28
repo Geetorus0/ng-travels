@@ -1,9 +1,9 @@
 import { apiFetch } from "@/lib/apiFetch";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Gauge, CheckCircle2, AlertCircle } from "lucide-react";
+import { Gauge, CheckCircle2, AlertCircle, Camera, X } from "lucide-react";
 import { TripActionLoader, ButtonLoader } from "@/components/loading";
 
 export interface DriverKmModalProps {
@@ -13,6 +13,9 @@ export interface DriverKmModalProps {
   mode: "start" | "end";
   onSuccess: (updatedTrip: any) => void | Promise<void>;
 }
+
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 
 export const DriverKmModal: React.FC<DriverKmModalProps> = ({
   isOpen,
@@ -30,11 +33,40 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!trip) return null;
 
   const startKm = Number(trip.startingKm || 0);
   const endKm = Number(kmValue || 0);
   const calculatedActual = mode === "end" && endKm >= startKm ? endKm - startKm : 0;
+
+  const handlePickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-capturing the same shot after removing it
+    if (!file) return;
+
+    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      setError("Unsupported photo format — please retake with the camera.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError("That photo is too large — please retake it (must be under 8MB).");
+      return;
+    }
+
+    setError(null);
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemovePhoto = () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -48,15 +80,35 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
       return;
     }
 
+    if (!photoFile) {
+      setError("Please take a photo of the odometer reading before submitting.");
+      return;
+    }
+
     setLoading(true);
     try {
+      // Upload the odometer photo first — the KM entry is only recorded
+      // once we have a real photo URL to attach to it, same as the driver
+      // expense flow requiring a receipt before the claim is submitted.
+      const formData = new FormData();
+      formData.append("file", photoFile);
+      const uploadRes = await apiFetch(`/api/driver/trips/upload-km-photo`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => null);
+        throw new Error(errData?.error?.message || "Failed to upload the odometer photo.");
+      }
+      const { url: photoUrl } = await uploadRes.json();
+
       const endpoint = mode === "start"
         ? `/api/driver/trips/${trip.id}/start`
         : `/api/driver/trips/${trip.id}/complete`;
 
       const payload = mode === "start"
-        ? { startingKm: Number(kmValue) }
-        : { endingKm: Number(kmValue) };
+        ? { startingKm: Number(kmValue), photoUrl }
+        : { endingKm: Number(kmValue), photoUrl };
 
       const res = await apiFetch(endpoint, {
         method: "POST",
@@ -76,9 +128,10 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
       // closes and the driver briefly sees the OLD stage/button underneath
       // until the background refetch lands.
       await onSuccess(updatedTrip);
+      handleRemovePhoto();
       onClose();
-    } catch {
-      setError("Network error while submitting odometer reading.");
+    } catch (err: any) {
+      setError(err?.message || "Network error while submitting odometer reading.");
     } finally {
       setLoading(false);
     }
@@ -133,6 +186,54 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
               </div>
             )}
 
+            <div>
+              <label className="text-xs text-amber-700 dark:text-amber-400 font-semibold uppercase block mb-1.5">
+                Upload Odometer Reading Image <span className="text-rose-600 dark:text-rose-400">*</span>
+              </label>
+              {/* accept="image/*" (no PDF/other types) + capture="environment"
+                  together make Android launch the camera app directly with
+                  no gallery/file-picker option — this must stay camera-only,
+                  not a pick-from-gallery upload. */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePickPhoto}
+                className="hidden"
+              />
+
+              {!photoFile ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-500/40 bg-card/60 text-muted-foreground hover:bg-amber-950/10 hover:border-amber-400 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  <span className="text-[11px] font-semibold">Tap to photograph the odometer</span>
+                  <span className="text-[10px] text-muted-foreground">Camera only · JPG/PNG/HEIC · up to 8MB</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-emerald-300 dark:border-emerald-500/40 bg-emerald-950/10">
+                  <img src={photoPreviewUrl || undefined} alt="Odometer preview" className="w-12 h-12 object-cover rounded-lg border border-border shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold text-foreground truncate">{photoFile.name}</div>
+                    <div className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Captured
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-muted-foreground hover:text-rose-700 hover:dark:text-rose-400 cursor-pointer p-1"
+                    title="Retake photo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {error && (
               <div className="bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 rounded p-2.5 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -143,8 +244,8 @@ export const DriverKmModal: React.FC<DriverKmModalProps> = ({
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-5 text-sm"
+              disabled={loading || !photoFile}
+              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold py-5 text-sm disabled:opacity-50"
             >
               {loading ? (
                 <ButtonLoader
