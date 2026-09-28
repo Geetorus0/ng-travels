@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminUserManagementModal, CreateStaffUserData } from "@/components/admin/AdminUserManagementModal";
 import { apiFetch } from "@/lib/apiFetch";
+import { openExternalUrl } from "@/lib/openExternal";
 
 // Fallback shown only until /api/app/version answers (or if it fails) —
 // the server's CURRENT_APP_VERSION (artifacts/api-server/src/routes/ng-travels.ts)
@@ -218,11 +219,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 "One app for everyone — pick Operations Admin or Driver Pilot on the sign-in screen. Full Command Desk, dispatch, live GPS radar, and revenue reports for admins; cockpit HUD, journey roster, odometer capture, and expense claims for drivers."}
             </p>
           </div>
-          <a href={appVersion.url} download={`NG-Travels-v${appVersion.versionName}.apk`}>
-            <Button className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-amber-400/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
-              <Smartphone className="w-4 h-4" /> Download NG-Travels APK
-            </Button>
-          </a>
+          <Button
+            onClick={() => openExternalUrl(appVersion.url)}
+            className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs py-5 px-5 shadow-lg shadow-amber-400/20 flex items-center gap-2 cursor-pointer whitespace-nowrap"
+          >
+            <Smartphone className="w-4 h-4" /> Download NG-Travels APK
+          </Button>
         </div>
       </div>
 
