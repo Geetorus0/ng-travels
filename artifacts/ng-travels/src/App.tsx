@@ -1945,6 +1945,7 @@ function MainApp() {
                     onOpenStartKmModal={(trip) => setDriverKmTrip({ trip, mode: "start" })}
                     onOpenEndKmModal={(trip) => setDriverKmTrip({ trip, mode: "end" })}
                     onUpdateMilestone={handleDriverMilestone}
+                    onOpenExpenseModal={(tripId) => setDriverExpenseTripId(tripId)}
                     onApproveExpense={handleApproveExpense}
                     onRejectExpense={handleRejectExpense}
                   />

@@ -242,6 +242,9 @@ function tripView(
     pricingMode: trip.pricingMode || "per_km",
     packageTotal: trip.packageTotal == null ? null : numeric(trip.packageTotal),
     baseFare: numeric(trip.baseFare),
+    driverCommissionType: trip.driverCommissionType || "percentage",
+    driverCommissionValue: numeric(trip.driverCommissionValue),
+    driverCommissionAmount: numeric(trip.driverCommissionAmount),
     toll: numeric(trip.finalToll ?? trip.toll),
     parking: numeric(trip.parking),
     permitCharge: numeric(trip.permitCharge),
@@ -1687,6 +1690,12 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
       totalPaid: Number(req.body.advance || req.body.totalPaid || 0),
     });
 
+    const driverCommissionType = req.body.driverCommissionType === "flat" ? "flat" : "percentage";
+    const driverCommissionValue = Math.max(0, Number(req.body.driverCommissionValue || 0));
+    const driverCommissionAmount = driverCommissionType === "flat"
+      ? driverCommissionValue
+      : Math.round(commercialFare.customerTotal * (driverCommissionValue / 100) * 100) / 100;
+
     const bookingId = `TRP-${Date.now().toString().slice(-7)}`;
 
     let driverName: string | null = req.body.driverName || null;
@@ -1792,6 +1801,9 @@ router.post("/trips", requireOwner, async (req, res): Promise<void> => {
       pricingMode: commercialFare.pricingMode,
       packageTotal: commercialFare.pricingMode === "package" ? String(commercialFare.packageTotal) : null,
       baseFare: String(commercialFare.distanceFare),
+      driverCommissionType,
+      driverCommissionValue: String(driverCommissionValue),
+      driverCommissionAmount: String(driverCommissionAmount),
       driverBata: String(commercialFare.driverBata),
       toll: String(commercialFare.toll),
       parking: String(commercialFare.parking),
@@ -2354,12 +2366,20 @@ router.post("/driver/trips/:id/complete", async (req, res): Promise<void> => {
     const remainingBalance = Math.max(0, Math.round((customerTotal - totalPaid) * 100) / 100);
     const credit = Math.max(0, Math.round((totalPaid - customerTotal) * 100) / 100);
 
+    // A flat commission stays fixed regardless of the final fare; a
+    // percentage commission is re-derived off the recalculated customer
+    // total so it reflects what actually got charged, not the estimate.
+    const driverCommissionAmount = trip.driverCommissionType === "flat"
+      ? numeric(trip.driverCommissionValue)
+      : Math.round(customerTotal * (numeric(trip.driverCommissionValue) / 100) * 100) / 100;
+
     const [completed] = await db
       .update(tripsTable)
       .set({
         status: "completed",
         endingKm: String(endKm),
         actualKm: String(actualKm),
+        driverCommissionAmount: String(driverCommissionAmount),
         billingKm: String(chargedKm),
         baseFare: String(recalculatedBase),
         finalToll: String(tollAmount),
@@ -2631,6 +2651,57 @@ router.post("/expenses/upload-receipt", receiptUpload.single("file"), async (req
   } catch (err: any) {
     console.error("[expenses/upload-receipt] Error:", err);
     res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to upload the receipt." } });
+  }
+});
+
+const ODOMETER_PHOTOS_BUCKET = "odometer-photos";
+const odometerPhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB — a single camera photo, not a video
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
+
+/**
+ * Upload a starting/ending odometer photo captured live from the device
+ * camera (the client only ever offers a camera capture, never a gallery
+ * picker, so this is proof the meter was actually photographed at that
+ * moment) for the Start Trip / Complete Trip KM entry step.
+ */
+router.post("/driver/trips/upload-km-photo", odometerPhotoUpload.single("file"), async (req, res): Promise<void> => {
+  if (!req.file) {
+    res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "No photo received, or the file type isn't supported (JPG/PNG/WEBP/HEIC only)." },
+    });
+    return;
+  }
+
+  try {
+    const viewer = await viewerFor(req);
+    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+    const path = `${viewer?.driverId || viewer?.id || "unknown"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const { error: uploadError } = await supabaseServer.storage
+      .from(ODOMETER_PHOTOS_BUCKET)
+      .upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (uploadError) {
+      console.error("[driver/trips/upload-km-photo] Storage upload error:", uploadError);
+      res.status(500).json({
+        success: false,
+        error: { code: "STORAGE_ERROR", message: "Unable to store the odometer photo. Please try again." },
+      });
+      return;
+    }
+
+    const { data: publicUrlData } = supabaseServer.storage.from(ODOMETER_PHOTOS_BUCKET).getPublicUrl(path);
+    res.json({ success: true, url: publicUrlData.publicUrl, path });
+  } catch (err: any) {
+    console.error("[driver/trips/upload-km-photo] Error:", err);
+    res.status(500).json({ success: false, error: { code: "SERVER_ERROR", message: "Unable to upload the odometer photo." } });
   }
 });
 
