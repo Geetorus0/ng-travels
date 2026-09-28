@@ -2932,10 +2932,10 @@ router.get("/settings", requireOwner, async (_req, res): Promise<void> => {
  * valid update-check response and can prompt the user to install this one.
  */
 const CURRENT_APP_VERSION = {
-  versionCode: 10,
-  versionName: "1.3.2",
+  versionCode: 11,
+  versionName: "1.3.3",
   url: "https://nihoyzdepvqkypvwpvvy.supabase.co/storage/v1/object/public/app-releases/NG-Travels.apk",
-  releaseNotes: "Owner/admin can now submit trip expenses and add a driver commission (percent or flat). Starting/ending odometer readings require a live camera photo, viewable from the trip detail page.",
+  releaseNotes: "Fixes the Settings page APK download button, which could get stuck at 100% inside the app — it now hands off to Chrome to download and install.",
 };
 const APP_VERSIONS = {
   owner: CURRENT_APP_VERSION,
